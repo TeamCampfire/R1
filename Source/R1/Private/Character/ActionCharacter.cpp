@@ -16,6 +16,11 @@ AActionCharacter::AActionCharacter()
  	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
+	/// 헤드메시 생성
+	HeadMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("HeadMesh"));
+	HeadMesh->SetupAttachment(GetMesh());
+	HeadMesh->SetLeaderPoseComponent(GetMesh());
+
 	/// 카메라 생성 및 세팅
 	FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
 	FirstPersonCamera->SetupAttachment(GetCapsuleComponent());
@@ -28,6 +33,8 @@ AActionCharacter::AActionCharacter()
 	// 크라우치 가능 모드로 세팅
 	// 빈 프로젝트 시작시 기본 비활성화 / Third Person 탬플릿으로 시작하면 활성화 되어 있음
 	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
+	GetCapsuleComponent()->InitCapsuleSize(34.f, 80.f);		// Standing: Radius, HalfHeight
+	GetCharacterMovement()->CrouchedHalfHeight = 60.f;		// Crouch 시 목표 HalfHeight
 
 	// 눈높이(카메라) 포지션
 	DefaultEyeHeight = BaseEyeHeight;
@@ -39,6 +46,7 @@ void AActionCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 	
+	// PC의 카메라 상하각도 세팅
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
 		if (PC->PlayerCameraManager)
@@ -64,7 +72,12 @@ void AActionCharacter::Tick(float DeltaTime)
 	CurrentWorldEyeHeight = FMath::FInterpTo(CurrentWorldEyeHeight, TargetWorldEyeHeight, DeltaTime, CrouchInterpSpeed);
 
 	const float LocalOffset = CurrentWorldEyeHeight - GetActorLocation().Z; // 현재 캡슐 위치 기준으로 역산
-	FirstPersonCamera->SetRelativeLocation(FVector(0.f, 0.f, LocalOffset));
+	FirstPersonCamera->SetRelativeLocation(FVector(
+		FirstPersonCamera->GetRelativeLocation().X, 
+		FirstPersonCamera->GetRelativeLocation().Y,
+		LocalOffset
+	));
+	
 }
 
 // Called to bind functionality to input
@@ -80,7 +93,7 @@ void AActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EIC->BindAction(IA_Look, ETriggerEvent::Triggered, this, &AActionCharacter::OnLookInput);
 
 		// Jump는 눌렀을 때(Started) 시작, 뗐을 때(Completed) 멈춤
-		EIC->BindAction(IA_Jump, ETriggerEvent::Started, this, &ACharacter::Jump);		// 부모클래스의 함수로 바인딩
+		EIC->BindAction(IA_Jump, ETriggerEvent::Started, this, &AActionCharacter::OnJumpPressed);
 		EIC->BindAction(IA_Jump, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 	
 		// 스프린트 (Started/Completed는 모드와 무관하게 항상 둘 다 바인딩)
@@ -105,6 +118,45 @@ void AActionCharacter::SetCrouchInputMode(ECrouchInputMode NewMode)
 	CrouchInputMode = NewMode;
 	UnCrouch(); // 모드 전환 시 안전하게 초기화 (Hold 누르고 있던 중 전환 등)
 	ApplyMovementSettings();
+}
+
+bool AActionCharacter::CanJumpInternal_Implementation() const
+{
+	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+
+	// 엔진 기본 구현에서 "!bIsCrouched" 체크만 제외하고 재구현.
+
+	// CanAttemptJump()를 그대로 쓰면 크라우치 중엔 항상 막힘.
+	// IsJumpAllowed()는 유지하고 크라우치 조건만 제외해서 직접 조합한다.
+	bool bCanJump = MoveComp && MoveComp->IsJumpAllowed()
+		&& (MoveComp->IsMovingOnGround() || MoveComp->IsFalling());
+
+	if (bCanJump)
+	{
+		if (JumpCurrentCount == 0 && MoveComp->IsFalling())
+		{
+			bCanJump = JumpCurrentCount + 1 < JumpMaxCount;
+		}
+		else
+		{
+			bCanJump = JumpCurrentCount < JumpMaxCount;
+		}
+	}
+
+	//UE_LOG(LogTemp, Warning, TEXT("CanJumpInternal called, bIsCrouched=%d, bCanJump=%d"), bIsCrouched, bCanJump);
+
+	return bCanJump;
+}
+
+void AActionCharacter::OnJumped_Implementation()
+{
+	Super::OnJumped_Implementation();
+
+	//UE_LOG(LogTemp, Warning, TEXT("OnJumped_Implementation called! UnCrouching now."));
+	if (bIsCrouched)
+	{
+		UnCrouch(); // 점프가 실제로 발동된 뒤에 크라우치를 풀어준다
+	}
 }
 
 void AActionCharacter::OnMoveAction(const FInputActionValue& InValue)
@@ -134,12 +186,12 @@ void AActionCharacter::OnSprintPressed()
 	{
 		bIsSprinting = !bIsSprinting;	// 누를 때만 반전
 
-		UE_LOG(LogTemp, Log, TEXT("OnSprintPressed  Toggle: %d"), SprintInputMode);
+		//UE_LOG(LogTemp, Log, TEXT("OnSprintPressed  Toggle: %d"), SprintInputMode);
 	}
 	else  // Hold
 	{
 		bIsSprinting = true;
-		UE_LOG(LogTemp, Log, TEXT("OnSprintPressed Started"));
+		//UE_LOG(LogTemp, Log, TEXT("OnSprintPressed Started"));
 	}
 	ApplyMovementSettings();
 }
@@ -150,7 +202,7 @@ void AActionCharacter::OnSprintReleased()
 	{
 		bIsSprinting = false;
 		ApplyMovementSettings();
-		UE_LOG(LogTemp, Log, TEXT("OnSprintPressed Released"));
+		//UE_LOG(LogTemp, Log, TEXT("OnSprintPressed Released"));
 	}
 	// Toggle 모드에서는 뗄 때 아무것도 안 함
 }
@@ -162,20 +214,20 @@ void AActionCharacter::OnCrouchPressed()
 		if (bIsCrouched)
 		{
 			UnCrouch();
-			UE_LOG(LogTemp, Log, TEXT("UnCrouch"));
+			//UE_LOG(LogTemp, Log, TEXT("UnCrouch"));
 		}
 		else
 		{
 			bIsSprinting = false; // 상호배타 규칙 유지
 			Crouch();
-			UE_LOG(LogTemp, Log, TEXT("Crouch"));
+			//UE_LOG(LogTemp, Log, TEXT("Crouch"));
 		}
 	}
 	else // Hold
 	{
 		bIsSprinting = false;
 		Crouch();
-		UE_LOG(LogTemp, Log, TEXT("Crouch Hold"));
+		//UE_LOG(LogTemp, Log, TEXT("Crouch Hold"));
 	}
 	ApplyMovementSettings();
 }
@@ -188,6 +240,11 @@ void AActionCharacter::OnCrouchReleased()
 		ApplyMovementSettings();
 	}
 	// Toggle 모드에서는 뗄 때 아무것도 안 함
+}
+
+void AActionCharacter::OnJumpPressed()
+{
+	Jump();
 }
 
 

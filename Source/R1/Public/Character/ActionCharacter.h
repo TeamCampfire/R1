@@ -53,6 +53,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Movement|Input")
 	void SetCrouchInputMode(ECrouchInputMode NewMode);
 
+	FORCEINLINE bool IsSprinting() const { return bIsSprinting; }
+
+protected:
+	virtual bool CanJumpInternal_Implementation() const override;
+	virtual void OnJumped_Implementation() override;
+
 protected:
 	/// 캐릭터 기본 조작 함수
 	void OnMoveAction(const FInputActionValue& Value);	// 이동
@@ -62,6 +68,8 @@ protected:
 	void OnSprintReleased();	// 스프린트 떼기
 	void OnCrouchPressed();		// 크라우치 누름
 	void OnCrouchReleased();	// 크라우치 떼기
+
+	void OnJumpPressed();		// 점프 누름
 
 	// 무브먼트 값 갱신
 	void ApplyMovementSettings();
@@ -123,6 +131,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Camera|Crouch")
 	float CrouchInterpSpeed = 5.f; // 값이 클수록 더 빠르게 전환됨
 
+	/// Head 메시 (Body는 기본으로 있는거 BP에서 할당해서 사용)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
+	TObjectPtr<USkeletalMeshComponent> HeadMesh;
+
 protected:
 	// 스프린트 모드
 	bool bIsSprinting = false;
@@ -134,7 +146,7 @@ protected:
 
 	// 크라우치 모드
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Input")
-	ECrouchInputMode CrouchInputMode = ECrouchInputMode::Toggle; // 기본 Toggle
+	ECrouchInputMode CrouchInputMode = ECrouchInputMode::Hold; // 기본 Hold
 
 	float DefaultEyeHeight = 0.f;
 	float CurrentWorldEyeHeight = 0.f; // 로컬이 아니라 "월드" 목표 눈높이
