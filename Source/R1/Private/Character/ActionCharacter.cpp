@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Character/ActionCharacter.h"
@@ -7,6 +7,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 
+#include "Component/StatComponent.h"	
 #include "Components/CapsuleComponent.h"
 #include "EnhancedInputComponent.h"
 
@@ -32,6 +33,9 @@ AActionCharacter::AActionCharacter()
 	// 눈높이(카메라) 포지션
 	DefaultEyeHeight = BaseEyeHeight;
 	CurrentWorldEyeHeight = GetActorLocation().Z + DefaultEyeHeight;
+
+	// 스탯 컴포넌트 세팅
+	StatComponent = CreateDefaultSubobject<UStatComponent>(TEXT("StatComponent"));
 }
 
 // Called when the game starts or when spawned
@@ -47,7 +51,10 @@ void AActionCharacter::BeginPlay()
 			PC->PlayerCameraManager->ViewPitchMin = ViewPicthMin;
 		}
 	}
-
+	if (StatComponent)
+	{
+		StatComponent->InitializeStat();
+	}
 	// 이동관련 파라미터 세팅
 	ApplyMovementSettings();
 }
@@ -105,6 +112,11 @@ void AActionCharacter::SetCrouchInputMode(ECrouchInputMode NewMode)
 	CrouchInputMode = NewMode;
 	UnCrouch(); // 모드 전환 시 안전하게 초기화 (Hold 누르고 있던 중 전환 등)
 	ApplyMovementSettings();
+}
+
+UStatComponent* AActionCharacter::GetStatComponent() const
+{
+	return StatComponent;
 }
 
 void AActionCharacter::OnMoveAction(const FInputActionValue& InValue)

@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.25
+﻿/// 최초작성 : 2026.08.25
 /// 작 성 자 : 최 요 환
 
 // Fill out your copyright notice in the Description page of Project Settings.
@@ -7,6 +7,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
+#include "Interface/StatInterface.h"
 #include "ActionCharacter.generated.h"
 
 UENUM(BlueprintType)
@@ -25,9 +26,10 @@ enum class ECrouchInputMode : uint8
 
 class UInputAction;
 class UCameraComponent;
+class UStatComponent;
 
 UCLASS()
-class R1_API AActionCharacter : public ACharacter
+class R1_API AActionCharacter : public ACharacter, public IStatInterface
 {
 	GENERATED_BODY()
 
@@ -53,6 +55,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Movement|Input")
 	void SetCrouchInputMode(ECrouchInputMode NewMode);
 
+	virtual UStatComponent* GetStatComponent() const override;
 protected:
 	/// 캐릭터 기본 조작 함수
 	void OnMoveAction(const FInputActionValue& Value);	// 이동
@@ -135,6 +138,10 @@ protected:
 	// 크라우치 모드
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Input")
 	ECrouchInputMode CrouchInputMode = ECrouchInputMode::Toggle; // 기본 Toggle
+
+	// 스탯 컴포넌트
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	TObjectPtr<UStatComponent> StatComponent = nullptr;
 
 	float DefaultEyeHeight = 0.f;
 	float CurrentWorldEyeHeight = 0.f; // 로컬이 아니라 "월드" 목표 눈높이

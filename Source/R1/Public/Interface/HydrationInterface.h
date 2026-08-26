@@ -1,0 +1,28 @@
+﻿// Fill out your copyright notice in the Description page of Project Settings.
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "UObject/Interface.h"
+#include "HydrationInterface.generated.h"
+
+UINTERFACE(MinimalAPI)
+class UHydrationInterface : public UInterface
+{
+	GENERATED_BODY()
+};
+
+class R1_API IHydrationInterface
+{
+	GENERATED_BODY()
+
+public:
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Hydration")
+	float GetCurrentHydration() const;
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Hydration")
+	bool DecreaseHydration(float inAmount);
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Hydration")
+	void RecoverHydration(float inAmount);
+};
