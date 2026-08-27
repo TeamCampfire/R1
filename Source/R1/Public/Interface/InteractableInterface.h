@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.27
+﻿/// 최초작성 : 2026.08.27
 /// 작 성 자 : 최 요 환
 /// 간단설명 : 조준점(크로스헤어) 대상 상호작용 공통 인터페이스.
 
@@ -45,4 +45,10 @@ public:
 	// 실제 상호작용 처리 — 아이템 픽업이면 인벤토리에 획득, 창고/상자면 UI 오픈 등.
 	UFUNCTION(BlueprintNativeEvent, Category = "Interaction")
 	void Interact(APawn* Interactor);
+
+	// 조준 UI에 같이 표시할 아이콘(선택). 창고/전리품 상자처럼 아이콘이 없는
+	// 상호작용 액터는 오버라이드하지 않으면 되고, 그 경우 UHT가 자동 생성한
+	// 기본 구현이 빈 소프트 포인터를 반환한다 — UI 쪽에서 IsValid 체크로 숨기면 됨.
+	UFUNCTION(BlueprintNativeEvent, Category = "Interaction")
+	TSoftObjectPtr<UTexture2D> GetInteractionIcon() const;
 };

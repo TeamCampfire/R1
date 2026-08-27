@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.27
+﻿/// 최초작성 : 2026.08.27
 /// 작 성 자 : 최 요 환
 /// 간단설명 : 캐릭터에 붙는 상호작용 컴포넌트.
 
@@ -11,7 +11,10 @@
 #include "Engine/EngineTypes.h"
 #include "InteractionComponent.generated.h"
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnInteractableTargetChanged, AActor*, NewTarget, const FText&, DisplayName);
+// Icon은 UI에서 바로 그릴 수 있게 이미 로드된 UTexture2D*로 넘긴다(대상이 바뀔 때만
+// 쏘는 이벤트라 동기 로드해도 비용이 크지 않음) 
+// — TSoftObjectPtr을 그대로 넘기면 UI(WBP) 쪽에서 매번 로드 처리를 해야 해서 델리게이트 소비 쪽이 번거로워진다.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnInteractableTargetChanged, AActor*, NewTarget, const FText&, DisplayName, UTexture2D*, Icon);
 
 /**
  * 캐릭터에 붙는 상호작용 컴포넌트.
@@ -50,6 +53,11 @@ protected:
 private:
 	void UpdateTargeting();
 
+	// Actor의 모든 프리미티브 컴포넌트에 Custom Depth 렌더링을 켜고/끈다 
+	// — 어떤 인터랙터블 액터든(메시 컴포넌트 이름/개수와 무관하게) 공통으로 동작하도록
+	// 인터페이스가 아니라 컴포넌트 순회로 처리한다.
+	void SetActorHighlight(AActor* Actor, bool bEnable) const;
+
 public:
 	// 타겟 감지 거리
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interaction")
@@ -58,6 +66,12 @@ public:
 	/// TODO : 추후 별도 상호작용 트레이스 채널이 생기면 교체
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interaction")
 	TEnumAsByte<ECollisionChannel> TraceChannel = ECC_Visibility;
+
+	// 포스트 프로세스 머티리얼에서 참조할 Custom Depth Stencil 값. 나중에 하이라이트
+	// 색을 여러 종류(예: 획득 가능=흰색, 상호작용 불가=빨강)로 나누고 싶어지면 이
+	// 값을 대상별로 다르게 넘기도록 확장하면 된다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interaction|Highlight")
+	int32 HighlightStencilValue = 1;
 
 	// 타겟 갱신시 브로드캐스트할 델리게이트
 	UPROPERTY(BlueprintAssignable, Category = "Interaction")

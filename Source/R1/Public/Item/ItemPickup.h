@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.27
+﻿/// 최초작성 : 2026.08.27
 /// 작 성 자 : 최 요 환
 /// 간단설명 : 레벨에 배치되거나 드랍으로 스폰되는 "월드 픽업" 액터.
 
@@ -58,6 +58,7 @@ public:
 	virtual FText GetInteractionDisplayName_Implementation() const override;
 	virtual bool CanInteract_Implementation(APawn* Interactor) const override;
 	virtual void Interact_Implementation(APawn* Interactor) override;
+	virtual TSoftObjectPtr<UTexture2D> GetInteractionIcon_Implementation() const override;
 	//~ End IInteractable Interface
 
 protected:

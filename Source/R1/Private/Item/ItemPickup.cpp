@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Item/ItemPickup.h"
@@ -130,6 +130,11 @@ bool AItemPickup::CanInteract_Implementation(APawn* Interactor) const
 void AItemPickup::Interact_Implementation(APawn* Interactor)
 {
 	TryGrantToInventory(Interactor);
+}
+
+TSoftObjectPtr<UTexture2D> AItemPickup::GetInteractionIcon_Implementation() const
+{
+	return ItemData ? ItemData->Icon : nullptr;
 }
 
 void AItemPickup::OnConstruction(const FTransform& Transform)
