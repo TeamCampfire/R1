@@ -23,6 +23,18 @@ enum class EItemCategory : uint8
 };
 
 /**
+ * 월드 픽업(AItemPickup)의 획득 방식. 아이템 종류에 따라 갈리므로 아이템
+ * 정의(UItemDataBase) 쪽 속성으로 둔다 — 예: 무기/방어구/물약은 조준+단축키
+ * (LookAndPress), 무더기로 흩어지는 광석·제작 재료는 근접 시 자동(AutoOnOverlap).
+ */
+UENUM(BlueprintType)
+enum class EPickupMode : uint8
+{
+	LookAndPress	UMETA(DisplayName = "Look + Press to Pick Up"),
+	AutoOnOverlap	UMETA(DisplayName = "Auto Pick Up on Overlap")
+};
+
+/**
  * 장비 슬롯 종류.
  * Head/Chest/Legs/Feet = 외형 전용 방어구 슬롯
  * Weapon/Tool = 손에 드는 슬롯
