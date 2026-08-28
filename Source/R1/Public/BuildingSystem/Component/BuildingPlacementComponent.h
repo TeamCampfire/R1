@@ -29,6 +29,9 @@ public:
 	void StopPlacement(); // 건축물 짓는 거 마무리 지을 때
 	//  ===================================================================================
 
+private:
+	float MaxPlacementDistance = 1500.f; // 최대 건축 지점 거리
+
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Building|Placement")
 	TSubclassOf<class ABuildingPreviewActor> PreviewActorClass; // 생성할 프리뷰 액터 종류 (BP_PreviewBuildingActor를 알기 위함)
@@ -37,7 +40,7 @@ protected:
 	TObjectPtr<ABuildingPreviewActor> PreviewActor; // PreviewActorClass로 생성된, 현재 재사용하고 있는 프리뷰 액터
 
 	UPROPERTY(Transient)
-	TObjectPtr<UBuildingPartDefinition> SelectedDefinition; // 현재 선택한 건축 파츠 데이터
+	TObjectPtr<UBuildingPartDefinition>	SelectedDefinition; // 현재 선택한 건축 파츠 데이터
 
 private:
 	bool bIsPlacing = false; // 현재 건축물 배치중인가요?
