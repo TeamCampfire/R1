@@ -16,10 +16,16 @@ AActionCharacter::AActionCharacter()
  	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
-	/// 헤드메시 생성
+	// Head메시 생성
 	HeadMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("HeadMesh"));
 	HeadMesh->SetupAttachment(GetMesh());
 	HeadMesh->SetLeaderPoseComponent(GetMesh());
+
+	// Leg메시 생성
+	LegMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("LegMesh"));
+	LegMesh->SetupAttachment(GetMesh());
+	LegMesh->SetLeaderPoseComponent(GetMesh());
+	
 
 	/// 카메라 생성 및 세팅
 	FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
@@ -71,12 +77,12 @@ void AActionCharacter::Tick(float DeltaTime)
 
 	CurrentWorldEyeHeight = FMath::FInterpTo(CurrentWorldEyeHeight, TargetWorldEyeHeight, DeltaTime, CrouchInterpSpeed);
 
-	const float LocalOffset = CurrentWorldEyeHeight - GetActorLocation().Z; // 현재 캡슐 위치 기준으로 역산
-	FirstPersonCamera->SetRelativeLocation(FVector(
-		FirstPersonCamera->GetRelativeLocation().X, 
-		FirstPersonCamera->GetRelativeLocation().Y,
-		LocalOffset
-	));
+	//const float LocalOffset = CurrentWorldEyeHeight - GetActorLocation().Z; // 현재 캡슐 위치 기준으로 역산
+	//FirstPersonCamera->SetRelativeLocation(FVector(
+	//	FirstPersonCamera->GetRelativeLocation().X, 
+	//	FirstPersonCamera->GetRelativeLocation().Y,
+	//	LocalOffset
+	//));
 	
 }
 

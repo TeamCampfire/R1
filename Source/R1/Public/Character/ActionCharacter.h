@@ -135,6 +135,10 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
 	TObjectPtr<USkeletalMeshComponent> HeadMesh;
 
+	/// Leg 메시
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
+	TObjectPtr<USkeletalMeshComponent> LegMesh;
+
 protected:
 	// 스프린트 모드
 	bool bIsSprinting = false;
