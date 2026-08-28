@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Components/HarvestableComponent.h"
@@ -8,16 +8,19 @@ UHarvestableComponent::UHarvestableComponent()
 {
 	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
 	// off to improve performance if you don't need them.
-	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.bCanEverTick = false;
 
 	// ...
 }
 
 FHarvestRes UHarvestableComponent::OnHitted_Implementation(AActionCharacter* InCharacter)
 {
+	FHarvestRes Res;
+	if (CurrentHp <= 0) return;
+	if (!InCharacter) return;
+
 	//TODO 세부 로직 구현
 	//TODO ItemData 기반으로 연동
-	FHarvestRes Res;
 
 	// 0. 캐릭터의 현재 무기가 이 액터를 공격할 수 있는 타입인지 확인
 	
@@ -31,11 +34,9 @@ FHarvestRes UHarvestableComponent::OnHitted_Implementation(AActionCharacter* InC
 	// Res.Count = Res.ItemData.Cnt 
 	Res.Count = 1;
 	Res.HarvesResult = true;
-	
+	Res.ItemData = ItemData;
 	// 3-0. 스위트 스팟에 맞은 경우 개수에 배율을 곱해서 반환
 	// Res.Count *= BounusRate;
-
-	UE_LOG(LogTemp, Display, TEXT("자원 [%s]를 %d개 획득!"), *ItemData, Res.Count);
 
 	// 4. 만약 자원 액터의 체력이 0보다 작아지면 OnHarvestEnd() 호출
 	if (CurrentHp <= 0)
@@ -55,6 +56,9 @@ void UHarvestableComponent::OnHarvestEnd_Implementation()
 	UE_LOG(LogTemp, Display, TEXT("자원 액터의 파괴 애니메이션"));
 	// 1. 연출 재생이 끝나면 Destroy
 	UE_LOG(LogTemp, Display, TEXT("자원 액터의 소멸"));
+	//DestroyComponent();
+	GetOwner()->Destroy();
+
 }
 
 // Called when the game starts

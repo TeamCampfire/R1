@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -13,12 +13,12 @@
 
 -----------------------------------------*/
 
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
+UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class R1_API UHarvestableComponent : public UActorComponent, public IHarvestable
 {
 	GENERATED_BODY()
 
-public:	
+public:
 	// Sets default values for this component's properties
 	UHarvestableComponent();
 
@@ -36,15 +36,15 @@ protected:
 protected:
 	//TODO Data 기반으로 초기화
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FString ItemData = "나무";
+	FString ItemData = TEXT("나무");
 
 	//TOOD Data 기반으로 초기화
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 MaxHp;
+	int32 MaxHp = 100.f;
 
 	//TODO Data 기반으로 초기화
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 CurrentHp;
+	int32 CurrentHp = 100.f;
 
 	// Sweet Spot 적중시 곱해질 배율
 	UPROPERTY(BlueprintReadOnly)
