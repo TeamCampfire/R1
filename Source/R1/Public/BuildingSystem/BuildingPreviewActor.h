@@ -22,6 +22,10 @@ protected:
 
 public:
 	void SetDefinition(class UBuildingPartDefinition* Definition);
+
+protected:
+	UFUNCTION(BlueprintCallable)
+	void SetPlacementValid(bool bIsValid); 	// 설치 가능 여부에 맞는 프리뷰 머티리얼 적용
 	//  ===================================================================================
 
 protected:
@@ -31,8 +35,16 @@ protected:
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UStaticMeshComponent> MeshComponent; // Mesh Component
 
+	UPROPERTY(EditDefaultsOnly)
+	TObjectPtr<class UMaterialInterface> ValidPreviewMtrl; // 설치 가능 위치에 표시할 머티리얼 인스턴스
+
+	UPROPERTY(EditDefaultsOnly)
+	TObjectPtr<class UMaterialInterface> InvalidPreviewMtrl; // 설치 불가능한 위치에 표시할 머티리얼 인스턴스
+	
 protected:
 	UPROPERTY(EditAnywhere)
 	TObjectPtr<class UBuildingPartDefinition> PreviewDefinition; // Preview로 보여줄 파츠의 데이터
 
+private:
+	bool bIsPlacementValid = true; // 현재 프리뷰 액터의 설치 가능 표시 상태
 };

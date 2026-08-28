@@ -27,6 +27,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Building|Placement")
 	void StopPlacement(); // 건축물 짓는 거 마무리 지을 때
+
+	UFUNCTION(BlueprintCallable)
+	class ABuildingPreviewActor* GetPreviewActor();
 	//  ===================================================================================
 
 private:

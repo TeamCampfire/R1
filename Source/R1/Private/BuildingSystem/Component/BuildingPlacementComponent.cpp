@@ -164,3 +164,7 @@ void UBuildingPlacementComponent::StopPlacement()
 		PreviewActor->SetActorHiddenInGame(true); // 화면에서 사라져요
 }
 
+ABuildingPreviewActor* UBuildingPlacementComponent::GetPreviewActor()
+{
+	return PreviewActor;
+}
