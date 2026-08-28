@@ -8,8 +8,32 @@
 void UParameterBarWidget::UpdateParameterBar(float inCurrent, float inMax)
 {
 	float Div = FMath::Max(inMax, 0.001f);
-	Bar->SetPercent(inCurrent / Div);
+	TargetPercent = inCurrent / Div;
 	CurrentText->SetText(FText::AsNumber(FMath::FloorToInt(inCurrent)));
+
+	if (GetWorld()->GetTimerManager().IsTimerActive(ParameterBarTimerHandle)) return;
+
+	float DeltaTime = GetWorld()->GetDeltaSeconds();
+	GetWorld()->GetTimerManager().SetTimer(
+		ParameterBarTimerHandle,
+		FTimerDelegate::CreateLambda([this, DeltaTime]()
+			{
+				CurrentPercent = FMath::FInterpTo(
+					CurrentPercent,
+					TargetPercent,
+					DeltaTime,
+					InterpSpeed
+			);
+				Bar->SetPercent(CurrentPercent);
+
+				if (FMath::IsNearlyEqual(CurrentPercent, TargetPercent, 0.001f))
+				{
+					GetWorld()->GetTimerManager().ClearTimer(ParameterBarTimerHandle);
+				}
+			}),
+		DeltaTime,
+		true
+	);
 }
 
 void UParameterBarWidget::NativePreConstruct()
@@ -21,6 +45,12 @@ void UParameterBarWidget::NativePreConstruct()
 		Bar->SetFillColorAndOpacity(FillColor);
 	}
 }
+
+void UParameterBarWidget::SetTargetPercent(float inPercent)
+{
+	TargetPercent = inPercent;
+}
+
 
 #if WITH_EDITOR
 

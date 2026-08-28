@@ -1,12 +1,17 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
+﻿/// 최초작성 : 2026.08.26
+/// 작 성 자 : 강 진 구
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Components/VerticalBoxSlot.h"
 #include "SurvivalStatBarsWidget.generated.h"
 
 class UParameterBarWidget;
+class UParameterBarWidgetTest;
+class UStatusBarWidget;
+class UVerticalBox;
+enum class EStatusEffect:uint8;
 
 /**
  * 
@@ -18,10 +23,17 @@ class R1_API USurvivalStatBarsWidget : public UUserWidget
 	
 protected:
 	virtual void NativeConstruct() override;
+	virtual void NativeDestruct() override;
 
-private:
+	UFUNCTION()
+	void UpdateStatusEffects();
+
 	void InitializeSurvivalStatBars();
+private:
 
+public:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+	TSubclassOf<UStatusBarWidget> StatusBarWidgetClass;
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UParameterBarWidget> HealthBar;
@@ -31,5 +43,11 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UParameterBarWidget> CaloriesBar;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (BindWidget))
+	TObjectPtr<UVerticalBox> Debuffs;
+
+	UPROPERTY()
+	TMap<EStatusEffect, TObjectPtr<UStatusBarWidget>> StatusBarWidgets;
 
 };

@@ -1,5 +1,5 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
+﻿/// 최초작성 : 2026.08.26
+/// 작 성 자 : 강 진 구
 #pragma once
 
 #include "CoreMinimal.h"
@@ -24,6 +24,8 @@ public:
 protected:
 	virtual void NativePreConstruct() override;
 
+	void SetTargetPercent(float inPercent);
+
 #if WITH_EDITOR
 	// #if ~ #endif 사이의 코드는 에디터 상에서만 존재한다.
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& inPropertyChangedEvent) override;
@@ -38,4 +40,11 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FLinearColor FillColor = FLinearColor::White;
+
+	FTimerHandle ParameterBarTimerHandle;
+
+private:
+	float CurrentPercent = 1.0f;
+	float TargetPercent = 0.0f;
+	float InterpSpeed = 5.0f;
 };

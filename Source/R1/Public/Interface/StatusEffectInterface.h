@@ -1,23 +1,26 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
+﻿/// 최초작성 : 2026.08.26
+/// 작 성 자 : 강 진 구
 #pragma once
 
 #include "CoreMinimal.h"
 #include "UObject/Interface.h"
 #include "StatusEffectInterface.generated.h"
 
-UENUM(BlueprintType)
-enum class EStatusEffectType : uint8
+UENUM(BlueprintType, meta = (Bitflags))
+enum class EStatusEffect : uint8
 {
-	None,
-	Cold,
-	FoodPoison,
-	Thirsty,
-	Hungry,
-	Hyperthermia,
-	Hypothermia,
-	Tetanus
+	None		= 0,
+	Cold		= 1 << 0,
+	FoodPoison	= 1	<< 1,
+	Thirsty		= 1 << 2,
+	Hungry		= 1 << 3,
+	Dehydrated	= 1 << 4,
+	Starving	= 1 << 5,
+	Overheat	= 1 << 6,
+	Frostbite	= 1 << 7,
+	//Tetanus		= 1 << 8
 };
+ENUM_CLASS_FLAGS(EStatusEffect)
 
 UINTERFACE(MinimalAPI)
 class UStatusEffectInterface : public UInterface
@@ -31,11 +34,11 @@ class R1_API IStatusEffectInterface
 
 public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Status Effect")
-	EStatusEffectType GetCurrentStatusEffect();
+	EStatusEffect GetCurrentStatusEffect();
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Status Effect")
-	void RemoveStatusEffect(EStatusEffectType inStatusEffectType);
+	void RemoveStatusEffect(EStatusEffect inStatusEffectType);
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Status Effect")
-	void SetStatusEffect(EStatusEffectType inStatusEffectType);
+	void SetStatusEffect(EStatusEffect inStatusEffectType);
 };

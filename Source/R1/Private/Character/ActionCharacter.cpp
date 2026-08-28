@@ -7,6 +7,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 
+#include "Interface/StatusEffectInterface.h"
 #include "Component/StatComponent.h"	
 #include "Components/CapsuleComponent.h"
 #include "EnhancedInputComponent.h"
@@ -205,6 +206,7 @@ void AActionCharacter::OnCrouchReleased()
 
 void AActionCharacter::ApplyMovementSettings()
 {
+	if (StatComponent && EnumHasAnyFlags(StatComponent->Execute_GetCurrentStatusEffect(StatComponent), EStatusEffect::Thirsty | EStatusEffect::Dehydrated)) return;	// 목마름 혹은 탈수일 경우 달리기 금지
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
 		// 이동속도 세팅

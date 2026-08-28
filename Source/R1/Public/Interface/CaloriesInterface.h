@@ -1,5 +1,5 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
+﻿/// 최초작성 : 2026.08.26
+/// 작 성 자 : 강 진 구
 #pragma once
 
 #include "CoreMinimal.h"
@@ -19,6 +19,9 @@ class R1_API ICaloriesInterface
 public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Calories")
 	float GetCurrentCalories() const;
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Calories")
+	float GetMaxCalories() const;
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Calories")
 	bool DecreaseCalories(float inAmount);
