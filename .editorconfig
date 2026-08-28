@@ -1,0 +1,49 @@
+﻿# EditorConfig for Unreal Engine 5 C++ Project (R1)
+# https://editorconfig.org
+
+root = true
+
+# Default rules for all files
+[*]
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+charset = utf-8
+
+# C++ Source and Header files (Unreal Engine Coding Standard)
+# - UTF-8 with BOM is mandatory for MSVC Korean character compilation
+# - Tab indentation with width 4
+[*.{h,hpp,c,cpp,inl}]
+charset = utf-8-bom
+indent_style = tab
+indent_size = 4
+tab_width = 4
+
+# C# files (UnrealBuildTool / Build.cs / Target.cs)
+[*.cs]
+charset = utf-8-bom
+indent_style = tab
+indent_size = 4
+tab_width = 4
+
+# Unreal Engine Configuration files (.ini)
+[*.ini]
+charset = utf-8
+indent_style = space
+indent_size = 4
+
+# JSON, Markdown, YAML files
+[*.{json,md,yml,yaml}]
+charset = utf-8
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = true
+
+# Shell / Batch scripts
+[*.{bat,cmd,ps1}]
+charset = utf-8
+end_of_line = crlf
+
+[*.sh]
+charset = utf-8
+end_of_line = lf

@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -20,7 +20,7 @@ struct FHarvestRes
 	// 떨어질 아이템 DATA
 	// TODO ItemData와 연동
 	UPROPERTY(BlueprintReadOnly)
-	FString ItemData = "떨어질 아이템 Data";
+	FString ItemData = TEXT("떨어질 아이템 Data");
 
 	bool HarvesResult = true;
 };
