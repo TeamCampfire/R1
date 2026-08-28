@@ -8,6 +8,8 @@
 #include "GameFramework/PlayerController.h"
 #include "Components/HarvestableComponent.h"
 
+#include "Component/InteractionComponent.h"
+#include "Component/InventoryComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "EnhancedInputComponent.h"
 
@@ -46,6 +48,10 @@ AActionCharacter::AActionCharacter()
 	// 눈높이(카메라) 포지션
 	DefaultEyeHeight = BaseEyeHeight;
 	CurrentWorldEyeHeight = GetActorLocation().Z + DefaultEyeHeight;
+
+	/// 컴포넌트 생성
+	InteractionComponent = CreateDefaultSubobject<UInteractionComponent>(TEXT("Interact"));
+	InventoryComponent = CreateDefaultSubobject<UInventoryComponent>(TEXT("Inventory"));
 }
 
 // Called when the game starts or when spawned
@@ -110,6 +116,9 @@ void AActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		// 크라우치 (Started/Completed 둘 다 바인딩)
 		EIC->BindAction(IA_Crouch, ETriggerEvent::Started, this, &AActionCharacter::OnCrouchPressed);
 		EIC->BindAction(IA_Crouch, ETriggerEvent::Completed, this, &AActionCharacter::OnCrouchReleased);
+
+		// 상호작용
+		EIC->BindAction(IA_Interact, ETriggerEvent::Started, this, &AActionCharacter::OnInteractPressed);
 
 		EIC->BindAction(IA_Attack, ETriggerEvent::Started, this, &AActionCharacter::OnAttackPressed);
 	}
@@ -287,6 +296,13 @@ void AActionCharacter::OnCrouchReleased()
 void AActionCharacter::OnJumpPressed()
 {
 	Jump();
+}
+
+void AActionCharacter::OnInteractPressed()
+{
+	InteractionComponent->TryInteract();
+
+	//UE_LOG(LogTemp, Log, TEXT("TryInteract()"));
 }
 
 void AActionCharacter::OnAttackPressed()

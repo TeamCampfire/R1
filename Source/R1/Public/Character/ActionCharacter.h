@@ -25,6 +25,8 @@ enum class ECrouchInputMode : uint8
 
 class UInputAction;
 class UCameraComponent;
+class UInventoryComponent;
+class UInteractionComponent;
 
 UCLASS()
 class R1_API AActionCharacter : public ACharacter
@@ -76,9 +78,10 @@ protected:
 	void OnSprintReleased();	// 스프린트 떼기
 	void OnCrouchPressed();		// 크라우치 누름
 	void OnCrouchReleased();	// 크라우치 떼기
-
 	void OnJumpPressed();		// 점프 누름
 	void OnAttackPressed();		// 공격키 누름
+
+	void OnInteractPressed();			// 상호작용 시도
 
 	// 무브먼트 값 갱신
 	void ApplyMovementSettings();
@@ -113,6 +116,11 @@ protected:
 	// 크라우치
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UInputAction> IA_Crouch;
+
+	// 상호작용
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UInputAction> IA_Interact;
+	//------------------------------------------------------------------
 
 	// 공격(좌클릭)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
@@ -169,6 +177,14 @@ protected:
 	/// Head 메시 (Body는 기본으로 있는거 BP에서 할당해서 사용)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
 	TObjectPtr<USkeletalMeshComponent> HeadMesh;
+
+	/// 컴포넌트
+	// 인벤토리
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Component")
+	TObjectPtr<UInventoryComponent> InventoryComponent;
+
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Component")
+	TObjectPtr<UInteractionComponent> InteractionComponent;
 
 	/// Leg 메시
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
