@@ -23,9 +23,11 @@ protected:
 public:
 	void SetDefinition(class UBuildingPartDefinition* Definition);
 
-protected:
 	UFUNCTION(BlueprintCallable)
 	void SetPlacementValid(bool bIsValid); 	// 설치 가능 여부에 맞는 프리뷰 머티리얼 적용
+
+	UFUNCTION(BlueprintCallable)
+	UStaticMeshComponent* GetPreviewMeshComponent();
 	//  ===================================================================================
 
 protected:

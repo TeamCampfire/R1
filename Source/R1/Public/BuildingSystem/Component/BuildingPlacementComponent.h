@@ -29,9 +29,17 @@ public:
 	void StopPlacement(); // 건축물 짓는 거 마무리 지을 때
 
 	UFUNCTION(BlueprintCallable)
-	class ABuildingPreviewActor* GetPreviewActor();
-	//  ===================================================================================
+	class ABuildingPreviewActor* GetPreviewActor(); // Getter함수_PreviewActor
 
+private:
+	// 현재 프리뷰 액터 영역이 다른 오브젝트들과 겹치는지 검사, true : 겹침(설치 불가)
+	// SupportingComponent : 프리뷰를 받치고 있는 지면 컴포넌트
+	bool HasPlacementOverlap(const UPrimitiveComponent* SupportingComponent) const;
+	
+	// 프리뷰 위치를 세팅하고, 겹침 결과에 따라 머티리얼 변경
+	void ShowPreviewAtLocation(const FVector& InPreviewLocation, UPrimitiveComponent* SupportingComponent);
+
+	//  ===================================================================================
 private:
 	// 최대 건축 지점 거리
 	float MaxPlacementDistance = 1000.f;

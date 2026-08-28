@@ -14,7 +14,9 @@ ABuildingPreviewActor::ABuildingPreviewActor()
 
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PreviewMesh"));
 	MeshComponent->SetupAttachment(SceneRoot);
-	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly); // 배치 Overlap 검사에만 사용
+	MeshComponent->SetCollisionResponseToAllChannels(ECR_Overlap);
+	MeshComponent->SetGenerateOverlapEvents(false); // 이벤트 방식이 아니라 직접 Overlap 함수를 호출하므로 비활성화
 
 	bReplicates = false; // 액터를 서버에서 다른 클라로 복제 안할거예요
 }
@@ -59,4 +61,9 @@ void ABuildingPreviewActor::SetPlacementValid(bool bIsValid)
 	{
 		MeshComponent->SetMaterial(SlotIndex, CurMaterial);
 	}
+}
+
+UStaticMeshComponent* ABuildingPreviewActor::GetPreviewMeshComponent()
+{
+	return MeshComponent;
 }

@@ -1,6 +1,7 @@
 #include "BuildingSystem/Component/BuildingPlacementComponent.h"
 #include "Data/Building/BuildingPartDefinition.h"
 #include "BuildingSystem/BuildingPreviewActor.h"
+#include "Engine/OverlapResult.h"
 
 UBuildingPlacementComponent::UBuildingPlacementComponent()
 {
@@ -55,7 +56,10 @@ void UBuildingPlacementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 			VerticalHitResult, ViewLocation, VerticalTraceEnd, ECC_Visibility, CollisionQueryParams);
 
 		if (true == bVerticalHit)
+		{
+			ShowPreviewAtLocation(VerticalHitResult.ImpactPoint, VerticalHitResult.GetComponent());
 			PreviewActor->SetActorHiddenInGame(false);
+		}
 		else
 			PreviewActor->SetActorHiddenInGame(true);
 
@@ -75,7 +79,8 @@ void UBuildingPlacementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 
 	if (true == bForwardHit)
 	{
-		PreviewActor->SetActorLocation(ForwardHitResult.ImpactPoint); // 높이 고려 안 해요
+		// 높이 고려 안 해요
+		ShowPreviewAtLocation(ForwardHitResult.ImpactPoint, ForwardHitResult.GetComponent());
 		PreviewActor->SetActorHiddenInGame(false);
 		return;
 	}
@@ -105,7 +110,7 @@ void UBuildingPlacementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 	float FinalHeight = FMath::Clamp(DesiredHeight, 0.f, CurFoundationLegLength);
 
 	FVector PreviewLocation(MaxDistancePoint.X, MaxDistancePoint.Y, GroundZ + FinalHeight);
-	PreviewActor->SetActorLocation(PreviewLocation);
+	ShowPreviewAtLocation(PreviewLocation,GroundHitResult.GetComponent());
 
 	PreviewActor->SetActorHiddenInGame(false);
 }
@@ -167,4 +172,62 @@ void UBuildingPlacementComponent::StopPlacement()
 ABuildingPreviewActor* UBuildingPlacementComponent::GetPreviewActor()
 {
 	return PreviewActor;
+}
+
+bool UBuildingPlacementComponent::HasPlacementOverlap( const UPrimitiveComponent* SupportingComponent) const
+{
+	if ((false == IsValid(SelectedDefinition)) || false == IsValid(SelectedDefinition->PartMesh)) return true;
+
+	const UStaticMeshComponent* PreviewMeshComponent = PreviewActor->GetPreviewMeshComponent();
+
+	if ((false == IsValid(PreviewMeshComponent)) || (false == IsValid(PreviewMeshComponent->GetStaticMesh()))) return true;
+
+	// 이러한 종류의 물체들과 충돌 검사를 합니다
+	FCollisionObjectQueryParams ObjectQueryParams;
+	ObjectQueryParams.AddObjectTypesToQuery(ECC_WorldStatic);
+	ObjectQueryParams.AddObjectTypesToQuery(ECC_WorldDynamic);
+	ObjectQueryParams.AddObjectTypesToQuery(ECC_PhysicsBody);
+	ObjectQueryParams.AddObjectTypesToQuery(ECC_Pawn);
+
+	// Preview Actor는 충돌 검사에서 제외시켜요
+	FComponentQueryParams QueryParams(SCENE_QUERY_STAT(BuildingPlacementOverlap), PreviewActor);
+
+	// 자기 플레이어도 충돌 검사에서 제외
+	if (const APlayerController* PlayerController = Cast<APlayerController>(GetOwner()))
+	{
+		if (const APawn* ControlledPawn = PlayerController->GetPawn())
+			QueryParams.AddIgnoredActor(ControlledPawn);
+	}
+
+	// Foundation을 받치는 지면 컴포넌트도 검사 대상에서 제외!
+	// 왜냐면요 Foundation 다리는 지면과 겹칠 수 있기 때문에..
+	if (true == IsValid(SupportingComponent))
+		QueryParams.AddIgnoredComponent(SupportingComponent);
+
+	// 진짜 충돌 검사
+	TArray<FOverlapResult> OverlapResults;
+	GetWorld()->ComponentOverlapMulti(
+		OverlapResults, // 발견된 결과 받는 배열
+		PreviewMeshComponent, // 충돌 검사에 사용할 콜리전 모양
+		PreviewMeshComponent->GetComponentLocation(),
+		PreviewMeshComponent->GetComponentQuat(),
+		QueryParams, // 충돌 검사 제외 목록
+		ObjectQueryParams // 충돌 검사 Object Type 목록
+	);
+
+	return OverlapResults.Num() > 0;
+}
+
+void UBuildingPlacementComponent::ShowPreviewAtLocation(const FVector& InPreviewLocation, UPrimitiveComponent* SupportingComponent)
+{
+	if (false == IsValid(PreviewActor)) return;
+
+	// 프리뷰 액터 위치 변경
+	PreviewActor->SetActorLocation(InPreviewLocation);
+
+	// 오브젝트 겹침 검사해서 결과를 얻어요
+	bool bHasOverlap = HasPlacementOverlap(SupportingComponent);
+	
+	PreviewActor->SetPlacementValid(!bHasOverlap); // 여기서 PreviewActor Valid/Invalid 머터리얼 세팅해요
+	PreviewActor->SetActorHiddenInGame(false);
 }
