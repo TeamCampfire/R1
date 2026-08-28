@@ -8,6 +8,8 @@
 #include "GameFramework/PlayerController.h"
 #include "Component/HarvestableComponent.h"
 
+#include "Interface/StatusEffectInterface.h"
+#include "Component/StatComponent.h"	
 #include "Component/InteractionComponent.h"
 #include "Component/InventoryComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -49,6 +51,9 @@ AActionCharacter::AActionCharacter()
 	DefaultEyeHeight = BaseEyeHeight;
 	CurrentWorldEyeHeight = GetActorLocation().Z + DefaultEyeHeight;
 
+	// 스탯 컴포넌트 세팅
+	StatComponent = CreateDefaultSubobject<UStatComponent>(TEXT("StatComponent"));
+
 	/// 컴포넌트 생성
 	InteractionComponent = CreateDefaultSubobject<UInteractionComponent>(TEXT("Interact"));
 	InventoryComponent = CreateDefaultSubobject<UInventoryComponent>(TEXT("Inventory"));
@@ -68,7 +73,10 @@ void AActionCharacter::BeginPlay()
 			PC->PlayerCameraManager->ViewPitchMin = ViewPicthMin;
 		}
 	}
-
+	if (StatComponent)
+	{
+		StatComponent->InitializeStat();
+	}
 	// 이동관련 파라미터 세팅
 	ApplyMovementSettings();
 }
@@ -210,6 +218,11 @@ void AActionCharacter::OnJumped_Implementation()
 	}
 }
 
+UStatComponent* AActionCharacter::GetStatComponent() const
+{
+	return StatComponent;
+}
+
 void AActionCharacter::OnMoveAction(const FInputActionValue& InValue)
 {
 	const FVector2D MoveValue = InValue.Get<FVector2D>();
@@ -323,6 +336,7 @@ void AActionCharacter::OnAttackPressed()
 
 void AActionCharacter::ApplyMovementSettings()
 {
+	if (StatComponent && EnumHasAnyFlags(StatComponent->Execute_GetCurrentStatusEffect(StatComponent), EStatusEffect::Thirsty | EStatusEffect::Dehydrated)) return;	// 목마름 혹은 탈수일 경우 달리기 금지
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
 		// 이동속도 세팅
