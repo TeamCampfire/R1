@@ -6,7 +6,7 @@
 #include "Camera/PlayerCameraManager.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
-#include "Components/HarvestableComponent.h"
+#include "Component/HarvestableComponent.h"
 
 #include "Component/InteractionComponent.h"
 #include "Component/InventoryComponent.h"
