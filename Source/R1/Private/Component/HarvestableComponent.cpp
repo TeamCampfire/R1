@@ -1,6 +1,9 @@
-﻿
+﻿// 08/28 주형진
+
 #include "Component/HarvestableComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "Character/ActionCharacter.h"
+#include "Components/DecalComponent.h"
 
 // Sets default values for this component's properties
 UHarvestableComponent::UHarvestableComponent()
@@ -12,7 +15,7 @@ UHarvestableComponent::UHarvestableComponent()
 	// ...
 }
 
-FHarvestRes UHarvestableComponent::OnHitted_Implementation(AActionCharacter* InCharacter)
+FHarvestRes UHarvestableComponent::OnHitted_Implementation(AActionCharacter* InCharacter, const FVector& HitLocation)
 {
 	FHarvestRes Res;
 	if (CurrentHp <= 0) return Res;
@@ -32,7 +35,19 @@ FHarvestRes UHarvestableComponent::OnHitted_Implementation(AActionCharacter* InC
 	Res.HarvesResult = true;
 	Res.ItemData = ItemData;
 	// 3-0. 스위트 스팟에 맞은 경우 개수에 배율을 곱해서 반환
-	// Res.Count *= BounusRate;
+
+	if (CurrentSweetSpotDecal)
+	{
+		float DistSqr = FVector::DistSquared(HitLocation, CurrentSweetSpotDecal->GetComponentLocation());
+		//TODO 매직넘버 고치리
+		// 반경 15cm를 때렸으면 맞은걸로 처리
+		if (DistSqr <= 15 * 15)
+		{
+			// 소수점 발생시 올림처리
+			Res.Count = FMath::CeilToInt32(Res.Count * BounusRate);
+			GenerateSweetSpot();
+		}
+	}
 
 	// 4. 만약 자원 액터의 체력이 0보다 작아지면 OnHarvestEnd() 호출
 	if (CurrentHp <= 0)
@@ -71,7 +86,7 @@ void UHarvestableComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// ...
+	GenerateSweetSpot();
 	
 }
 
@@ -82,5 +97,79 @@ void UHarvestableComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
 	// ...
+}
+
+void UHarvestableComponent::GenerateSweetSpot()
+{
+
+	FVector SpawnPos;
+	FRotator SpawnRot;
+
+	// 초기 생성
+	if (!CurrentSweetSpotDecal)
+	{
+		
+		//0. 액터의 원점에서 랜덤한 벡터 선정 (높이 제한 60 ~ 100)
+		//0-0 액터의 원점에서 60~100만큼 떨어진 지점에서 시작
+		FVector ActorCenter  = GetOwner()->GetActorLocation();
+		// TODO 매직 넘버 수정
+		ActorCenter.Z += FMath::FRandRange(80.f, 120.f);
+
+		//1. 랜덤한 방향 선정 (yaw만 설정)
+		float RandAngle = FMath::FRandRange(0.f, 360.f);
+		FVector Dir = FRotator(0.0, RandAngle, 0.0).Vector();
+
+		//2. 위에서 선정한 백터 방향으로 10m이동 (큰 나무 생각)
+		FVector TraceStart = ActorCenter + Dir * 1000;
+
+		FVector TraceEnd = ActorCenter;
+
+		FHitResult HitRes;
+
+		// 이렇게 할거면 플레이어는 감지 못하는 채널을 만들던가
+		// 플레이어는 Visibillity에서 영원히 빼던가
+		//if (GetWorld()->LineTraceSingleByChannel(HitRes, TraceStart, TraceEnd, ECC_Visibility))
+
+		// 이렇게하면 이 액터의 컴포넌트들을 대상으로 라인 트레이싱 
+		//2. 해당 지점에서 벡터를 액터의 원점 방향으로 쏴서 데칼 생성
+		FCollisionQueryParams Param;
+		if(GetOwner()->ActorLineTraceSingle(HitRes, TraceStart, TraceEnd, ECC_Visibility, Param))
+		{
+			SpawnPos = HitRes.ImpactPoint;
+			SpawnRot = HitRes.ImpactNormal.Rotation();
+
+			//TODO 매직넘버 고치기
+			FVector DecalSize(10, 10, 10);
+			CurrentSweetSpotDecal = UGameplayStatics::SpawnDecalAtLocation(GetWorld(), SweetSpotDecal, DecalSize, SpawnPos, SpawnRot, 60.f);
+		}
+	}
+	else
+	{
+		// 이미 데칼이 존재하는 상태면
+		// 
+		// 0. 기존 데칼의 상하 20cm까지 움직인다.
+		FVector ActorCenter = GetOwner()->GetActorLocation();
+		//TODO 매직넘버 고치기
+		ActorCenter.Z = FMath::Clamp(CurrentSweetSpotDecal->GetComponentLocation().Z + FMath::FRandRange(-15.f, 15.f), 80.f, 120.f);
+
+		// 1. 기존 데칼의 좌우로 45도까지 회전한다.
+		float RandAngle = FMath::FRandRange(-22.5f, 22.5f) + CurrentSweetSpotDecal->GetComponentRotation().Yaw;
+		FVector Dir = FRotator(0.0, RandAngle, 0.0).Vector();
+
+		// 2. 그 지점에서 다시 ray를 쏴서 맞은 지점에 데칼을 이동 시킨다.
+		FVector TraceStart = ActorCenter + Dir * 1000;
+		FVector TraceEnd = ActorCenter;
+
+		FHitResult HitRes;
+		FCollisionQueryParams Param;
+		if (GetOwner()->ActorLineTraceSingle(HitRes, TraceStart, TraceEnd, ECC_Visibility, Param))
+		{
+			SpawnPos = HitRes.ImpactPoint;
+			SpawnRot = HitRes.ImpactNormal.Rotation();
+			CurrentSweetSpotDecal->SetWorldLocationAndRotation(SpawnPos, SpawnRot);
+		}
+	}
+
+
 }
 

@@ -29,7 +29,7 @@ void UStatComponent::InflictDamage_Implementation(float InAmount)
 {
 	DecreaseParameter(EParameterType::Health, InAmount);
 	//DEBUG
-	UE_LOG(LogTemp, Log, TEXT("HP : %.1f / %.1f"), CurrentHealth, MaxHealth);
+	//ㄴUE_LOG(LogTemp, Log, TEXT("HP : %.1f / %.1f"), CurrentHealth, MaxHealth);
 
 }
 
@@ -37,7 +37,7 @@ void UStatComponent::Heal_Implementation(float InAmount)
 {
 	IncreaseParameter(EParameterType::Health, InAmount);
 	//DEBUG
-	UE_LOG(LogTemp, Log, TEXT("HP : %.1f / %.1f"), CurrentHealth, MaxHealth);
+	//UE_LOG(LogTemp, Log, TEXT("HP : %.1f / %.1f"), CurrentHealth, MaxHealth);
 }
 
 bool UStatComponent::IsAlive() const
@@ -61,7 +61,7 @@ bool UStatComponent::DecreaseCalories_Implementation(float InAmount)
 	DecreaseParameter(EParameterType::Calories, InAmount);
 
 	//DEBUG
-	UE_LOG(LogTemp, Log, TEXT("Calories : %.1f / %.1f"), CurrentCalories, MaxCalories);
+	//UE_LOG(LogTemp, Log, TEXT("Calories : %.1f / %.1f"), CurrentCalories, MaxCalories);
 	return false;
 }
 
@@ -69,7 +69,7 @@ void UStatComponent::RecoverCalories_Implementation(float InAmount)
 {
 	IncreaseParameter(EParameterType::Calories, InAmount);
 	//DEBUG
-	UE_LOG(LogTemp, Log, TEXT("Calories : %.1f / %.1f"), CurrentCalories, MaxCalories);
+	//UE_LOG(LogTemp, Log, TEXT("Calories : %.1f / %.1f"), CurrentCalories, MaxCalories);
 }
 
 float UStatComponent::GetCurrentHydration_Implementation() const
@@ -87,7 +87,7 @@ bool UStatComponent::DecreaseHydration_Implementation(float InAmount)
 	DecreaseParameter(EParameterType::Hydration, InAmount);
 
 	//DEBUG
-	UE_LOG(LogTemp, Log, TEXT("Hydration : %.1f / %.1f"), CurrentHydration, MaxHydration);
+	//UE_LOG(LogTemp, Log, TEXT("Hydration : %.1f / %.1f"), CurrentHydration, MaxHydration);
 	return false;
 }
 
@@ -95,7 +95,7 @@ void UStatComponent::RecoverHydration_Implementation(float InAmount)
 {
 	IncreaseParameter(EParameterType::Hydration, InAmount);
 	//DEBUG
-	UE_LOG(LogTemp, Log, TEXT("Hydration : %.1f / %.1f"), CurrentHydration, MaxHydration);
+	//UE_LOG(LogTemp, Log, TEXT("Hydration : %.1f / %.1f"), CurrentHydration, MaxHydration);
 }
 
 float UStatComponent::GetCurrentTemperature_Implementation() const

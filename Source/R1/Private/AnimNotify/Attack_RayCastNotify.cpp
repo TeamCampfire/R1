@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+﻿// 08/28 주형진
 
 
 #include "AnimNotify/Attack_RayCastNotify.h"

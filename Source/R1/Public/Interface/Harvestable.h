@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+﻿// 08/28 주형진
 
 #pragma once
 
@@ -44,7 +44,7 @@ public:
 
 	// 자원을 획득할 수 있는 대상이 공격 받았을 때 (나무, 돌 등)
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Harvest")
-	FHarvestRes OnHitted(AActionCharacter* InCharacter);
+	FHarvestRes OnHitted(AActionCharacter* InCharacter, const FVector& HitLocation);
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Harvest")
 	void SpawnImpactDecal(const FVector SpawnPoint, const FRotator SpawnRotator);

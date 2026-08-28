@@ -158,7 +158,7 @@ void AActionCharacter::ProcessAttack()
 		if (UHarvestableComponent* HarvestComp = Target->FindComponentByClass<UHarvestableComponent>())
 		{
 			// 자원 획득 진행
-			FHarvestRes HarvRes =  IHarvestable::Execute_OnHitted(HarvestComp, this);
+			FHarvestRes HarvRes =  IHarvestable::Execute_OnHitted(HarvestComp, this, DetectRes.ImpactPoint);
 			if (HarvRes.HarvesResult)
 			{
 				//데칼 소환 호출

@@ -23,7 +23,7 @@ public:
 	UHarvestableComponent();
 
 	// 자원을 획득할 수 있는 대상이 공격 받았을 때 (나무, 돌 등)
-	virtual FHarvestRes OnHitted_Implementation(AActionCharacter* InCharacter) override;
+	virtual FHarvestRes OnHitted_Implementation(AActionCharacter* InCharacter, const FVector& HitLocation) override;
 	// 대상의 체력이 0이되어서 없어질 때 호출될 함수
 	virtual void		OnHarvestEnd_Implementation() override;
 	virtual void		SpawnImpactDecal_Implementation(const FVector SpawnPoint, const FRotator SpawnRotator) override;
@@ -33,6 +33,9 @@ protected:
 	virtual void		BeginPlay() override;
 	// Called every frame
 	virtual void		TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
+	// 맞추면 자원을 더 획득하는 구건을 생성(나무는 빨간 X자 스프레이)
+	void				GenerateSweetSpot();
 
 protected:
 	//TODO Data 기반으로 초기화
@@ -54,4 +57,13 @@ protected:
 	// 공격 받았을때 소환할 데칼
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<TObjectPtr<UMaterial>> ImpactDecals;
+
+	// SweetSpot Decal
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TObjectPtr<UMaterial> SweetSpotDecal;
+
+private:
+	// 실제 생성된 SweetSpotDecal
+	UPROPERTY()
+	TObjectPtr<UDecalComponent> CurrentSweetSpotDecal;
 };
