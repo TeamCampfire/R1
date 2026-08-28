@@ -19,6 +19,9 @@ class R1_API AActionPlayerController : public APlayerController
 {
 	GENERATED_BODY()
 	
+public:
+	AActionPlayerController();
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -27,7 +30,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UInputMappingContext> DefaultMappingContext = nullptr;
 
-
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Building", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<class UBuildingPlacementComponent> BuildingPlacementComponent;
 
 private:
 	// 입력 우선 순위

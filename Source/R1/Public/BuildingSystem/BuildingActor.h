@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "BuildingActor.generated.h"
 
+// 건축 조각들이 모여 만들어진 건축물 하나 단위의 액터 클래스
 UCLASS()
 class R1_API ABuildingActor : public AActor
 {
@@ -18,6 +19,7 @@ protected:
 	virtual void Tick(float DeltaTime) override;
 
 protected:
+	// 건축물에(this) 건축 파츠를 추가하는 함수
 	UFUNCTION(BlueprintCallable, Category = "Building")
 	void AddPart(class UBuildingPartDefinition* Definition, const FTransform& InRelativeTransform);
 
@@ -28,5 +30,5 @@ protected:
 	TObjectPtr<USceneComponent> SceneRoot; // Root Component
 
 	UPROPERTY(Transient)
-	TArray<TObjectPtr<UStaticMeshComponent>> PartComponents;
+	TArray<TObjectPtr<UStaticMeshComponent>> PartComponents; // 건축 파츠들의 메시 컴포넌트를 관리하는 배열
 };
