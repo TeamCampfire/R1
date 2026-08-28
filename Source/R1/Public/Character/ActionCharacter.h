@@ -70,12 +70,18 @@ protected:
 	void OnCrouchReleased();	// 크라우치 떼기
 
 	void OnJumpPressed();		// 점프 누름
+	void OnAttackPressed();		// 공격키 누름
 
 	// 무브먼트 값 갱신
 	void ApplyMovementSettings();
 
 protected:
-	/// 키 맵핑
+
+	/*--------------------------------
+	*			IA 변수
+	--------------------------------*/
+#pragma region IA
+
 	// 이동
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UInputAction> IA_Move;
@@ -95,7 +101,21 @@ protected:
 	// 크라우치
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UInputAction> IA_Crouch;
-	//------------------------------------------------------------------
+
+	// 공격(좌클릭)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UInputAction> IA_Attack;
+#pragma endregion
+
+
+
+	/*--------------------------------
+	*			AM 변수
+	--------------------------------*/
+#pragma region Anim Montage
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UAnimMontage> AM_Attack;
+#pragma endregion
 	
 	/// 카메라
 	// 카메라 컴포넌트

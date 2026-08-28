@@ -39,8 +39,8 @@ AActionCharacter::AActionCharacter()
 	// 크라우치 가능 모드로 세팅
 	// 빈 프로젝트 시작시 기본 비활성화 / Third Person 탬플릿으로 시작하면 활성화 되어 있음
 	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
-	GetCapsuleComponent()->InitCapsuleSize(34.f, 80.f);		// Standing: Radius, HalfHeight
-	GetCharacterMovement()->CrouchedHalfHeight = 60.f;		// Crouch 시 목표 HalfHeight
+	GetCapsuleComponent()->InitCapsuleSize(34.f, 88.f);		// Standing: Radius, HalfHeight
+	GetCharacterMovement()->SetCrouchedHalfHeight(60.f);		// Crouch 시 목표 HalfHeight
 
 	// 눈높이(카메라) 포지션
 	DefaultEyeHeight = BaseEyeHeight;
@@ -109,6 +109,8 @@ void AActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		// 크라우치 (Started/Completed 둘 다 바인딩)
 		EIC->BindAction(IA_Crouch, ETriggerEvent::Started, this, &AActionCharacter::OnCrouchPressed);
 		EIC->BindAction(IA_Crouch, ETriggerEvent::Completed, this, &AActionCharacter::OnCrouchReleased);
+
+		EIC->BindAction(IA_Attack, ETriggerEvent::Started, this, &AActionCharacter::OnAttackPressed);
 	}
 }
 
@@ -251,6 +253,17 @@ void AActionCharacter::OnCrouchReleased()
 void AActionCharacter::OnJumpPressed()
 {
 	Jump();
+}
+
+void AActionCharacter::OnAttackPressed()
+{
+	UE_LOG(LogTemp, Display, TEXT("AttackPressed"));
+	if (!AM_Attack)
+	{
+		UE_LOG(LogTemp, Display, TEXT("AM_Attack was nullptr"));
+		return;
+	}
+	PlayAnimMontage(AM_Attack);
 }
 
 
