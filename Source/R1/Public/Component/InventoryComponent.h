@@ -19,8 +19,28 @@
  */
 
 class UItemDataBase;
+class AItemPickup;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryChanged);
+
+/**
+ * MoveSlot의 결과 — 대상 슬롯이 비어있었는지/같은 아이템이라 합쳐졌는지/다른
+ * 아이템이라 서로 자리를 바꿨는지를 구분해서 돌려준다. 드래그앤드롭 UI에서
+ * 결과에 따라 다른 사운드/이펙트를 재생하고 싶을 때 이 값을 쓰면 된다.
+ */
+UENUM(BlueprintType)
+enum class EMoveSlotResult : uint8
+{
+	Failed,
+	Moved,
+	Merged,
+	Swapped
+};
+
+/**
+ * 인벤토리 데이터 매니저.
+ * 
+ */
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class R1_API UInventoryComponent : public UActorComponent
