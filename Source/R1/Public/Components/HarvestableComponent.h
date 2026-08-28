@@ -26,6 +26,7 @@ public:
 	virtual FHarvestRes OnHitted_Implementation(AActionCharacter* InCharacter) override;
 	// 대상의 체력이 0이되어서 없어질 때 호출될 함수
 	virtual void		OnHarvestEnd_Implementation() override;
+	virtual void		SpawnImpactDecal_Implementation(const FVector SpawnPoint, const FRotator SpawnRotator) override;
 
 protected:
 	// Called when the game starts
@@ -49,4 +50,8 @@ protected:
 	// Sweet Spot 적중시 곱해질 배율
 	UPROPERTY(BlueprintReadOnly)
 	float BounusRate = 1.5f;
+
+	// 공격 받았을때 소환할 데칼
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<TObjectPtr<UMaterial>> ImpactDecals;
 };

@@ -85,7 +85,7 @@ protected:
 
 private:
 	// 공격 범위안에 있는 액터를 반환하는 함수
-	AActor* DetectdObjectInAttackRange();
+	bool DetectdObjectInAttackRange(FHitResult& OutHitRes);
 
 protected:
 

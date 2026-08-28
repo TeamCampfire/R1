@@ -1,7 +1,6 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
-
+﻿
 #include "Components/HarvestableComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 // Sets default values for this component's properties
 UHarvestableComponent::UHarvestableComponent()
@@ -16,8 +15,8 @@ UHarvestableComponent::UHarvestableComponent()
 FHarvestRes UHarvestableComponent::OnHitted_Implementation(AActionCharacter* InCharacter)
 {
 	FHarvestRes Res;
-	if (CurrentHp <= 0) return;
-	if (!InCharacter) return;
+	if (CurrentHp <= 0) return Res;
+	if (!InCharacter) return Res;
 
 	//TODO 세부 로직 구현
 	//TODO ItemData 기반으로 연동
@@ -26,9 +25,6 @@ FHarvestRes UHarvestableComponent::OnHitted_Implementation(AActionCharacter* InC
 	
 	// 1. 무기의 데이터를 기반으로 체력 감소
 	CurrentHp -= 50.f;
-	
-	// 2. 피격 데칼 생성
-	UE_LOG(LogTemp, Display, TEXT("데칼 생성"));
 
 	// 3. 자원 액터의 데이터를 통해서 결과 구조체 생성
 	// Res.Count = Res.ItemData.Cnt 
@@ -59,6 +55,15 @@ void UHarvestableComponent::OnHarvestEnd_Implementation()
 	//DestroyComponent();
 	GetOwner()->Destroy();
 
+}
+
+void UHarvestableComponent::SpawnImpactDecal_Implementation(const FVector SpawnPoint, const FRotator SpawnRotator)
+{
+	if (ImpactDecals.Num() == 0) return;
+	// 데칼 중에서 랜덤으로 선택해 소환
+	int32 RandInt = FMath::RandRange(0, FMath::Max(ImpactDecals.Num() - 1,0));
+	TObjectPtr<UMaterial> CurrDecal = ImpactDecals[RandInt];
+	UGameplayStatics::SpawnDecalAtLocation(GetWorld(), CurrDecal, FVector(10, 10, 10), SpawnPoint, SpawnRotator, 60.f);
 }
 
 // Called when the game starts

@@ -22,7 +22,7 @@ struct FHarvestRes
 	UPROPERTY(BlueprintReadOnly)
 	FString ItemData = TEXT("떨어질 아이템 Data");
 
-	bool HarvesResult = true;
+	bool HarvesResult = false;
 };
 
 // This class does not need to be modified.
@@ -45,6 +45,9 @@ public:
 	// 자원을 획득할 수 있는 대상이 공격 받았을 때 (나무, 돌 등)
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Harvest")
 	FHarvestRes OnHitted(AActionCharacter* InCharacter);
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Harvest")
+	void SpawnImpactDecal(const FVector SpawnPoint, const FRotator SpawnRotator);
 
 	// 대상의 체력이 0이되어서 없어질 때 호출될 함수
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Harvest")

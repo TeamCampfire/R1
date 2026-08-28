@@ -132,15 +132,20 @@ void AActionCharacter::SetCrouchInputMode(ECrouchInputMode NewMode)
 void AActionCharacter::ProcessAttack()
 {
 	//TODO 무기 타입에 따라서 세분화
-	if (AActor* Target = DetectdObjectInAttackRange())
+	FHitResult DetectRes;
+	if (DetectdObjectInAttackRange(DetectRes))
 	{
+		AActor* Target = DetectRes.GetActor();
+
 		// 자원을 얻을 수 있는 대상인지 확인
-		if (UHarvestableComponent* HarvestComt = Target->FindComponentByClass<UHarvestableComponent>())
+		if (UHarvestableComponent* HarvestComp = Target->FindComponentByClass<UHarvestableComponent>())
 		{
 			// 자원 획득 진행
-			FHarvestRes HarvRes =  IHarvestable::Execute_OnHitted(HarvestComt, this);
+			FHarvestRes HarvRes =  IHarvestable::Execute_OnHitted(HarvestComp, this);
 			if (HarvRes.HarvesResult)
 			{
+				//데칼 소환 호출
+				IHarvestable::Execute_SpawnImpactDecal(HarvestComp, DetectRes.ImpactPoint, DetectRes.ImpactNormal.Rotation());
 				UE_LOG(LogTemp, Display, TEXT("자원 [%s]를 %d개 획득!"), *(HarvRes.ItemData), HarvRes.Count);
 			}
 		}
@@ -286,7 +291,6 @@ void AActionCharacter::OnJumpPressed()
 
 void AActionCharacter::OnAttackPressed()
 {
-	UE_LOG(LogTemp, Display, TEXT("AttackPressed"));
 	if (!AM_Attack)
 	{
 		UE_LOG(LogTemp, Display, TEXT("AM_Attack was nullptr"));
@@ -314,25 +318,23 @@ void AActionCharacter::ApplyMovementSettings()
 	}
 }
 
-AActor* AActionCharacter::DetectdObjectInAttackRange()
+bool AActionCharacter::DetectdObjectInAttackRange(FHitResult& OutHitRes)
 {
-	AActor* Res = nullptr;
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
 		if (APlayerCameraManager* CameraManger = PC->PlayerCameraManager)
 		{
 			// 카메라의 위치에서 사정거리만큼 line trace
-			FHitResult HitRes;
 			FVector StartPos = CameraManger->GetCameraLocation();
-			FVector EndPos = StartPos + CameraManger->GetActorForwardVector() * AttackRange;
-			if (GetWorld()->LineTraceSingleByChannel(HitRes, StartPos, EndPos, ECC_Visibility))
-			{
-				// Hit된 Actor을 Res에 세팅
-				Res = HitRes.GetActor();
-				UE_LOG(LogTemp, Display, TEXT("%s"), *Res->GetFName().ToString());
-			}
+			FVector EndPos = StartPos + CameraManger->GetCameraRotation().Vector() * AttackRange;
+
+			// 나는 제외
+			FCollisionQueryParams Params;
+			Params.AddIgnoredActor(this);
+
+			return GetWorld()->LineTraceSingleByChannel(OutHitRes, StartPos, EndPos, ECC_Visibility, Params);
 		}
 	}
-	return Res;
+	return false;
 }
 
