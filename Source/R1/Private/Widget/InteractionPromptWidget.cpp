@@ -56,7 +56,7 @@ void UInteractionPromptWidget::HandleInteractionTargetChanged(AActor* NewTarget,
 		}
 		else
 		{
-			// 아이콘 없는 상호작용 액터(창고 등) — 이미지 슬롯만 숨기고 이름은 그대로 보여준다.
+			// 아이콘 없는 상호작용 액터 — 이미지 슬롯만 숨기고 이름은 그대로 보여준다.
 			TargetIcon->SetVisibility(ESlateVisibility::Collapsed);
 		}
 	}
