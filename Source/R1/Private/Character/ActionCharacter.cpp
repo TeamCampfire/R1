@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Character/ActionCharacter.h"
@@ -6,6 +6,7 @@
 #include "Camera/PlayerCameraManager.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "Components/HarvestableComponent.h"
 
 #include "Components/CapsuleComponent.h"
 #include "EnhancedInputComponent.h"
@@ -127,6 +128,34 @@ void AActionCharacter::SetCrouchInputMode(ECrouchInputMode NewMode)
 	UnCrouch(); // 모드 전환 시 안전하게 초기화 (Hold 누르고 있던 중 전환 등)
 	ApplyMovementSettings();
 }
+
+void AActionCharacter::ProcessAttack()
+{
+	//TODO 무기 타입에 따라서 세분화
+	if (AActor* Target = DetectdObjectInAttackRange())
+	{
+		// 자원을 얻을 수 있는 대상인지 확인
+		if (UHarvestableComponent* HarvestComt = Target->FindComponentByClass<UHarvestableComponent>())
+		{
+			// 자원 획득 진행
+			FHarvestRes HarvRes =  IHarvestable::Execute_OnHitted(HarvestComt, this);
+			if (HarvRes.HarvesResult)
+			{
+				UE_LOG(LogTemp, Display, TEXT("자원 [%s]를 %d개 획득!"), *(HarvRes.ItemData), HarvRes.Count);
+			}
+		}
+		//TOOD 자원이 얻는 대상이 아니라 공격을 받는 대상
+		else if (true)
+		{
+			UE_LOG(LogTemp, Display, TEXT("TODO 공격을 받는 인터페이스 구현"));
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Display, TEXT("아무도 것도 맞지 않았습니다."));
+	}
+}
+
 
 bool AActionCharacter::CanJumpInternal_Implementation() const
 {
@@ -263,7 +292,12 @@ void AActionCharacter::OnAttackPressed()
 		UE_LOG(LogTemp, Display, TEXT("AM_Attack was nullptr"));
 		return;
 	}
-	PlayAnimMontage(AM_Attack);
+
+	if (UAnimInstance* Instance = GetMesh()->GetAnimInstance())
+	{
+		if (!Instance->IsAnyMontagePlaying())
+			PlayAnimMontage(AM_Attack);
+	}
 }
 
 
@@ -278,5 +312,27 @@ void AActionCharacter::ApplyMovementSettings()
 		// 점프파워 세팅
 		MoveComp->JumpZVelocity = JumpPower;
 	}
+}
+
+AActor* AActionCharacter::DetectdObjectInAttackRange()
+{
+	AActor* Res = nullptr;
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		if (APlayerCameraManager* CameraManger = PC->PlayerCameraManager)
+		{
+			// 카메라의 위치에서 사정거리만큼 line trace
+			FHitResult HitRes;
+			FVector StartPos = CameraManger->GetCameraLocation();
+			FVector EndPos = StartPos + CameraManger->GetActorForwardVector() * AttackRange;
+			if (GetWorld()->LineTraceSingleByChannel(HitRes, StartPos, EndPos, ECC_Visibility))
+			{
+				// Hit된 Actor을 Res에 세팅
+				Res = HitRes.GetActor();
+				UE_LOG(LogTemp, Display, TEXT("%s"), *Res->GetFName().ToString());
+			}
+		}
+	}
+	return Res;
 }
 

@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.25
+﻿/// 최초작성 : 2026.08.25
 /// 작 성 자 : 최 요 환
 
 // Fill out your copyright notice in the Description page of Project Settings.
@@ -54,10 +54,18 @@ public:
 	void SetCrouchInputMode(ECrouchInputMode NewMode);
 
 	FORCEINLINE bool IsSprinting() const { return bIsSprinting; }
+	
+	// 공격 프로세스
+	UFUNCTION(BlueprintCallable)
+	void ProcessAttack();
+	
 
 protected:
 	virtual bool CanJumpInternal_Implementation() const override;
 	virtual void OnJumped_Implementation() override;
+
+	// 공격 사거리내에 객체가 있는지 확인하는 함수
+
 
 protected:
 	/// 캐릭터 기본 조작 함수
@@ -74,6 +82,10 @@ protected:
 
 	// 무브먼트 값 갱신
 	void ApplyMovementSettings();
+
+private:
+	// 공격 범위안에 있는 액터를 반환하는 함수
+	AActor* DetectdObjectInAttackRange();
 
 protected:
 
@@ -150,6 +162,9 @@ protected:
 	// 크라우치 카메라 보간 속도
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Camera|Crouch")
 	float CrouchInterpSpeed = 5.f; // 값이 클수록 더 빠르게 전환됨
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
+	float AttackRange = 200.f;
 
 	/// Head 메시 (Body는 기본으로 있는거 BP에서 할당해서 사용)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
