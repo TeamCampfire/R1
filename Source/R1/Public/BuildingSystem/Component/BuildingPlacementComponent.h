@@ -30,7 +30,14 @@ public:
 	//  ===================================================================================
 
 private:
-	float MaxPlacementDistance = 1500.f; // 최대 건축 지점 거리
+	// 최대 건축 지점 거리
+	float MaxPlacementDistance = 1000.f;
+
+	// 최대 건축 지점을 기준으로 위,아래 각각 탐색할 세로 라인트레이스 길이
+	float GroundSearchDistance = 1000.f;
+
+	// Foundation 전용 : 현재 Foundation의 피벗부터 가장 낮은 지점까지의 길이
+	float CurFoundationLegLength = 0.f;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Building|Placement")
