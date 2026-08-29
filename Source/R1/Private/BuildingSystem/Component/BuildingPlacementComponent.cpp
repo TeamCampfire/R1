@@ -1,7 +1,10 @@
 #include "BuildingSystem/Component/BuildingPlacementComponent.h"
+
+#include "Engine/OverlapResult.h"
+#include "../R1.h"
+
 #include "Data/Building/BuildingPartDefinition.h"
 #include "BuildingSystem/BuildingPreviewActor.h"
-#include "Engine/OverlapResult.h"
 
 UBuildingPlacementComponent::UBuildingPlacementComponent()
 {
@@ -225,16 +228,35 @@ void UBuildingPlacementComponent::ShowPreviewAtLocation(const FVector& InPreview
 	// 프리뷰 액터 위치 변경
 	PreviewActor->SetActorLocation(InPreviewLocation);
 
+	// 현재 맞힌 곳이 실제 설치 가능한 지면(옵젝타입:BuildableGround)인지 검사해서 결과를 얻어요
+	const bool bIsSurfaceValid = IsBuildableSurface(SupportingComponent);
+
+	// 지형 경사 각도 검사를 해서 결과를 얻어요
+	const bool bIsSlopeValid = IsGroundSlopeValid(InSurfaceNormal);
+
 	// 오브젝트 겹침 검사해서 결과를 얻어요
-	bool bHasOverlap = HasPlacementOverlap(SupportingComponent);
-
-	// 지형 경사 관련 검사를 해서 결과를 얻어요
-	bool bIsSlopeValid = IsGroundSlopeValid(InSurfaceNormal);
+	const bool bHasOverlap = HasPlacementOverlap(SupportingComponent);
 	
-	bool bIsPreviewValid = (!bHasOverlap) && (bIsSlopeValid);
+	bCanPlace = (bIsSurfaceValid) && (bIsSlopeValid) && (!bHasOverlap);
 
-	PreviewActor->SetPlacementValid(bIsPreviewValid); // 여기서 PreviewActor Valid/Invalid 머터리얼 세팅해요
+	PreviewActor->SetPlacementValid(bCanPlace); // 여기서 PreviewActor Valid/Invalid 머터리얼 세팅해요
 	PreviewActor->SetActorHiddenInGame(false);
+}
+
+bool UBuildingPlacementComponent::IsBuildableSurface(const UPrimitiveComponent* SupportingComponent) const
+{
+	if (false == IsValid(SelectedDefinition)) return false;
+
+	// 건축 파츠의 배치 규칙을 가져옴
+	const FGroundPlacementRule& GroundRule = SelectedDefinition->GroundPlacementRule;
+
+	if (false == GroundRule.bEnabled) return true; // 경사를 신경 안 쓰니 true. 무조건 배치 가능해요
+
+	// 라인트레이스가 유효한 컴포넌트를 맞히지 못했다면 설치 불가!
+	if (false == IsValid(SupportingComponent)) return false;
+
+	// 맞힌 컴포넌트가 BuildableGround 옵젝 타입인지 확인하고 그 결과를 리턴해요
+	return (SupportingComponent->GetCollisionObjectType() == ECC_BUILDABLEGROUND);
 }
 
 bool UBuildingPlacementComponent::IsGroundSlopeValid(const FVector& InSurfaceNormal)

@@ -39,6 +39,9 @@ private:
 	// 프리뷰 위치를 세팅하고, 겹침 결과에 따라 머티리얼 변경
 	void ShowPreviewAtLocation(const FVector& InPreviewLocation, const FVector& InSurfaceNormal, UPrimitiveComponent* SupportingComponent);
 
+	// 현재 맞힌 표면이 선택한 파츠를 배치할 수 있는 표면인지 검사
+	bool IsBuildableSurface(const UPrimitiveComponent* SupportingComponent) const;
+
 	// 현재 표면의 경사가 선택한 파츠의 허용 범위인지 검사
 	bool IsGroundSlopeValid(const FVector& InSurfaceNormal);
 
@@ -62,6 +65,9 @@ protected:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UBuildingPartDefinition>	SelectedDefinition; // 현재 선택한 건축 파츠 데이터
+
+	UPROPERTY(Transient)
+	bool bCanPlace = false; // 현재 프리뷰 위치에 실제 파츠를 설치할 수 있는지요?
 
 private:
 	bool bIsPlacing = false; // 현재 건축물 배치중인가요?

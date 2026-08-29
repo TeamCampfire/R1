@@ -4,3 +4,4 @@
 
 #include "CoreMinimal.h"
 
+#define ECC_BUILDABLEGROUND ECC_GameTraceChannel1
