@@ -31,6 +31,14 @@ public:
 	UFUNCTION(BlueprintCallable)
 	class ABuildingPreviewActor* GetPreviewActor(); // Getter함수_PreviewActor
 
+	// 현재 프리뷰 위치에 건축물 설치를 요청
+	void ConfirmPlacement();
+
+protected:
+	// 클라이언트가 서버에 새로운 건물 생성을 요청
+	UFUNCTION(Server, Reliable)
+	void ServerPlaceNewBuilding(UBuildingPartDefinition* Definition, const FTransform& InPlacementTransform);
+
 private:
 	// 현재 프리뷰 액터 영역이 다른 오브젝트들과 겹치는지 검사, true : 겹침(설치 불가)
 	// SupportingComponent : 프리뷰를 받치고 있는 지면 컴포넌트
@@ -44,6 +52,9 @@ private:
 
 	// 현재 표면의 경사가 선택한 파츠의 허용 범위인지 검사
 	bool IsGroundSlopeValid(const FVector& InSurfaceNormal);
+
+	// 본인이 로컬 플레이어인지 검사. 서버일 때는 본인의 프리뷰 액터만 보여야 하기 때문
+	bool IsLocalPlacementController() const;
 
 	//  ===================================================================================
 private:
@@ -65,6 +76,9 @@ protected:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UBuildingPartDefinition>	SelectedDefinition; // 현재 선택한 건축 파츠 데이터
+
+	UPROPERTY(EditDefaultsOnly, Category = "Building|Placement")
+	TSubclassOf<class ABuildingActor> BuildingActorClass; // 실제 설치 시 생성할 건물 껍데기 액터 클래스
 
 	UPROPERTY(Transient)
 	bool bCanPlace = false; // 현재 프리뷰 위치에 실제 파츠를 설치할 수 있는지요?

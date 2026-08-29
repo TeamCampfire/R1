@@ -27,3 +27,9 @@ void AActionPlayerController::BeginPlay()
 	}
 }
 
+void AActionPlayerController::OnConfirmBuildingPlacement()
+{
+	if (true == IsValid(BuildingPlacementComponent))
+		BuildingPlacementComponent->ConfirmPlacement();
+}
+

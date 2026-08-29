@@ -18,10 +18,10 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 
-protected:
+public:
 	// 건축물에(this) 건축 파츠를 추가하는 함수
 	UFUNCTION(BlueprintCallable, Category = "Building")
-	void AddPart(class UBuildingPartDefinition* Definition, const FTransform& InRelativeTransform);
+	UStaticMeshComponent* AddPart(class UBuildingPartDefinition* Definition, const FTransform& InRelativeTransform);
 
 	//  ===================================================================================
 

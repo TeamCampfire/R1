@@ -1,16 +1,21 @@
 #include "BuildingSystem/Component/BuildingPlacementComponent.h"
 
 #include "Engine/OverlapResult.h"
+#include "Components/StaticMeshComponent.h"
 #include "../R1.h"
 
 #include "Data/Building/BuildingPartDefinition.h"
 #include "BuildingSystem/BuildingPreviewActor.h"
+#include "BuildingSystem/BuildingActor.h"
 
 UBuildingPlacementComponent::UBuildingPlacementComponent()
 {
 	// 평소에는 tick을 꺼두지만, 배치중일 땐 tick을 켜요
 	PrimaryComponentTick.bCanEverTick = true;
 	PrimaryComponentTick.bStartWithTickEnabled = true;
+
+	// PlayerController를 통해 서버 RPC를 호출하기 위해 복제 활성화
+	SetIsReplicatedByDefault(true);
 }
 
 void UBuildingPlacementComponent::BeginPlay()
@@ -24,6 +29,9 @@ void UBuildingPlacementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 
 	if ((false == bIsPlacing) || (nullptr == SelectedDefinition))
 		return;
+
+	// 서버가 가진 원격 PlayerController 사본은 로컬 프리뷰 연산도 하면 안됩니다
+	if (false == IsLocalPlacementController()) return;
 
 	// 컴포넌트가 부착된 컨트롤러 찾아요
 	APlayerController* PlayerController = Cast<APlayerController>(GetOwner());
@@ -120,6 +128,9 @@ void UBuildingPlacementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 
 void UBuildingPlacementComponent::StartPlacement(UBuildingPartDefinition* Definition)
 {
+	// 서버가 가진 원격 PlayerController 사본은 로컬 프리뷰를 생성하면 안됩니다ㅏ
+	if (false == IsLocalPlacementController()) return;
+
 	// 터짐 방지
 	if (false == IsValid(Definition))
 	{
@@ -175,6 +186,87 @@ void UBuildingPlacementComponent::StopPlacement()
 ABuildingPreviewActor* UBuildingPlacementComponent::GetPreviewActor()
 {
 	return PreviewActor;
+}
+
+void UBuildingPlacementComponent::ConfirmPlacement()
+{
+	if (false == bIsPlacing)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UBuildingPlacementComponent::ConfirmPlacement()] : 현재 건축 모드가 아닙니다."));
+		return;
+	}
+
+	if (false == IsValid(SelectedDefinition) || false == IsValid(PreviewActor))
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UBuildingPlacementComponent::ConfirmPlacement()] : 건축 파츠 또는 프리뷰가 없습니다."));
+		return;
+	}
+
+	if (false == bCanPlace)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UBuildingPlacementComponent::ConfirmPlacement()] : 현재 위치에는 설치할 수 없습니다."));
+		return;
+	}
+
+	if (nullptr == BuildingActorClass)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UBuildingPlacementComponent::ConfirmPlacement()] : BuildingActorClass가 설정되지 않았습니다."));
+		return;
+	}
+
+	//UE_LOG(LogTemp, Log, TEXT("ConfirmPlacement: 설치 가능 위치입니다. Location=%s"), *PreviewActor->GetActorLocation().ToString());
+
+	const FTransform PlacementTransform = PreviewActor->GetActorTransform(); // 프리뷰의 트랜스폼 가져오기
+	ServerPlaceNewBuilding(SelectedDefinition.Get(), PlacementTransform); // 실제 건축물 생성은 서버에 요청해요
+}
+
+void UBuildingPlacementComponent::ServerPlaceNewBuilding_Implementation(UBuildingPartDefinition* Definition, const FTransform& InPlacementTransform)
+{
+	if (false == IsValid(Definition))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ServerPlaceNewBuilding : Definition이 유효하지 않습니다."));
+		return;
+	}
+
+	if (nullptr == BuildingActorClass)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ServerPlaceNewBuilding : BuildingActorClass가 설정되지 않았습니다."));
+		return;
+	}
+
+	APlayerController* OwnerController = Cast<APlayerController>(GetOwner());
+	APawn* OwnerPawn = (true == IsValid(OwnerController)) ? OwnerController->GetPawn() : nullptr;
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Owner = OwnerController; // 이 건물을 설치한 PlayerController
+	SpawnParameters.Instigator = OwnerPawn; // 이 건물을 설치한 Pawn
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	// 클라이언트가 보낸 Scale은 사용하지 않음
+	const FTransform SafePlacementTransform(
+		InPlacementTransform.GetRotation(), InPlacementTransform.GetLocation(), FVector::OneVector);
+
+	ABuildingActor* NewBuilding = GetWorld()->SpawnActor<ABuildingActor>(
+			BuildingActorClass, SafePlacementTransform, SpawnParameters);
+
+	if (false == IsValid(NewBuilding))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ServerPlaceNewBuilding : BuildingActor 생성에 실패했습니다."));
+		return;
+	}
+
+	// BuildingActor 자체가 프리뷰 위치에 있으므로 첫 파츠는 건축 껍데기 액터의 원점에 배치
+	UStaticMeshComponent* NewPart = NewBuilding->AddPart(Definition, FTransform::Identity);
+
+	if (false == IsValid(NewPart))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ServerPlaceNewBuilding : 첫 건축 파츠 추가에 실패했습니다."));
+
+		NewBuilding->Destroy(); // 파츠가 없는 빈껍데기 액터를 남기지 않음
+		return;
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("ServerPlaceNewBuilding: 건축물 설치 완료. Location=%s"), *SafePlacementTransform.GetLocation().ToString());
 }
 
 bool UBuildingPlacementComponent::HasPlacementOverlap( const UPrimitiveComponent* SupportingComponent) const
@@ -288,4 +380,11 @@ bool UBuildingPlacementComponent::IsGroundSlopeValid(const FVector& InSurfaceNor
 	float SlopeAngle = FMath::RadiansToDegrees(FMath::Acos(NormalDotUp));
 
 	return SlopeAngle <= GroundRule.MaxSlopeAngle;
+}
+
+bool UBuildingPlacementComponent::IsLocalPlacementController() const
+{
+	APlayerController* OwnerController = Cast<APlayerController>(GetOwner());
+
+	return (true == IsValid(OwnerController)) && OwnerController->IsLocalController();
 }

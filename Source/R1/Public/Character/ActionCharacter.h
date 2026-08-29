@@ -71,6 +71,8 @@ protected:
 
 	void OnJumpPressed();		// 점프 누름
 
+	void OnBuildingPlacementPressed();
+
 	// 무브먼트 값 갱신
 	void ApplyMovementSettings();
 
@@ -95,6 +97,10 @@ protected:
 	// 크라우치
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UInputAction> IA_Crouch;
+
+	// 건축물 설치 확정 좌클릭
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UInputAction> IA_BuildingPlacement;
 	//------------------------------------------------------------------
 	
 	/// 카메라

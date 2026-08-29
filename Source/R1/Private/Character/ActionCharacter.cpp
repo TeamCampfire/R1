@@ -9,6 +9,7 @@
 
 #include "Components/CapsuleComponent.h"
 #include "EnhancedInputComponent.h"
+#include "Character/ActionPlayerController.h"
 
 // Sets default values
 AActionCharacter::AActionCharacter()
@@ -103,6 +104,9 @@ void AActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		// 크라우치 (Started/Completed 둘 다 바인딩)
 		EIC->BindAction(IA_Crouch, ETriggerEvent::Started, this, &AActionCharacter::OnCrouchPressed);
 		EIC->BindAction(IA_Crouch, ETriggerEvent::Completed, this, &AActionCharacter::OnCrouchReleased);
+
+		// 건축 배치
+		EIC->BindAction(IA_BuildingPlacement, ETriggerEvent::Started, this, &AActionCharacter::OnBuildingPlacementPressed);
 	}
 }
 
@@ -245,6 +249,13 @@ void AActionCharacter::OnCrouchReleased()
 void AActionCharacter::OnJumpPressed()
 {
 	Jump();
+}
+
+void AActionCharacter::OnBuildingPlacementPressed()
+{
+	// 플레이어 컨트롤러에게 건축 배치를 맡김
+	if (AActionPlayerController* PlayerController = Cast<AActionPlayerController>(GetController()))
+		PlayerController->OnConfirmBuildingPlacement();
 }
 
 
