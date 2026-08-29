@@ -27,15 +27,31 @@ FHarvestRes UHarvestableComponent::OnHitted_Implementation(AActionCharacter* InC
 	// 2. 피격 피드백(사운드/FX/데칼) 및 스위트스팟 배율 산출
 	const float YieldMultiplier = ProcessHitFeedback(InCharacter, HitLocation, Res.bHitSweetSpot);
 
-	// 3. 일반 타격 아이템 수확
-	CollectYieldItems(HarvestYields, YieldMultiplier, Res.HarvestedItems);
+	// 3. 고갈(파괴) 조건 판정 (Rust 방식)
+	// - 스위트스팟을 쓰는 오브젝트(나무/광석): 피가 다 닳아도 '스위트스팟(X자)을 쳐야만' 최종 파괴 & 보너스 수확!
+	// - 스위트스팟을 안 쓰는 오브젝트(드럼통/상자/시체): 피가 다 닳으면 즉시 파괴 & 보너스 수확!
+	const bool bCanDeplete = (CurrentHp <= 0) && (!bUseSweetSpot || Res.bHitSweetSpot);
 
-	// 4. 고갈(파괴) 처리: 보너스 수확 & 드럼통 바닥 드랍
-	if (CurrentHp <= 0)
+	if (bCanDeplete)
 	{
-		ProcessDepletion(Res.HarvestedItems);
+		CurrentHp = 0.f;
 		Res.bIsDepleted = true;
+
+		// 고갈 보너스 수확 (드럼통은 바닥 드랍, 나무/돌은 인벤토리)
+		ProcessDepletion(YieldMultiplier, Res.HarvestedItems);
+
 		IHarvestable::Execute_OnHarvestEnd(this);
+	}
+	else
+	{
+		// 피가 다 닳았는데 스위트스팟을 안 쳐서 안 부서진 경우: 피를 최소치(1.0f)로 유지하여 쓰러지지 않게 함
+		if (CurrentHp <= 0)
+		{
+			CurrentHp = 1.0f;
+		}
+
+		// 일반 타격 아이템 수확
+		CollectYieldItems(HarvestYields, YieldMultiplier, Res.HarvestedItems);
 	}
 
 	Res.HarvesResult = (Res.HarvestedItems.Num() > 0 || Res.bIsDepleted);
@@ -124,7 +140,7 @@ void UHarvestableComponent::CollectYieldItems(const TArray<FHarvestItemYield>& I
 	}
 }
 
-void UHarvestableComponent::ProcessDepletion(TArray<FHarvestItemResult>& InOutResults)
+void UHarvestableComponent::ProcessDepletion(float Multiplier, TArray<FHarvestItemResult>& InOutResults)
 {
 	CurrentHp = 0.f;
 	if (!bGiveFinalBonus) return;
@@ -133,7 +149,7 @@ void UHarvestableComponent::ProcessDepletion(TArray<FHarvestItemResult>& InOutRe
 	if (FinalBonusYields.Num() > 0)
 	{
 		TArray<FHarvestItemResult> BonusItems;
-		CollectYieldItems(FinalBonusYields, 1.0f, BonusItems);
+		CollectYieldItems(FinalBonusYields, Multiplier, BonusItems);
 
 		if (bDropItemsInWorldOnDepleted)
 		{
@@ -158,18 +174,19 @@ void UHarvestableComponent::ProcessDepletion(TArray<FHarvestItemResult>& InOutRe
 			}
 		}
 	}
-	// 2. 별도 목록 없이 기본 채집량에 배율만 적용하는 경우 (나무, 돌 등)
+	// 2. 별도 목록 없이 기본 채집량에 배율을 주는 경우 (나무, 돌 등)
 	else if (FinalBonusMultiplier > 1.0f)
 	{
-		for (FHarvestItemResult& Item : InOutResults)
-		{
-			Item.Count = FMath::CeilToInt32(Item.Count * FinalBonusMultiplier);
-		}
+		TArray<FHarvestItemResult> BaseItems;
+		CollectYieldItems(HarvestYields, FinalBonusMultiplier * Multiplier, BaseItems);
 
 		if (bDropItemsInWorldOnDepleted)
 		{
-			SpawnWorldPickups(InOutResults);
-			InOutResults.Empty(); // 월드 바닥에 떨궜으므로 인벤토리 반환 리스트는 비움
+			SpawnWorldPickups(BaseItems);
+		}
+		else
+		{
+			InOutResults.Append(BaseItems);
 		}
 	}
 }

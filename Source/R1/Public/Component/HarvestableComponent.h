@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -156,7 +156,7 @@ private:
 	void CollectYieldItems(const TArray<FHarvestItemYield>& InYields, float Multiplier, TArray<FHarvestItemResult>& OutResults);
 
 	// 자원 고갈 및 마무리 보너스 처리 헬퍼 함수
-	void ProcessDepletion(TArray<FHarvestItemResult>& InOutResults);
+	void ProcessDepletion(float Multiplier, TArray<FHarvestItemResult>& InOutResults);
 
 	// 월드 바닥에 AItemPickup 액터 스폰
 	void SpawnWorldPickups(const TArray<FHarvestItemResult>& ItemsToSpawn);
