@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -12,6 +12,9 @@
 	자원을 주는 액터가 가질 액터 컴포넌트
 
 -----------------------------------------*/
+
+class UNiagaraSystem;
+class USoundBase;
 
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class R1_API UHarvestableComponent : public UActorComponent, public IHarvestable
@@ -38,29 +41,99 @@ protected:
 	void				GenerateSweetSpot();
 
 protected:
-	//TODO Data 기반으로 초기화
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FString ItemData = TEXT("나무");
+	// 채집 시 획득할 아이템 목록 (다중 아이템 및 확률 지원)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Item")
+	TArray<FHarvestItemYield> HarvestYields;
 
 	//TOOD Data 기반으로 초기화
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Stats")
 	int32 MaxHp = 100.f;
 
 	//TODO Data 기반으로 초기화
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Stats")
 	int32 CurrentHp = 100.f;
 
+	// Sweet Spot 사용 여부 (false일 경우 시체나 단순 자원처럼 스위트스팟 미니게임 없이 채집)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|SweetSpot")
+	bool bUseSweetSpot = true;
+
 	// Sweet Spot 적중시 곱해질 배율
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|SweetSpot")
 	float BounusRate = 1.5f;
 
+	// Sweet Spot 적중 판정 반경 (cm)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|SweetSpot")
+	float SweetSpotHitRadius = 15.0f;
+
+	// Sweet Spot 생성 최소/최대 높이
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|SweetSpot")
+	float SweetSpotMinHeight = 80.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|SweetSpot")
+	float SweetSpotMaxHeight = 120.0f;
+
+	// Sweet Spot 재배치 시 상하 랜덤 변위
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|SweetSpot")
+	float SweetSpotHeightDeltaRange = 15.0f;
+
+	// Sweet Spot 재배치 시 좌우 랜덤 각도 변위 (Yaw +- deg)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|SweetSpot")
+	float SweetSpotAngleDeltaRange = 22.5f;
+
+	// Sweet Spot 라인트레이스 거리
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|SweetSpot")
+	float SweetSpotTraceDistance = 1000.0f;
+
+	// SweetSpot Decal 크기 및 수명
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|SweetSpot")
+	FVector SweetSpotDecalSize = FVector(10.0f, 10.0f, 10.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|SweetSpot")
+	float SweetSpotDecalLifeSpan = 60.0f;
+
+	// SweetSpot Decal 머티리얼
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|SweetSpot")
+	TObjectPtr<UMaterial> SweetSpotDecal;
+
 	// 공격 받았을때 소환할 데칼
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Decal")
 	TArray<TObjectPtr<UMaterial>> ImpactDecals;
 
-	// SweetSpot Decal
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TObjectPtr<UMaterial> SweetSpotDecal;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Decal")
+	FVector ImpactDecalSize = FVector(10.0f, 10.0f, 10.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Decal")
+	float ImpactDecalLifeSpan = 60.0f;
+
+	// ---- 사운드 및 이펙트 (FX / Audio) ----
+	// 일반 타격 사운드
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|FX")
+	TObjectPtr<USoundBase> HitSound;
+
+	// 스위트 스팟 적중 시 특수 사운드 (X자 타격음)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|FX")
+	TObjectPtr<USoundBase> SweetSpotHitSound;
+
+	// 일반 타격 나이아가라 이펙트 (나무 조각, 돌가루, 피 등)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|FX")
+	TObjectPtr<UNiagaraSystem> HitNiagaraFX;
+
+	// 스위트 스팟 적중 시 나이아가라 이펙트
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|FX")
+	TObjectPtr<UNiagaraSystem> SweetSpotNiagaraFX;
+
+	// ---- 고갈 마무리 보너스 (Final Finish Bonus) ----
+	// 자원 고갈(마지막 타격) 시 보너스 수확 지급 여부
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Bonus")
+	bool bGiveFinalBonus = true;
+
+	// 고갈 시 추가로 지급할 별도 보너스 아이템 목록 (비어있을 경우 기본 HarvestYields에 FinalBonusMultiplier가 적용됨)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Bonus")
+	TArray<FHarvestItemYield> FinalBonusYields;
+
+	// FinalBonusYields가 비어있을 때 기본 채집량에 적용할 고갈 보너스 배율
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Bonus")
+	float FinalBonusMultiplier = 2.0f;
 
 private:
 	// 실제 생성된 SweetSpotDecal

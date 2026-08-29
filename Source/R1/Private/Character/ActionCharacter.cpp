@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Character/ActionCharacter.h"
@@ -14,6 +14,7 @@
 #include "Component/InventoryComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "EnhancedInputComponent.h"
+#include "Data/Item/ItemDataBase.h"
 
 // Sets default values
 AActionCharacter::AActionCharacter()
@@ -161,9 +162,18 @@ void AActionCharacter::ProcessAttack()
 			FHarvestRes HarvRes =  IHarvestable::Execute_OnHitted(HarvestComp, this, DetectRes.ImpactPoint);
 			if (HarvRes.HarvesResult)
 			{
-				//데칼 소환 호출
-				IHarvestable::Execute_SpawnImpactDecal(HarvestComp, DetectRes.ImpactPoint, DetectRes.ImpactNormal.Rotation());
-				UE_LOG(LogTemp, Display, TEXT("자원 [%s]를 %d개 획득!"), *(HarvRes.ItemData), HarvRes.Count);
+				// 획득한 아이템 로그 출력
+				for (const FHarvestItemResult& ItemRes : HarvRes.HarvestedItems)
+				{
+					if (ItemRes.ItemData)
+					{
+						UE_LOG(LogTemp, Display, TEXT("자원 [%s]를 %d개 획득! (스위트스팟: %s, 고갈보너스: %s)"),
+							*(ItemRes.ItemData->DisplayName.ToString()),
+							ItemRes.Count,
+							HarvRes.bHitSweetSpot ? TEXT("O") : TEXT("X"),
+							HarvRes.bIsDepleted ? TEXT("O") : TEXT("X"));
+					}
+				}
 			}
 		}
 		//TOOD 자원이 얻는 대상이 아니라 공격을 받는 대상
