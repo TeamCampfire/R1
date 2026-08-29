@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -15,6 +15,7 @@
 
 class UNiagaraSystem;
 class USoundBase;
+class AItemPickup;
 
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class R1_API UHarvestableComponent : public UActorComponent, public IHarvestable
@@ -44,6 +45,18 @@ protected:
 	// 채집 시 획득할 아이템 목록 (다중 아이템 및 확률 지원)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Item")
 	TArray<FHarvestItemYield> HarvestYields;
+
+	// 고갈(파괴) 시 아이템을 인벤토리로 직접 주지 않고 월드 바닥에 AItemPickup 액터를 스폰하여 드랍할지 여부 (드럼통, 상자 등)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Item")
+	bool bDropItemsInWorldOnDepleted = false;
+
+	// 월드 드랍 시 스폰할 ItemPickup 액터 클래스 (기본: AItemPickup)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Item", meta = (EditCondition = "bDropItemsInWorldOnDepleted"))
+	TSubclassOf<AItemPickup> ItemPickupClass;
+
+	// 월드 드랍 시 퍼지는 랜덤 반경 (cm)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Item", meta = (EditCondition = "bDropItemsInWorldOnDepleted"))
+	float DropImpulseRadius = 60.0f;
 
 	//TOOD Data 기반으로 초기화
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Stats")
@@ -134,6 +147,19 @@ protected:
 	// FinalBonusYields가 비어있을 때 기본 채집량에 적용할 고갈 보너스 배율
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Bonus")
 	float FinalBonusMultiplier = 2.0f;
+
+private:
+	// 피격 피드백(사운드/FX/데칼) 처리 및 스위트스팟 배율 계산
+	float ProcessHitFeedback(AActionCharacter* InCharacter, const FVector& HitLocation, bool& bOutHitSweetSpot);
+
+	// 아이템 수확 계산 헬퍼 함수
+	void CollectYieldItems(const TArray<FHarvestItemYield>& InYields, float Multiplier, TArray<FHarvestItemResult>& OutResults);
+
+	// 자원 고갈 및 마무리 보너스 처리 헬퍼 함수
+	void ProcessDepletion(TArray<FHarvestItemResult>& InOutResults);
+
+	// 월드 바닥에 AItemPickup 액터 스폰
+	void SpawnWorldPickups(const TArray<FHarvestItemResult>& ItemsToSpawn);
 
 private:
 	// 실제 생성된 SweetSpotDecal
