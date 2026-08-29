@@ -37,12 +37,15 @@ private:
 	bool HasPlacementOverlap(const UPrimitiveComponent* SupportingComponent) const;
 	
 	// 프리뷰 위치를 세팅하고, 겹침 결과에 따라 머티리얼 변경
-	void ShowPreviewAtLocation(const FVector& InPreviewLocation, UPrimitiveComponent* SupportingComponent);
+	void ShowPreviewAtLocation(const FVector& InPreviewLocation, const FVector& InSurfaceNormal, UPrimitiveComponent* SupportingComponent);
+
+	// 현재 표면의 경사가 선택한 파츠의 허용 범위인지 검사
+	bool IsGroundSlopeValid(const FVector& InSurfaceNormal);
 
 	//  ===================================================================================
 private:
 	// 최대 건축 지점 거리
-	float MaxPlacementDistance = 1000.f;
+	float MaxPlacementDistance = 800.f;
 
 	// 최대 건축 지점을 기준으로 위,아래 각각 탐색할 세로 라인트레이스 길이
 	float GroundSearchDistance = 1000.f;

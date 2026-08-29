@@ -57,7 +57,7 @@ void UBuildingPlacementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 
 		if (true == bVerticalHit)
 		{
-			ShowPreviewAtLocation(VerticalHitResult.ImpactPoint, VerticalHitResult.GetComponent());
+			ShowPreviewAtLocation(VerticalHitResult.ImpactPoint, VerticalHitResult.ImpactNormal, VerticalHitResult.GetComponent());
 			PreviewActor->SetActorHiddenInGame(false);
 		}
 		else
@@ -80,7 +80,7 @@ void UBuildingPlacementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 	if (true == bForwardHit)
 	{
 		// 높이 고려 안 해요
-		ShowPreviewAtLocation(ForwardHitResult.ImpactPoint, ForwardHitResult.GetComponent());
+		ShowPreviewAtLocation(ForwardHitResult.ImpactPoint, ForwardHitResult.ImpactNormal, ForwardHitResult.GetComponent());
 		PreviewActor->SetActorHiddenInGame(false);
 		return;
 	}
@@ -110,7 +110,7 @@ void UBuildingPlacementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 	float FinalHeight = FMath::Clamp(DesiredHeight, 0.f, CurFoundationLegLength);
 
 	FVector PreviewLocation(MaxDistancePoint.X, MaxDistancePoint.Y, GroundZ + FinalHeight);
-	ShowPreviewAtLocation(PreviewLocation,GroundHitResult.GetComponent());
+	ShowPreviewAtLocation(PreviewLocation, GroundHitResult.ImpactNormal, GroundHitResult.GetComponent());
 
 	PreviewActor->SetActorHiddenInGame(false);
 }
@@ -218,7 +218,7 @@ bool UBuildingPlacementComponent::HasPlacementOverlap( const UPrimitiveComponent
 	return OverlapResults.Num() > 0;
 }
 
-void UBuildingPlacementComponent::ShowPreviewAtLocation(const FVector& InPreviewLocation, UPrimitiveComponent* SupportingComponent)
+void UBuildingPlacementComponent::ShowPreviewAtLocation(const FVector& InPreviewLocation, const FVector& InSurfaceNormal, UPrimitiveComponent* SupportingComponent)
 {
 	if (false == IsValid(PreviewActor)) return;
 
@@ -227,7 +227,43 @@ void UBuildingPlacementComponent::ShowPreviewAtLocation(const FVector& InPreview
 
 	// 오브젝트 겹침 검사해서 결과를 얻어요
 	bool bHasOverlap = HasPlacementOverlap(SupportingComponent);
+
+	// 지형 경사 관련 검사를 해서 결과를 얻어요
+	bool bIsSlopeValid = IsGroundSlopeValid(InSurfaceNormal);
 	
-	PreviewActor->SetPlacementValid(!bHasOverlap); // 여기서 PreviewActor Valid/Invalid 머터리얼 세팅해요
+	bool bIsPreviewValid = (!bHasOverlap) && (bIsSlopeValid);
+
+	PreviewActor->SetPlacementValid(bIsPreviewValid); // 여기서 PreviewActor Valid/Invalid 머터리얼 세팅해요
 	PreviewActor->SetActorHiddenInGame(false);
+}
+
+bool UBuildingPlacementComponent::IsGroundSlopeValid(const FVector& InSurfaceNormal)
+{
+	// 인자 InSurfaceNormal은 HitResult.ImpactNormal이 들어와요 (ShowPreviewAtLocation()로 넘겨옴)
+	// ImpactNormal : 표면을 기준으로 수직으로 뻗어나오는 방향
+	// 표면이 기울수록 노말도 옆으로 기울어짐
+
+	if (false == IsValid(SelectedDefinition)) return false;
+
+	// 건축 파츠의 배치 규칙을 가져옴
+	const FGroundPlacementRule& GroundRule = SelectedDefinition->GroundPlacementRule;
+
+	if (false == GroundRule.bEnabled) return true; // 경사를 신경 안 쓰니 true. 무조건 배치 가능해요
+
+	if (InSurfaceNormal.IsNearlyZero()) return false; // 0에 가까우면 방향이 없다? 각도 계산 못 해요 배치 불가
+
+	FVector NormalizedSurfaceNormal = InSurfaceNormal.GetSafeNormal();
+
+	// 표면 노멀벡터와 업벡터를 내적시키면 표면 노멀과 월드 위쪽 방향 사이의 각도를 알 수 있어요
+	// 표면의 노멀과 업벡터가 가까워질수록 평지에 가까운 것!!! 
+
+	// 내적 결과는 그 사이 각도의 cos값
+	// 부동 소수점 오차 때문에 내적 결과에 오차가 생김 --> Acos의 계산 범위 때문에 Clamp로 감쌈
+	float NormalDotUp = FMath::Clamp(
+		FVector::DotProduct(NormalizedSurfaceNormal, FVector::UpVector), -1.f, 1.f);
+
+	// NormalDotUp은 cos값이라 Acos로 진짜 각도로 추출
+	float SlopeAngle = FMath::RadiansToDegrees(FMath::Acos(NormalDotUp));
+
+	return SlopeAngle <= GroundRule.MaxSlopeAngle;
 }
