@@ -14,6 +14,9 @@
 #include "Component/InventoryComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "EnhancedInputComponent.h"
+#include "Character/ActionPlayerController.h"
+#include "Framework/MainHUD.h"
+#include "Widget/MainHUDWidget.h"
 
 // Sets default values
 AActionCharacter::AActionCharacter()
@@ -129,6 +132,18 @@ void AActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EIC->BindAction(IA_Interact, ETriggerEvent::Started, this, &AActionCharacter::OnInteractPressed);
 
 		EIC->BindAction(IA_Attack, ETriggerEvent::Started, this, &AActionCharacter::OnAttackPressed);
+
+		// 인벤토리 토글
+		EIC->BindAction(IA_InventoryToggle, ETriggerEvent::Started, this, &AActionCharacter::OnInventoryTogglePressed);
+
+		// 벨트슬롯 단축키(1~6) — 인벤토리가 열려있는 동안엔 DefaultMappingContext 자체가 빠져있어서
+		// 이 액션들도 같이 안 눌린다(ActionPlayerController::SetInventoryInputState 참고).
+		EIC->BindAction(IA_Use_BeltSlot_1, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 0);
+		EIC->BindAction(IA_Use_BeltSlot_2, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 1);
+		EIC->BindAction(IA_Use_BeltSlot_3, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 2);
+		EIC->BindAction(IA_Use_BeltSlot_4, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 3);
+		EIC->BindAction(IA_Use_BeltSlot_5, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 4);
+		EIC->BindAction(IA_Use_BeltSlot_6, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 5);
 	}
 }
 
@@ -316,6 +331,39 @@ void AActionCharacter::OnInteractPressed()
 	InteractionComponent->TryInteract();
 
 	//UE_LOG(LogTemp, Log, TEXT("TryInteract()"));
+}
+
+void AActionCharacter::OnInventoryTogglePressed()
+{
+	AActionPlayerController* PC = Cast<AActionPlayerController>(GetController());
+	UE_LOG(LogTemp, Warning, TEXT("[InvToggle] OnInventoryTogglePressed. PC=%s"), *GetNameSafe(PC));
+	if (!PC)
+	{
+		return;
+	}
+
+	AMainHUD* HUD = PC->GetHUD<AMainHUD>();
+	UMainHUDWidget* MainHudWidget = HUD ? HUD->GetMainHudWidget() : nullptr;
+	UE_LOG(LogTemp, Warning, TEXT("[InvToggle] HUD=%s, MainHudWidget=%s"), *GetNameSafe(HUD), *GetNameSafe(MainHudWidget));
+	if (!MainHudWidget)
+	{
+		return;
+	}
+
+	const bool bIsOpen = MainHudWidget->ToggleInventoryPanel();
+	UE_LOG(LogTemp, Warning, TEXT("[InvToggle] ToggleInventoryPanel returned bIsOpen=%d"), bIsOpen);
+	PC->SetInventoryInputState(bIsOpen);
+}
+
+void AActionCharacter::OnUseBeltSlotPressed(int32 BeltIndex)
+{
+	// InventoryComponent 멤버 대신 FindComponentByClass로 찾는다 — BP_PlayerCharacter의
+	// 상속 컴포넌트 템플릿이 깨져서 멤버 포인터가 널로 읽히는 환경 문제가 있어(원인 조사 중),
+	// UInventoryWidget/UBeltBarWidget이 이미 쓰고 있는 것과 같은 방식으로 우회한다.
+	if (UInventoryComponent* Inventory = FindComponentByClass<UInventoryComponent>())
+	{
+		Inventory->UseBeltSlot(BeltIndex);
+	}
 }
 
 void AActionCharacter::OnAttackPressed()

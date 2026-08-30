@@ -29,6 +29,13 @@ class R1_API UItemDataBase : public UPrimaryDataAsset
 	GENERATED_BODY()
 	
 public:
+	//~ Begin UObject Interface
+	virtual void PostLoad() override;
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+	//~ End UObject Interface
+
 	//~ Begin UPrimaryDataAsset Interface
 	virtual FPrimaryAssetId GetPrimaryAssetId() const override;
 	//~ End UPrimaryDataAsset Interface
@@ -56,7 +63,8 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
 	EItemCategory Category = EItemCategory::Misc;
 
-	// 1이면 스택 불가. 장비 아이템은 UEquipmentItemData 생성자에서 1로 고정한다.
+	// 1이면 스택 불가. Equipment/Weapon/Tool은 슬롯당 1개만 보관 가능해야 하므로
+	// PostLoad/PostEditChangeProperty에서 Category를 보고 강제로 1로 고정한다(EnforceStackRulesForCategory).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item", meta = (ClampMin = "1"))
 	int32 MaxStackSize = 1;
 
@@ -66,4 +74,8 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item|Visual")
 	TSoftObjectPtr<UStaticMesh> PickupMesh;
 
+private:
+	// Category가 Equipment/Weapon/Tool이면 MaxStackSize를 1로 강제한다 — 디자이너가
+	// 실수로 다른 값을 넣거나 에디터에서 Category만 바꿔도 즉시(에디터)/로드 시(런타임) 정정된다.
+	void EnforceStackRulesForCategory();
 };
