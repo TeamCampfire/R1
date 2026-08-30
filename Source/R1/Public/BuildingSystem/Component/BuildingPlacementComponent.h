@@ -39,6 +39,18 @@ protected:
 	UFUNCTION(Server, Reliable)
 	void ServerPlaceNewBuilding(UBuildingPartDefinition* Definition, const FTransform& InPlacementTransform);
 
+	// Foundation Type의 지면 배치 프리뷰를 갱신
+	void UpdateFoundationPreview(APlayerController* PlayerController);
+
+	// Structure_Snap Type의 지면 배치 프리뷰를 갱신
+	void UpdateStructureSnapPreview(APlayerController* PlayerController);
+
+	// Structure_Snap 대상 초기화 함수
+	void ClearCurrentSnapTarget();
+
+	// 프리뷰를 설치 불가 상태로 만들고 숨김
+	void HidePlacementPreview();
+
 private:
 	// 현재 프리뷰 액터 영역이 다른 오브젝트들과 겹치는지 검사, true : 겹침(설치 불가)
 	// SupportingComponent : 프리뷰를 받치고 있는 지면 컴포넌트
@@ -68,6 +80,12 @@ private:
 	// 요청받은 Transform에서 실제 메시 콜리전이 장애물과 겹치는지 검사
 	bool HasServerPlacementOverlap(const UBuildingPartDefinition* Definition, const FTransform& InPlacementTransform);
 
+	// 파츠의 PlacementType에 맞는 서버 배치 검사
+	bool IsServerPlacementRuleValid(const UBuildingPartDefinition* Definition, const FTransform& InPlacementTransform);
+
+	// Foundation의 지면·경사·장애물 조건을 검사 (기존)
+	bool IsServerFoundationPlacementValid(const UBuildingPartDefinition* Definition, const FTransform& InPlacementTransform);
+	
 	//  ===================================================================================
 private:
 	// 최대 건축 지점 거리
@@ -97,6 +115,19 @@ protected:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UStaticMeshComponent> ServerValidationMeshComponent; // 서버에서 실제 메시 콜리전 검사에 사용하는 숨겨진 컴포넌트
+
+	UPROPERTY(EditDefaultsOnly, Category = "Building|Snapping", meta = (ClampMin = "0.0"))
+	float StructureSnapTraceDistance = 1000.f; // 카메라에서 기존 건축물을 찾는 라인트레이스 거리
+
+	UPROPERTY(EditDefaultsOnly, Category = "Building|Snapping", meta = (ClampMin = "0.0"))
+	float SnapPointSearchRadius = 200.f; // 조준 위치에서 이 거리 안에 있는 소켓만 후보로 사용
+
+	UPROPERTY(Transient)
+	TWeakObjectPtr<class ABuildingActor> CurrentSnapBuilding; // 현재 프리뷰가 붙어 있는 BuildingActor
+
+	FGuid CurrentSnapTargetPartID; // 현재 프리뷰가 붙어 있는 대상 파츠 ID
+
+	FName CurrentSnapSocketName = NAME_None; // 현재 선택된 소켓 이름
 
 private:
 	bool bIsPlacing = false; // 현재 건축물 배치중인가요?
