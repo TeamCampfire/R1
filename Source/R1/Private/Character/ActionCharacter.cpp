@@ -79,6 +79,15 @@ void AActionCharacter::BeginPlay()
 	}
 	// 이동관련 파라미터 세팅
 	ApplyMovementSettings();
+
+	// 사망 델리게이트 연결
+	if (StatComponent)
+	{
+		StatComponent->OnDeath.AddDynamic(
+			this,
+			&AActionCharacter::Die
+		);
+	}
 }
 
 // Called every frame
@@ -176,6 +185,22 @@ void AActionCharacter::ProcessAttack()
 	{
 		UE_LOG(LogTemp, Display, TEXT("아무도 것도 맞지 않았습니다."));
 	}
+}
+
+void AActionCharacter::Die()
+{
+	// 애니메이션 중지
+	GetMesh()->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+	GetMesh()->Stop();
+	// 메쉬 랙돌 전환
+	GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
+	GetMesh()->SetSimulatePhysics(true);
+	// 컨트롤러 연결 해제
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		PC->UnPossess();
+	}
+
 }
 
 
