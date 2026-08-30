@@ -48,13 +48,25 @@ private:
 	void ShowPreviewAtLocation(const FVector& InPreviewLocation, const FVector& InSurfaceNormal, UPrimitiveComponent* SupportingComponent);
 
 	// 현재 맞힌 표면이 선택한 파츠를 배치할 수 있는 표면인지 검사
-	bool IsBuildableSurface(const UPrimitiveComponent* SupportingComponent) const;
+	bool IsBuildableSurface(const UBuildingPartDefinition* Definition, const UPrimitiveComponent* SupportingComponent) const;
 
 	// 현재 표면의 경사가 선택한 파츠의 허용 범위인지 검사
-	bool IsGroundSlopeValid(const FVector& InSurfaceNormal);
+	bool IsGroundSlopeValid(const UBuildingPartDefinition* Definition, const FVector& InSurfaceNormal);
 
 	// 본인이 로컬 플레이어인지 검사. 서버일 때는 본인의 프리뷰 액터만 보여야 하기 때문
 	bool IsLocalPlacementController() const;
+
+	// 요청한 설치 위치가 서버에서 허용하는 거리 안인지 검사
+	bool IsWithinServerPlacementDistance(const FVector& InPlacementLocation) const;
+
+	// 설치 요청 위치 아래에서 Foundation을 지지할 BuildableGround 탐색 (서버용)
+	bool FindSupportingGround(const UBuildingPartDefinition* Definition, const FVector& InPlacementLocation, struct FHitResult& OutGroundHit) const;
+
+	// 서버 겹침 검사용 테스트 메시 컴포넌트를 최초 한 번 생성한 뒤 재사용할 예정
+	UStaticMeshComponent* GetOrCreateServerValidationMesh();
+
+	// 요청받은 Transform에서 실제 메시 콜리전이 장애물과 겹치는지 검사
+	bool HasServerPlacementOverlap(const UBuildingPartDefinition* Definition, const FTransform& InPlacementTransform);
 
 	//  ===================================================================================
 private:
@@ -82,6 +94,9 @@ protected:
 
 	UPROPERTY(Transient)
 	bool bCanPlace = false; // 현재 프리뷰 위치에 실제 파츠를 설치할 수 있는지요?
+
+	UPROPERTY(Transient)
+	TObjectPtr<UStaticMeshComponent> ServerValidationMeshComponent; // 서버에서 실제 메시 콜리전 검사에 사용하는 숨겨진 컴포넌트
 
 private:
 	bool bIsPlacing = false; // 현재 건축물 배치중인가요?

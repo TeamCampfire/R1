@@ -237,14 +237,63 @@ void UBuildingPlacementComponent::ServerPlaceNewBuilding_Implementation(UBuildin
 	APlayerController* OwnerController = Cast<APlayerController>(GetOwner());
 	APawn* OwnerPawn = (true == IsValid(OwnerController)) ? OwnerController->GetPawn() : nullptr;
 
+	// 비정상적인 Transform이 사용되는 걸 방지해요
+	if (InPlacementTransform.ContainsNaN())
+	{
+		UE_LOG(LogTemp, Warning,TEXT("ServerPlaceNewBuilding : 유효하지 않은 Transform 요청입니다."));
+		return;
+	}
+
+	// 건축 위치가 최대 설치 거리(수평 기준) 안인지 검사해요
+	const FVector PlacementLocation = InPlacementTransform.GetLocation();
+	if (false == IsWithinServerPlacementDistance(PlacementLocation))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ServerPlaceNewBuilding : 허용 거리를 벗어난 설치 요청입니다. Location=%s"),*PlacementLocation.ToString());
+		return;
+	}
+
+	const FGroundPlacementRule& GroundRule = Definition->GroundPlacementRule;
+	if (true == GroundRule.bEnabled)
+	{
+		FHitResult GroundHit;
+
+		//  지면이 다리가 닿는 범위 안에 있는지 검사해요
+		if (false == FindSupportingGround(Definition, InPlacementTransform.GetLocation(), GroundHit))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("ServerPlaceNewBuilding : 파츠를 지지할 지면이 없습니다."));
+			return;
+		}
+
+		if (false == IsBuildableSurface(Definition, GroundHit.GetComponent()))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("ServerPlaceNewBuilding : BuildableGround가 아닌 표면입니다."));
+			return;
+		}
+
+		// 지면 ImpactNormal을 이용해 파츠 배치 최대 경사각을 넘는지 검사해요
+		if (false == IsGroundSlopeValid(Definition, GroundHit.ImpactNormal))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("ServerPlaceNewBuilding: 허용되지 않는 지면 경사입니다."));
+			return;
+		}
+	}
+
+	// 클라이언트가 전달한 임의의 Scale은 사용하지 않습니다
+	const FTransform SafePlacementTransform(InPlacementTransform.GetRotation(), InPlacementTransform.GetLocation(), FVector::OneVector);
+	if (true == HasServerPlacementOverlap(Definition, SafePlacementTransform))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ServerPlaceNewBuilding: 장애물과 겹치는 설치 요청입니다."));
+		return;
+	}
+
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.Owner = OwnerController; // 이 건물을 설치한 PlayerController
 	SpawnParameters.Instigator = OwnerPawn; // 이 건물을 설치한 Pawn
 	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
 	// 클라이언트가 보낸 Scale은 사용하지 않음
-	const FTransform SafePlacementTransform(
-		InPlacementTransform.GetRotation(), InPlacementTransform.GetLocation(), FVector::OneVector);
+	//const FTransform SafePlacementTransform(
+	//	InPlacementTransform.GetRotation(), InPlacementTransform.GetLocation(), FVector::OneVector);
 
 	ABuildingActor* NewBuilding = GetWorld()->SpawnActor<ABuildingActor>(
 			BuildingActorClass, SafePlacementTransform, SpawnParameters);
@@ -321,10 +370,10 @@ void UBuildingPlacementComponent::ShowPreviewAtLocation(const FVector& InPreview
 	PreviewActor->SetActorLocation(InPreviewLocation);
 
 	// 현재 맞힌 곳이 실제 설치 가능한 지면(옵젝타입:BuildableGround)인지 검사해서 결과를 얻어요
-	const bool bIsSurfaceValid = IsBuildableSurface(SupportingComponent);
+	const bool bIsSurfaceValid = IsBuildableSurface(SelectedDefinition.Get(), SupportingComponent);
 
 	// 지형 경사 각도 검사를 해서 결과를 얻어요
-	const bool bIsSlopeValid = IsGroundSlopeValid(InSurfaceNormal);
+	const bool bIsSlopeValid = IsGroundSlopeValid(SelectedDefinition.Get(), InSurfaceNormal);
 
 	// 오브젝트 겹침 검사해서 결과를 얻어요
 	const bool bHasOverlap = HasPlacementOverlap(SupportingComponent);
@@ -335,12 +384,12 @@ void UBuildingPlacementComponent::ShowPreviewAtLocation(const FVector& InPreview
 	PreviewActor->SetActorHiddenInGame(false);
 }
 
-bool UBuildingPlacementComponent::IsBuildableSurface(const UPrimitiveComponent* SupportingComponent) const
+bool UBuildingPlacementComponent::IsBuildableSurface(const UBuildingPartDefinition* Definition, const UPrimitiveComponent* SupportingComponent) const
 {
-	if (false == IsValid(SelectedDefinition)) return false;
+	if (false == IsValid(Definition)) return false;
 
 	// 건축 파츠의 배치 규칙을 가져옴
-	const FGroundPlacementRule& GroundRule = SelectedDefinition->GroundPlacementRule;
+	const FGroundPlacementRule& GroundRule = Definition->GroundPlacementRule;
 
 	if (false == GroundRule.bEnabled) return true; // 경사를 신경 안 쓰니 true. 무조건 배치 가능해요
 
@@ -351,16 +400,16 @@ bool UBuildingPlacementComponent::IsBuildableSurface(const UPrimitiveComponent* 
 	return (SupportingComponent->GetCollisionObjectType() == ECC_BUILDABLEGROUND);
 }
 
-bool UBuildingPlacementComponent::IsGroundSlopeValid(const FVector& InSurfaceNormal)
+bool UBuildingPlacementComponent::IsGroundSlopeValid(const UBuildingPartDefinition* Definition, const FVector& InSurfaceNormal)
 {
 	// 인자 InSurfaceNormal은 HitResult.ImpactNormal이 들어와요 (ShowPreviewAtLocation()로 넘겨옴)
 	// ImpactNormal : 표면을 기준으로 수직으로 뻗어나오는 방향
 	// 표면이 기울수록 노말도 옆으로 기울어짐
 
-	if (false == IsValid(SelectedDefinition)) return false;
+	if (false == IsValid(Definition)) return false;
 
 	// 건축 파츠의 배치 규칙을 가져옴
-	const FGroundPlacementRule& GroundRule = SelectedDefinition->GroundPlacementRule;
+	const FGroundPlacementRule& GroundRule = Definition->GroundPlacementRule;
 
 	if (false == GroundRule.bEnabled) return true; // 경사를 신경 안 쓰니 true. 무조건 배치 가능해요
 
@@ -387,4 +436,147 @@ bool UBuildingPlacementComponent::IsLocalPlacementController() const
 	APlayerController* OwnerController = Cast<APlayerController>(GetOwner());
 
 	return (true == IsValid(OwnerController)) && OwnerController->IsLocalController();
+}
+
+bool UBuildingPlacementComponent::IsWithinServerPlacementDistance(const FVector& InPlacementLocation) const
+{
+	const APlayerController* OwnerController = Cast<APlayerController>(GetOwner());
+	if (false == IsValid(OwnerController)) return false;
+
+	const APawn* OwnerPawn = OwnerController->GetPawn();
+	if (false == IsValid(OwnerPawn)) return false;
+
+	const FVector ViewLocation = OwnerPawn->GetPawnViewLocation(); // 서버가 알고 있는 Pawn의 시점 위치
+	// 서버가 알고 있는 Pawn의 시점 위치를 기준으로 요청받은 건축 위치가 최대 설치 거리(수평 기준) 안인지 검사해요
+	return FVector::DistSquared2D(ViewLocation, InPlacementLocation) <= FMath::Square(MaxPlacementDistance);
+}
+
+bool UBuildingPlacementComponent::FindSupportingGround(const UBuildingPartDefinition* Definition, const FVector& InPlacementLocation, FHitResult& OutGroundHit) const
+{
+	if (false == IsValid(Definition) || false == IsValid(Definition->PartMesh)) return false;
+
+	// 메시의 가장 낮은 Z를 구합니다
+	FBoxSphereBounds MeshBounds = Definition->PartMesh->GetBounds();
+	float LowestLocalZ = MeshBounds.Origin.Z - MeshBounds.BoxExtent.Z;
+	float GroundReach = FMath::Max(0.f, -LowestLocalZ); // 파츠 기준점에서 다리 끝까지 지면에 도달할 수 있는 순수 길이
+
+	// 파츠의 기준점보다 약간 위에서 시작해
+	// 다리 끝보다 약간 아래까지의 지면을 탐색해요
+	FVector TraceStart = InPlacementLocation + FVector::UpVector * 10.f; // 10은 지면<->파츠 작은 높이 오차값? 변수로 변경을 해야 하는데..
+	FVector TraceEnd = InPlacementLocation - FVector::UpVector * (GroundReach + 10.f);
+
+	// 옵젝타입 BuildableGround만 지면으로 인정하기로 해요..
+	FCollisionObjectQueryParams ObjectQueryParams;
+	ObjectQueryParams.AddObjectTypesToQuery(ECC_BUILDABLEGROUND);
+	
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(ServerPlacementGroundTrace), false);
+
+	if (APlayerController* OwnerController = Cast<APlayerController>(GetOwner()))
+	{
+		if (APawn* OwnerPawn = OwnerController->GetPawn())
+			QueryParams.AddIgnoredActor(OwnerPawn);
+	}
+
+	return GetWorld()->LineTraceSingleByObjectType(OutGroundHit, TraceStart, TraceEnd, ObjectQueryParams, QueryParams);
+}
+
+UStaticMeshComponent* UBuildingPlacementComponent::GetOrCreateServerValidationMesh()
+{
+	if (true == IsValid(ServerValidationMeshComponent)) return ServerValidationMeshComponent; // 있으면 재사용, 없으면 만들어용
+
+	AActor* OwnerActor = GetOwner();
+	if (false == IsValid(OwnerActor) || false == OwnerActor->HasAuthority()) return nullptr;
+
+	ServerValidationMeshComponent = NewObject<UStaticMeshComponent>(OwnerActor);
+
+	if (false == IsValid(ServerValidationMeshComponent)) return nullptr;
+
+	// 서버 내부 검사 전용이므로 복제 안 함!
+	ServerValidationMeshComponent->SetIsReplicated(false);
+
+	// 화면에도 안 보이게
+	ServerValidationMeshComponent->SetVisibility(false);
+	ServerValidationMeshComponent->SetHiddenInGame(true);
+
+	// 내비게이션에 영향을 주지 않음
+	ServerValidationMeshComponent->SetCanEverAffectNavigation(false);
+	ServerValidationMeshComponent->SetMobility(EComponentMobility::Movable);
+
+	// 평소에는 노콜리전
+	ServerValidationMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	// 검사할 때 접촉 결과를 얻기 위한 설정
+	ServerValidationMeshComponent->SetCollisionResponseToAllChannels(ECR_Overlap);
+	ServerValidationMeshComponent->SetGenerateOverlapEvents(false);
+
+	// 렌더링을 숨기지만
+	// 충돌을 Query Only로 바꿀 때 Physics State를 사용할 수 있도록 월드에 등록을 해야 해요..
+	OwnerActor->AddInstanceComponent(ServerValidationMeshComponent);
+	ServerValidationMeshComponent->RegisterComponent();
+
+	return ServerValidationMeshComponent;
+}
+
+bool UBuildingPlacementComponent::HasServerPlacementOverlap(const UBuildingPartDefinition* Definition, const FTransform& InPlacementTransform)
+{
+	if (false == IsValid(Definition) || false == IsValid(Definition->PartMesh)) return true;
+
+	UStaticMeshComponent* ValidationMesh = GetOrCreateServerValidationMesh();
+	if (false == IsValid(ValidationMesh)) return true;
+
+	// 클라가 요청한 위치에 해당 파츠를 임시로 놔봐요 (눈에 보이진 않음)
+	ValidationMesh->SetStaticMesh(Definition->PartMesh);
+	ValidationMesh->SetWorldTransform(InPlacementTransform);
+
+	// 콜리전 Physics State를 생성하기 위해 검사할 때만 QueryOnly로 잠시!! 변경해요
+	ValidationMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+
+	// 장애물로 취급할 오브젝트 종류
+	FCollisionObjectQueryParams ObjectQueryParams;
+	ObjectQueryParams.AddObjectTypesToQuery(ECC_WorldStatic);
+	ObjectQueryParams.AddObjectTypesToQuery(ECC_WorldDynamic);
+	ObjectQueryParams.AddObjectTypesToQuery(ECC_PhysicsBody);
+	ObjectQueryParams.AddObjectTypesToQuery(ECC_Pawn);
+
+	FComponentQueryParams QueryParams;
+
+	AActor* OwnerActor = GetOwner();
+	if (true == IsValid(OwnerActor))
+		QueryParams.AddIgnoredActor(OwnerActor); // 자기 자신 제외
+
+	if (APlayerController* OwnerController = Cast<APlayerController>(OwnerActor))
+	{
+		if (APawn* OwnerPawn = OwnerController->GetPawn())
+			QueryParams.AddIgnoredActor(OwnerPawn); // 자기 자신 제외
+	}
+
+	// 로컬 프리뷰가 서버 월드에 있으므로 얘도 제외
+	if (true == IsValid(PreviewActor))
+		QueryParams.AddIgnoredActor(PreviewActor);
+
+	// ValidationMesh를 InPlacementTransform 위치에 놓았을 때 겹치는 게 있는지요?
+	TArray<FOverlapResult> OverlapResults;
+	GetWorld()->ComponentOverlapMulti( 
+		OverlapResults, ValidationMesh,
+		InPlacementTransform.GetLocation(), InPlacementTransform.GetRotation(), 
+		QueryParams, ObjectQueryParams);
+
+	// 실제 배치될 위치 겹침 검사가 끝났으므로 다시 노콜리전으로 변경
+	ValidationMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	for (const FOverlapResult& OverlapResult : OverlapResults)
+	{
+		AActor* OverlappedActor = OverlapResult.GetActor();
+		UPrimitiveComponent* OverlappedComponent = OverlapResult.GetComponent();
+		
+		// 다른 로컬 프리뷰까지 장애물로 판단하지 않도록.. 모든 PreviewActor 제외	
+		if (true == IsValid(OverlappedActor) && OverlappedActor->IsA<ABuildingPreviewActor>())
+			continue;
+
+		UE_LOG(LogTemp, Warning, TEXT("서버 배치 겹침 감지 | Actor=%s | Component=%s"),
+			*GetNameSafe(OverlappedActor), *GetNameSafe(OverlappedComponent));
+
+		return true;
+	}
+	return false;
 }
