@@ -93,7 +93,7 @@ void AFishingRod::SetupInputComponent(UEnhancedInputComponent* PlayerEIC)
 
 void AFishingRod::TryInitializeInputs()
 {
-	if (bInputInitialized || !OwnerCharacter) return;
+	if (bInputInitialized || !OwnerCharacter || !OwnerCharacter->IsLocallyControlled()) return;
 
 	// 1. 캐릭터의 InputComponent 시도
 	if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(OwnerCharacter->InputComponent))
@@ -290,18 +290,24 @@ void AFishingRod::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	// 로컬에서 직접 조종하는 내 캐릭터가 아니라면 로컬 렌더링/미니게임 연산 건너뛰기 (멀티플레이 격리)
+	if (!OwnerCharacter || !OwnerCharacter->IsLocallyControlled())
+	{
+		return;
+	}
+
 	// 지연 입력 초기화 안전장치
-	if (!bInputInitialized && OwnerCharacter)
+	if (!bInputInitialized)
 	{
 		TryInitializeInputs();
 	}
 
-	// 1. 조준 중일 때 캐스팅 궤적 실시간 프리뷰 렌더링
+	// 1. 조준 중일 때 캐스팅 궤적 실시간 프리뷰 렌더링 (내 화면에만 렌더링)
 	if (CurrentState == EFishingState::Aiming)
 	{
 		UpdateCastingTrajectory(DeltaTime);
 	}
-	// 2. 미니게임 진행 중일 때 장력 및 물고기 저항 틱 연산
+	// 2. 미니게임 진행 중일 때 장력 및 물고기 저항 틱 연산 (내 로컬 세션에서만 연산)
 	else if (CurrentState == EFishingState::Minigame)
 	{
 		UpdateMinigame(DeltaTime);
