@@ -7,6 +7,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Component/HarvestableComponent.h"
+#include "Component/HeldItemComponent.h"
+#include "Data/Item/EquipmentItemData.h"
 
 #include "Interface/StatusEffectInterface.h"
 #include "Component/StatComponent.h"	
@@ -15,6 +17,10 @@
 #include "Components/CapsuleComponent.h"
 #include "EnhancedInputComponent.h"
 #include "Data/Item/ItemDataBase.h"
+
+#include "InputMappingContext.h"
+#include "InputAction.h"
+#include "EnhancedInputSubsystems.h"
 
 // Sets default values
 AActionCharacter::AActionCharacter()
@@ -58,6 +64,7 @@ AActionCharacter::AActionCharacter()
 	/// 컴포넌트 생성
 	InteractionComponent = CreateDefaultSubobject<UInteractionComponent>(TEXT("Interact"));
 	InventoryComponent = CreateDefaultSubobject<UInventoryComponent>(TEXT("Inventory"));
+	HeldItemComponent = CreateDefaultSubobject<UHeldItemComponent>(TEXT("HeldItemComponent"));
 }
 
 // Called when the game starts or when spawned
@@ -129,7 +136,40 @@ void AActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		// 상호작용
 		EIC->BindAction(IA_Interact, ETriggerEvent::Started, this, &AActionCharacter::OnInteractPressed);
 
-		EIC->BindAction(IA_Attack, ETriggerEvent::Started, this, &AActionCharacter::OnAttackPressed);
+		// 공격 (좌클릭 / 도구 주 액션)
+		if (IA_Attack)
+		{
+			EIC->BindAction(IA_Attack, ETriggerEvent::Started, this, &AActionCharacter::OnAttackPressed);
+		}
+
+		// 보조 액션 (우클릭 / 도구 보조 기능 / 조준 등)
+		if (IA_SecondaryAction)
+		{
+			EIC->BindAction(IA_SecondaryAction, ETriggerEvent::Started, this, &AActionCharacter::OnSecondaryActionPressed);
+			EIC->BindAction(IA_SecondaryAction, ETriggerEvent::Completed, this, &AActionCharacter::OnSecondaryActionReleased);
+		}
+
+		// 손에 장착된 도구가 있다면 도구 고유 입력 바인딩 전달
+		if (HeldItemComponent && HeldItemComponent->GetCurrentHeldItem())
+		{
+			HeldItemComponent->GetCurrentHeldItem()->SetupInputComponent(EIC);
+		}
+	}
+}
+
+void AActionCharacter::OnSecondaryActionPressed()
+{
+	if (HeldItemComponent)
+	{
+		HeldItemComponent->UseSecondaryAction(true);
+	}
+}
+
+void AActionCharacter::OnSecondaryActionReleased()
+{
+	if (HeldItemComponent)
+	{
+		HeldItemComponent->UseSecondaryAction(false);
 	}
 }
 
@@ -241,10 +281,27 @@ UStatComponent* AActionCharacter::GetStatComponent() const
 void AActionCharacter::OnMoveAction(const FInputActionValue& InValue)
 {
 	const FVector2D MoveValue = InValue.Get<FVector2D>();
+
+	// 손에 든 도구/무기가 이동 차단 중일 때 (예: 낚시 중 A/D 저항, S 릴 감기)
+	if (HeldItemComponent && HeldItemComponent->BlocksCharacterMovement())
+	{
+		HeldItemComponent->OnMoveInput(MoveValue);
+		return;
+	}
+
 	AddMovementInput(GetActorForwardVector(), MoveValue.Y);
 	AddMovementInput(GetActorRightVector(), MoveValue.X);
 
 	//UE_LOG(LogTemp, Log, TEXT("OnMoveAction"));
+}
+
+void AActionCharacter::OnMoveCompleted(const FInputActionValue& InValue)
+{
+	// 이동 키를 뗐을 때 손에 든 도구에 중립 입력(0, 0) 전달
+	if (HeldItemComponent && HeldItemComponent->BlocksCharacterMovement())
+	{
+		HeldItemComponent->OnMoveInput(FVector2D::ZeroVector);
+	}
 }
 
 void AActionCharacter::OnLookInput(const FInputActionValue& InValue)
@@ -258,8 +315,8 @@ void AActionCharacter::OnLookInput(const FInputActionValue& InValue)
 
 void AActionCharacter::OnSprintPressed()
 {
-	// 크라우치 모드에는 스프린트 안함
-	if (bIsCrouched) return;
+	// 도구 액션 중이거나 크라우치 모드에는 스프린트 안함
+	if (bIsCrouched || (HeldItemComponent && HeldItemComponent->BlocksCharacterMovement())) return;
 
 	if (SprintInputMode == ESprintInputMode::Toggle)
 	{
@@ -288,6 +345,8 @@ void AActionCharacter::OnSprintReleased()
 
 void AActionCharacter::OnCrouchPressed()
 {
+	if (HeldItemComponent && HeldItemComponent->BlocksCharacterMovement()) return;
+
 	if (CrouchInputMode == ECrouchInputMode::Toggle)
 	{
 		if (bIsCrouched)
@@ -323,6 +382,7 @@ void AActionCharacter::OnCrouchReleased()
 
 void AActionCharacter::OnJumpPressed()
 {
+	if (HeldItemComponent && HeldItemComponent->BlocksCharacterMovement()) return;
 	Jump();
 }
 
@@ -335,6 +395,13 @@ void AActionCharacter::OnInteractPressed()
 
 void AActionCharacter::OnAttackPressed()
 {
+	// 손에 도구/무기가 장착되어 있으면 도구 주 액션(Primary Action) 실행
+	if (HeldItemComponent && HeldItemComponent->GetCurrentHeldItem())
+	{
+		HeldItemComponent->UsePrimaryAction(true);
+		return;
+	}
+
 	if (!AM_Attack)
 	{
 		UE_LOG(LogTemp, Display, TEXT("AM_Attack was nullptr"));
@@ -382,4 +449,7 @@ bool AActionCharacter::DetectdObjectInAttackRange(FHitResult& OutHitRes)
 	}
 	return false;
 }
+
+
+
 

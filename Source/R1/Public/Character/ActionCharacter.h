@@ -1,4 +1,4 @@
-﻿/// 최초작성 : 2026.08.25
+/// 최초작성 : 2026.08.25
 /// 작 성 자 : 최 요 환
 
 // Fill out your copyright notice in the Description page of Project Settings.
@@ -29,6 +29,7 @@ class UCameraComponent;
 class UStatComponent;
 class UInventoryComponent;
 class UInteractionComponent;
+class UEquipmentComponent;
 
 UCLASS()
 class R1_API AActionCharacter : public ACharacter, public IStatInterface
@@ -75,6 +76,7 @@ protected:
 protected:
 	/// 캐릭터 기본 조작 함수
 	void OnMoveAction(const FInputActionValue& Value);	// 이동
+	void OnMoveCompleted(const FInputActionValue& Value); // 이동 종료 (키 뗌)
 	void OnLookInput(const FInputActionValue& InValue);	// 회전
 
 	void OnSprintPressed();		// 스프린트 누름
@@ -82,7 +84,10 @@ protected:
 	void OnCrouchPressed();		// 크라우치 누름
 	void OnCrouchReleased();	// 크라우치 떼기
 	void OnJumpPressed();		// 점프 누름
-	void OnAttackPressed();		// 공격키 누름
+	void OnAttackPressed();		// 공격키 누름 (좌클릭 / 도구 주 액션)
+	void OnAttackReleased();	// 공격키 뗌 (좌클릭 뗌 / 도구 주 액션 종료)
+	void OnSecondaryActionPressed();	// 보조 액션 시작 (우클릭 / 도구 보조 기능 / 조준)
+	void OnSecondaryActionReleased();	// 보조 액션 종료 (우클릭 뗌)
 
 	void OnInteractPressed();			// 상호작용 시도
 
@@ -125,10 +130,23 @@ protected:
 	TObjectPtr<UInputAction> IA_Interact;
 	//------------------------------------------------------------------
 
-	// 공격(좌클릭)
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	// 공격(좌클릭 / 도구 주 액션)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Action")
 	TObjectPtr<UInputAction> IA_Attack;
+
+	// 보조 액션(우클릭 / 도구 보조 기능 / 조준 등)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Action")
+	TObjectPtr<UInputAction> IA_SecondaryAction;
 #pragma endregion
+
+public:
+	// 손에 든 아이템(도구/무기) 관리 컴포넌트 접근자
+	UFUNCTION(BlueprintPure, Category = "Component")
+	FORCEINLINE class UHeldItemComponent* GetHeldItemComponent() const { return HeldItemComponent; }
+
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
+	TObjectPtr<class UHeldItemComponent> HeldItemComponent;
 
 
 

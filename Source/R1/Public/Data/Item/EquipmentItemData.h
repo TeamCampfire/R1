@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.27
+﻿/// 최초작성 : 2026.08.27
 /// 작 성 자 : 최 요 환
 /// 간단설명 : 장비아이템 정의 클래스
 
@@ -36,6 +36,10 @@ public:
 	// 캐릭터 이동/애니메이션 로드맵 문서의 Body+Head Leader Pose 패턴 참고)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment|Visual")
 	TSoftObjectPtr<USkeletalMesh> EquippedMesh;
+
+	// 무기/도구(Weapon/Tool) 슬롯 착용 시 손에 스폰하여 장착할 액터 클래스
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment|HeldItem")
+	TSubclassOf<class AHeldItemBase> HeldItemClass;
 
 	// 착용 시 적용되는 스탯 변화 (방어력, 이동속도 배율, 채집 효율 등).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
