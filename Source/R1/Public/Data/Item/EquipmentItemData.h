@@ -1,4 +1,4 @@
-﻿/// 최초작성 : 2026.08.27
+/// 최초작성 : 2026.08.27
 /// 작 성 자 : 최 요 환
 /// 간단설명 : 장비아이템 정의 클래스
 
@@ -37,8 +37,15 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment|Visual")
 	TSoftObjectPtr<USkeletalMesh> EquippedMesh;
 
-	// 착용 시 적용되는 스탯 변화 (방어력, 이동속도 배율 등). 스탯 종류가 늘어나면
-	// EEquipmentStatType(ItemTypes.h)에 값만 추가하면 되고 이 배열 구조는 그대로 둔다.
+	// 착용 시 적용되는 스탯 변화 (방어력, 이동속도 배율, 채집 효율 등).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
 	TArray<FEquipmentStatModifier> StatModifiers;
+
+	// 내구도 사용 여부 (방어구, 도구, 무기 등)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment|Durability")
+	bool bHasDurability = true;
+
+	// 장비의 최대 내구도 (정적 불변값)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment|Durability", meta = (EditCondition = "bHasDurability", ClampMin = "1.0"))
+	float MaxDurability = 100.0f;
 };

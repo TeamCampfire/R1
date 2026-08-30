@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Character/ActionCharacter.h"
@@ -167,6 +167,11 @@ void AActionCharacter::ProcessAttack()
 				{
 					if (ItemRes.ItemData)
 					{
+						int32 RemainCnt = 0;
+						InventoryComponent->AddItem(ItemRes.ItemData, ItemRes.Count, RemainCnt);
+
+						//TODO RemainCnt
+						//바닥에 소환하기
 						UE_LOG(LogTemp, Display, TEXT("자원 [%s]를 %d개 획득! (스위트스팟: %s, 고갈보너스: %s)"),
 							*(ItemRes.ItemData->DisplayName.ToString()),
 							ItemRes.Count,

@@ -1,4 +1,4 @@
-﻿/// 최초작성 : 2026.08.27
+/// 최초작성 : 2026.08.27
 /// 작 성 자 : 최 요 환
 /// 간단설명 : 아이템 타입 정의
 
@@ -62,7 +62,12 @@ UENUM(BlueprintType)
 enum class EEquipmentStatType : uint8
 {
 	Defense				UMETA(DisplayName = "Defense"),
-	MovementSpeedMult	UMETA(DisplayName = "Movement Speed Multiplier")
+	MovementSpeedMult	UMETA(DisplayName = "Movement Speed Multiplier"),
+	HarvestDamage		UMETA(DisplayName = "Harvest Damage (자원 타격 피해량)"),
+	WoodGatheringMult	UMETA(DisplayName = "Wood Gathering Mult (나무 벌목 배율)"),
+	OreGatheringMult	UMETA(DisplayName = "Ore Gathering Mult (암석 채광 배율)"),
+	FleshGatheringMult	UMETA(DisplayName = "Flesh Gathering Mult (생고기 해체 배율)"),
+	DurabilityLossMult	UMETA(DisplayName = "Durability Loss Mult (내구도 소모율 배율)")
 };
 
 USTRUCT(BlueprintType)

@@ -1,4 +1,4 @@
-#include "Component/HarvestableComponent.h"
+﻿#include "Component/HarvestableComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Character/ActionCharacter.h"
 #include "Components/DecalComponent.h"
@@ -22,6 +22,7 @@ FHarvestRes UHarvestableComponent::OnHitted_Implementation(AActionCharacter* InC
 	if (CurrentHp <= 0 || !InCharacter) return Res;
 
 	// 1. 체력 감소 (임시 50)
+	// TODO 아이템 장착 구현되면 적용
 	CurrentHp -= 50.f;
 
 	// 2. 피격 피드백(사운드/FX/데칼) 및 스위트스팟 배율 산출
@@ -145,7 +146,7 @@ void UHarvestableComponent::ProcessDepletion(float Multiplier, TArray<FHarvestIt
 	CurrentHp = 0.f;
 	if (!bGiveFinalBonus) return;
 
-	// 1. 별도의 고갈 보너스 아이템 목록(FinalBonusYields)이 있는 경우 (드럼통, 보물상자 등)
+	// 1. 별도의 고갈 보너스 아이템 목록(FinalBonusYields)이 명시된 경우 (드럼통, 보물상자 등)
 	if (FinalBonusYields.Num() > 0)
 	{
 		TArray<FHarvestItemResult> BonusItems;
@@ -174,11 +175,13 @@ void UHarvestableComponent::ProcessDepletion(float Multiplier, TArray<FHarvestIt
 			}
 		}
 	}
-	// 2. 별도 목록 없이 기본 채집량에 배율을 주는 경우 (나무, 돌 등)
-	else if (FinalBonusMultiplier > 1.0f)
+	// 2. 아이템 누락시 기본 아이템에 배율만 적용해서 지급(사고 방지)
+	else
 	{
+		const float EffectiveBonus = (FinalBonusMultiplier > 0.0f) ? FinalBonusMultiplier : 1.0f;
+
 		TArray<FHarvestItemResult> BaseItems;
-		CollectYieldItems(HarvestYields, FinalBonusMultiplier * Multiplier, BaseItems);
+		CollectYieldItems(HarvestYields, EffectiveBonus * Multiplier, BaseItems);
 
 		if (bDropItemsInWorldOnDepleted)
 		{
