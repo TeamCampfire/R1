@@ -1,4 +1,4 @@
-// 작업 시작일 : 8/28
+﻿// 작업 시작일 : 8/28
 // 작업자 : 우진
 #pragma once
 
@@ -134,6 +134,9 @@ protected:
 	FGuid CurrentSnapTargetPartID; // 현재 프리뷰가 붙어 있는 대상 파츠 ID
 
 	FName CurrentSnapSocketName = NAME_None; // 현재 선택된 소켓 이름
+
+	UPROPERTY(EditDefaultsOnly, Category = "Building|Server")
+	float ServerPlacementDistanceTolerance = 50.f; // 서버 허용 오차 (네트워크 지연이나 부동소수점 계산 차이)
 
 private:
 	bool bIsPlacing = false; // 현재 건축물 배치중인가요?

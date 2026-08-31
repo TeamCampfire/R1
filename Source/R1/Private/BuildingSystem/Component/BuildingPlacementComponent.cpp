@@ -1,4 +1,4 @@
-#include "BuildingSystem/Component/BuildingPlacementComponent.h"
+﻿#include "BuildingSystem/Component/BuildingPlacementComponent.h"
 
 #include "Engine/OverlapResult.h"
 #include "Components/StaticMeshComponent.h"
@@ -369,6 +369,7 @@ void UBuildingPlacementComponent::UpdateFoundationPreview(APlayerController* Pla
 	float FinalHeight = FMath::Clamp(DesiredHeight, 0.f, CurFoundationLegLength);
 
 	FVector PreviewLocation(MaxDistancePoint.X, MaxDistancePoint.Y, GroundZ + FinalHeight);
+
 	ShowPreviewAtLocation(PreviewLocation, GroundHitResult.ImpactNormal, GroundHitResult.GetComponent());
 
 	PreviewActor->SetActorHiddenInGame(false);
@@ -653,9 +654,9 @@ void UBuildingPlacementComponent::ShowPreviewAtLocation(const FVector& InPreview
 
 	// 오브젝트 겹침 검사해서 결과를 얻어요
 	const bool bHasOverlap = HasPlacementOverlap(SupportingComponent);
-	
-	bCanPlace = (bIsSurfaceValid) && (bIsSlopeValid) && (!bHasOverlap);
 
+	bCanPlace = (bIsSurfaceValid) && (bIsSlopeValid) && (!bHasOverlap);
+	
 	PreviewActor->SetPlacementValid(bCanPlace); // 여기서 PreviewActor Valid/Invalid 머터리얼 세팅해요
 	PreviewActor->SetActorHiddenInGame(false);
 }
@@ -723,8 +724,11 @@ bool UBuildingPlacementComponent::IsWithinServerPlacementDistance(const FVector&
 	if (false == IsValid(OwnerPawn)) return false;
 
 	const FVector ViewLocation = OwnerPawn->GetPawnViewLocation(); // 서버가 알고 있는 Pawn의 시점 위치
+
+	const float AllowedDistance = MaxPlacementDistance + ServerPlacementDistanceTolerance;
+
 	// 서버가 알고 있는 Pawn의 시점 위치를 기준으로 요청받은 건축 위치가 최대 설치 거리(수평 기준) 안인지 검사해요
-	return FVector::DistSquared2D(ViewLocation, InPlacementLocation) <= FMath::Square(MaxPlacementDistance);
+	return FVector::DistSquared2D(ViewLocation, InPlacementLocation) <= FMath::Square(AllowedDistance);
 }
 
 bool UBuildingPlacementComponent::FindSupportingGround(const UBuildingPartDefinition* Definition, const FVector& InPlacementLocation, FHitResult& OutGroundHit) const
