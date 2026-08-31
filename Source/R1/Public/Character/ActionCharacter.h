@@ -64,6 +64,9 @@ public:
 	// 공격 프로세스
 	UFUNCTION(BlueprintCallable)
 	void ProcessAttack();
+	// 사망
+	UFUNCTION(BlueprintCallable)
+	void Die();
 	
 
 protected:
