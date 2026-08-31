@@ -30,6 +30,12 @@ bool UMainHUDWidget::ToggleInventoryPanel()
 	const bool bNewOpenState = !IsInventoryPanelOpen();
 	InventoryWidget->SetVisibility(bNewOpenState ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 
+	if (!bNewOpenState)
+	{
+		// 닫을 때는 선택 상태(파란 테두리)도 같이 초기화 — 다음에 열었을 때 예전 선택이 남아있지 않게.
+		InventoryWidget->ClearSelection();
+	}
+
 	//UE_LOG(LogTemp, Warning, TEXT("[InvToggle] -> new open state=%d, resulting visibility=%d"),
 	//	bNewOpenState, (int32)InventoryWidget->GetVisibility());
 

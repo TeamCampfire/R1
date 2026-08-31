@@ -27,6 +27,17 @@ public:
 	UPROPERTY(BlueprintReadWrite, Category = "Inventory")
 	FInventorySlotRef SourceSlotRef;
 
+	// 옮길 수량. 0 이하이면 슬롯 전체(TransferItem 기준)를 뜻한다 — 일반 슬롯 드래그는 항상 0,
+	// DetailInfoWidget의 분할 드래그만 여기에 양수 값(CurrentSplitCount)을 채워 넣는다.
+	UPROPERTY(BlueprintReadWrite, Category = "Inventory")
+	int32 Count = 0;
+
+	// 휠클릭(가운데 버튼)으로 시작한 드래그인지 — true면 빈 슬롯에 놓았을 때 TransferItem이
+	// (Count가 0 이하라는 전제하에) 전량 이동 대신 절반만 떼어 옮긴다. InventorySlotWidget::
+	// NativeOnMouseButtonDown이 MiddleMouseButton으로 드래그를 감지했을 때만 true로 채워진다.
+	UPROPERTY(BlueprintReadWrite, Category = "Inventory")
+	bool bAutoHalfSplitOnEmptyTarget = false;
+
 	// 드래그를 시작한 슬롯 위젯 — 유효한 드롭 대상 없이(슬롯 밖) 드래그가 끝났을 때
 	// 그 사실을 알려주기 위해 들고 있는다. UInventorySlotWidget::NativeOnDragDetected에서 설정.
 	UPROPERTY()

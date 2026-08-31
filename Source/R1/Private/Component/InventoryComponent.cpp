@@ -198,7 +198,7 @@ EMoveSlotResult UInventoryComponent::EquipToSlot(const FInventorySlotRef& From, 
 	return EMoveSlotResult::Equipped;
 }
 
-EMoveSlotResult UInventoryComponent::TransferItem(FInventorySlotRef From, FInventorySlotRef To, int32 Count)
+EMoveSlotResult UInventoryComponent::TransferItem(FInventorySlotRef From, FInventorySlotRef To, int32 Count, bool bAutoHalfSplitIfTargetEmpty)
 {
 	if (From.Category == To.Category && From.Index == To.Index)
 	{
@@ -232,11 +232,18 @@ EMoveSlotResult UInventoryComponent::TransferItem(FInventorySlotRef From, FInven
 	// 대상이 비어있음 → 그냥 이동(장비슬롯에서 나오는 경우면 "해제"로 취급).
 	if (!TargetInstance.IsValid())
 	{
+		// 휠클릭 드래그(bAutoHalfSplitIfTargetEmpty)로 빈 슬롯에 놓았고 Count를 따로 지정하지
+		// 않았으면(0 이하), 2개 이상 쌓여있는 경우에 한해 절반만(내림) 떼어 옮긴다 — 나머지는
+		// 원래 자리에 남는다. 그 외에는 기존과 동일하게 MoveCount(전량 또는 지정 수량) 그대로.
+		const int32 ActualMoveCount = (bAutoHalfSplitIfTargetEmpty && Count <= 0 && SourceInstance.StackCount >= 2)
+			? (SourceInstance.StackCount / 2)
+			: MoveCount;
+
 		FItemInstance Moved = SourceInstance;
-		Moved.StackCount = MoveCount;
+		Moved.StackCount = ActualMoveCount;
 		SetSlot(To.Category, To.Index, Moved);
 
-		const int32 Remaining = SourceInstance.StackCount - MoveCount;
+		const int32 Remaining = SourceInstance.StackCount - ActualMoveCount;
 		SetSlot(From.Category, From.Index, Remaining > 0 ? FItemInstance(SourceInstance.ItemData, Remaining) : FItemInstance());
 
 		return bFromEquipment ? EMoveSlotResult::Unequipped : EMoveSlotResult::Moved;
@@ -322,6 +329,13 @@ void UInventoryComponent::UseBeltSlot(int32 BeltIndex)
 	const FItemInstance Instance = BeltSlots[BeltIndex];
 	if (!Instance.IsValid())
 	{
+		// 빈 슬롯 단축키 — 지금 손에 든 무기/도구가 있으면 맨손으로 내려놓는다(Rust처럼 빈 칸
+		// 단축키가 "무장 해제" 역할). 아무것도 안 들고 있었으면 그대로 무동작.
+		if (HeldBeltIndex != INDEX_NONE)
+		{
+			HeldBeltIndex = INDEX_NONE;
+			OnInventoryChanged.Broadcast();
+		}
 		return;
 	}
 
@@ -334,9 +348,13 @@ void UInventoryComponent::UseBeltSlot(int32 BeltIndex)
 
 		case EItemCategory::Weapon:
 		case EItemCategory::Tool:
+			/// 벨트 UI 갱신
 			// 선택 = 손에 듦, 이미 든 같은 칸을 다시 선택 = 손을 내림. 다른 벨트 슬롯은 건드리지 않는다.
 			HeldBeltIndex = (HeldBeltIndex == BeltIndex) ? INDEX_NONE : BeltIndex;
 			OnInventoryChanged.Broadcast();
+
+			/// 헬드 컴포넌트에 아이템 장착
+
 			break;
 
 		case EItemCategory::Consumable:
@@ -352,6 +370,21 @@ void UInventoryComponent::UseBeltSlot(int32 BeltIndex)
 			// Misc 등 — 벨트에 있을 수는 있지만 사용 액션은 무동작.
 			break;
 	}
+}
+
+bool UInventoryComponent::UseSelectedItem()
+{
+	const FItemInstance Instance = GetSelectedItemInstance();
+	if (!Instance.IsValid() || Instance.ItemData->Category != EItemCategory::Consumable)
+	{
+		return false;
+	}
+
+	// TODO(효과 적용): 실제 효과(Heal/RestoreHunger/RestoreThirst 등) 적용은 StatComponent 연동 후 처리.
+	// 지금은 UseBeltSlot의 Consumable 분기와 동일하게 수량 차감만 담당한다.
+	const int32 Remaining = Instance.StackCount - 1;
+	SetSlot(SelectedSlotRef.Category, SelectedSlotRef.Index, Remaining > 0 ? FItemInstance(Instance.ItemData, Remaining) : FItemInstance());
+	return true;
 }
 
 bool UInventoryComponent::DropItem(FInventorySlotRef Slot, int32 Count, const FTransform& DropTransform, const FVector& ThrowImpulse)

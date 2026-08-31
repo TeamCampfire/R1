@@ -41,8 +41,16 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory", meta = (WorldContext = "WorldContextObject"))
 	static UInventoryWidget* ShowInventoryTestWidget(UObject* WorldContextObject, TSubclassOf<UInventoryWidget> WidgetClass);
 
+	// 선택 상태(파란 테두리)를 초기화한다 — 패널이 닫힐 때 선택이 남아있지 않도록
+	// MainHUDWidget::ToggleInventoryPanel이 닫는 시점에 호출한다.
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void ClearSelection();
+
 protected:
 	//~ Begin UUserWidget Interface
+	// WBP 디자이너 프리뷰 전용 — PIE 밖에서는 BoundInventory가 없어 그리드가 비어 보이므로,
+	// IsDesignTime()일 때만 UInventoryComponent CDO의 슬롯 개수만큼 더미로 미리 채운다.
+	virtual void NativePreConstruct() override;
 	virtual void NativeOnInitialized() override;
 	virtual void NativeDestruct() override;
 	//~ End UUserWidget Interface
@@ -72,7 +80,7 @@ private:
 	void RebuildSlots();
 
 	UFUNCTION()
-	void HandleSlotDropped(FInventorySlotRef FromSlot, FInventorySlotRef ToSlot);
+	void HandleSlotDropped(FInventorySlotRef FromSlot, FInventorySlotRef ToSlot, int32 Count, bool bAutoHalfSplitOnEmptyTarget);
 
 	// 슬롯 클릭 → 선택 상태로 만들기만 한다(실제 파란 테두리 갱신은 다음 HandleInventoryChanged에서).
 	UFUNCTION()

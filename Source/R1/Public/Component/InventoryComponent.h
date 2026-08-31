@@ -95,9 +95,11 @@ public:
 
 	// 메인↔벨트 이동/병합/교환, (메인|벨트)→장비(부위 일치 시 자동 장착, 기존 장착품은
 	// From 자리로 스왑), 장비→(메인|벨트)(해제)까지 전부 이 함수 하나로 처리한다.
-	// Count가 0 이하이면 슬롯 전체를 이동시킨다.
+	// Count가 0 이하이면 슬롯 전체를 이동시킨다 — 단, bAutoHalfSplitIfTargetEmpty가 true고
+	// Count가 0 이하이며 대상이 빈 슬롯이고 원본이 2개 이상 쌓여있으면 절반만(내림) 옮긴다
+	// (휠클릭 드래그로 스택형 아이템을 빈 슬롯에 놓았을 때의 "절반 분할" 용도).
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
-	EMoveSlotResult TransferItem(FInventorySlotRef From, FInventorySlotRef To, int32 Count);
+	EMoveSlotResult TransferItem(FInventorySlotRef From, FInventorySlotRef To, int32 Count, bool bAutoHalfSplitIfTargetEmpty = false);
 
 	// 우클릭 "빠른 이동" — 대상 슬롯을 직접 고르지 않고 아이템 종류 + 어느 풀에서 눌렀는지로 알아서 보낼 곳을 정한다.
 	//  - 메인   ┬ 장비 아이템 → 장착(같은 부위 착용중이면 교체)
@@ -109,10 +111,18 @@ public:
 	EMoveSlotResult QuickMoveItem(const FInventorySlotRef& SlotRef);
 
 	// 벨트 슬롯 "사용/선택" — 이동(TransferItem)과는 별개의 액션이다(예: 단축키 1~6).
+	// 빈 슬롯이면: 지금 손에 든(HeldBeltIndex) 무기/도구가 있으면 그걸 내려놓고, 없으면 무동작.
 	// Weapon/Tool은 HeldBeltIndex를 토글(선택 = 손에 듦, 같은 칸 재선택 = 손을 내림).
-	// Consumable은 즉시 효과 적용 후 1개 소모(0개가 되면 슬롯을 비움). 그 외(Misc 등)는 무동작.
+	// Equipment(의류)는 장비창에 장착/교체. Consumable은 즉시 효과 적용 후 1개 소모(0개가 되면
+	// 슬롯을 비움). 그 외(Misc 등)는 무동작.
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	void UseBeltSlot(int32 BeltIndex);
+
+	// 현재 선택된 슬롯(SelectedSlotRef, 장비/메인/벨트 무관)의 아이템을 사용한다.
+	// Consumable만 처리(1개 소모, 효과 적용은 StatComponent 연동 후 TODO) — 그 외 카테고리는
+	// 무동작(장착/손에 들기는 QuickMoveItem/UseBeltSlot이 전담). DetailInfoWidget의 사용 버튼이 호출한다.
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	bool UseSelectedItem();
 
 	// 지정한 슬롯에서 Count만큼(0 이하이면 전체) 빼서 DropTransform 위치에 AItemPickup으로 스폰한다.
 	// ThrowImpulse가 0이 아니면 스폰 직후 그 방향/크기로 밀어준다(던지는 연출용).
@@ -145,6 +155,9 @@ public:
 	// 나중에 추가될 상단 중앙 "선택된 아이템 정보" 패널이 이 함수만 보고 그리면 된다.
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	FItemInstance GetSelectedItemInstance() const;
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	inline int32 GetCurrentHeledBeltIndex() const { return HeldBeltIndex; }
 
 protected:
 	// Called when the game starts
@@ -184,16 +197,16 @@ public:
 	float ThrowImpulseStrength = 350.f;
 
 	// 메인 인벤토리 — 종류 무관하게 아무 아이템이나 들어갈 수 있는 일반 저장공간.
-	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
 	TArray<FItemInstance> MainSlots;
 
 	// 벨트(퀵슬롯) — 메인과 완전히 독립된 저장공간. 아이템 종류 제한 없음.
-	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
 	TArray<FItemInstance> BeltSlots;
 
 	// 장비(착용) 슬롯 — 크기 = EquipmentSlotCount. 부위(EquipSlot)가 특정 인덱스에 고정되지
 	// 않는다 — 같은 부위는 한 벌만 착용 가능(EquipToSlot이 검사)하고, 빈 칸 아무데나 들어간다.
-	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
 	TArray<FItemInstance> EquipmentSlots;
 
 	// 현재 손에 든 벨트 슬롯 인덱스(Weapon/Tool 아이템에만 의미가 있음). 없으면 INDEX_NONE.
