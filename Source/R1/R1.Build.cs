@@ -15,18 +15,18 @@ public class R1 : ModuleRules
 			"InputCore",
 			"EnhancedInput",
 			"AnimGraphRuntime",
-			"Niagara",
+			"UMG",
+			"Slate",
+			"SlateCore"
 			"Water",
 			"CableComponent",
+			"Niagara",
 			"OnlineSubsystem",		// 세션 관리
 			"OnlineSubsystemUtils"	// 세션 관리
 		});
 
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
-
-		// Uncomment if you are using Slate UI
-		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
 		
 		// Uncomment if you are using online features
 		// PrivateDependencyModuleNames.Add("OnlineSubsystem");

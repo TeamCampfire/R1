@@ -64,6 +64,9 @@ public:
 	// 공격 프로세스
 	UFUNCTION(BlueprintCallable)
 	void ProcessAttack();
+	// 사망
+	UFUNCTION(BlueprintCallable)
+	void Die();
 	
 
 protected:
@@ -89,7 +92,11 @@ protected:
 	void OnSecondaryActionPressed();	// 보조 액션 시작 (우클릭 / 도구 보조 기능 / 조준)
 	void OnSecondaryActionReleased();	// 보조 액션 종료 (우클릭 뗌)
 
+	void OnBuildingPlacementPressed();
+
 	void OnInteractPressed();			// 상호작용 시도
+	void OnInventoryTogglePressed();	// 인벤토리 패널 토글
+	void OnUseBeltSlotPressed(int32 BeltIndex);	// 벨트슬롯 단축키(1~6, 0-based 인덱스로 받음)
 
 	// 무브먼트 값 갱신
 	void ApplyMovementSettings();
@@ -125,9 +132,42 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UInputAction> IA_Crouch;
 
+	// 건축물 설치 확정 좌클릭
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UInputAction> IA_BuildingPlacement;
+
 	// 상호작용
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UInputAction> IA_Interact;
+
+	// 인벤토리 토글
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UInputAction> IA_InventoryToggle;
+
+	/// 벨트슬롯 단축키
+	// 1
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UInputAction> IA_Use_BeltSlot_1;
+
+	// 2
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UInputAction> IA_Use_BeltSlot_2;
+
+	// 3
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UInputAction> IA_Use_BeltSlot_3;
+
+	// 4
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UInputAction> IA_Use_BeltSlot_4;
+
+	// 5
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UInputAction> IA_Use_BeltSlot_5;
+
+	// 6
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UInputAction> IA_Use_BeltSlot_6;
 	//------------------------------------------------------------------
 
 	// 공격(좌클릭 / 도구 주 액션)

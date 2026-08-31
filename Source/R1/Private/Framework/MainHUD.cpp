@@ -3,9 +3,9 @@
 
 #include "Framework/MainHUD.h"
 #include "Blueprint/UserWidget.h"
-#include "Widget/InteractionPromptWidget.h"
+#include "Widget/MainHUDWidget.h"
 
-UInteractionPromptWidget* AMainHUD::GetMainHudWidget() const
+UMainHUDWidget* AMainHUD::GetMainHudWidget() const
 {
 	return MainHudWidgetInstance;
 }
@@ -16,10 +16,11 @@ void AMainHUD::BeginPlay()
 
 	if (MainHudWidgetClass)
 	{
-		MainHudWidgetInstance = CreateWidget<UInteractionPromptWidget>(GetWorld(), MainHudWidgetClass);
+		MainHudWidgetInstance = CreateWidget<UMainHUDWidget>(GetWorld(), MainHudWidgetClass);
 		if (MainHudWidgetInstance)
 		{
 			MainHudWidgetInstance->AddToViewport();
 		}
 	}
+
 }

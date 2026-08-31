@@ -50,6 +50,10 @@ public:
 	// 드랍으로 스폰될 때 사용 — ItemData/Count를 지정하고 시각적 표현을 즉시 갱신한다.
 	UFUNCTION(BlueprintCallable, Category = "Item")
 	void InitializeFromItem(UItemDataBase* InItemData, int32 InCount);
+
+	// 스폰 직후 던지는 연출용 — Mesh(물리 시뮬레이션 켜져있음)에 impulse를 준다.
+	UFUNCTION(BlueprintCallable, Category = "Item")
+	void AddThrowImpulse(const FVector& Impulse);
 	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;

@@ -16,6 +16,9 @@
 #include "Component/InventoryComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "EnhancedInputComponent.h"
+#include "Character/ActionPlayerController.h"
+#include "Framework/MainHUD.h"
+#include "Widget/MainHUDWidget.h"
 #include "Data/Item/ItemDataBase.h"
 
 #include "InputMappingContext.h"
@@ -87,6 +90,15 @@ void AActionCharacter::BeginPlay()
 	}
 	// 이동관련 파라미터 세팅
 	ApplyMovementSettings();
+
+	// 사망 델리게이트 연결
+	if (StatComponent)
+	{
+		StatComponent->OnDeath.AddDynamic(
+			this,
+			&AActionCharacter::Die
+		);
+	}
 }
 
 // Called every frame
@@ -136,10 +148,24 @@ void AActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		// 상호작용
 		EIC->BindAction(IA_Interact, ETriggerEvent::Started, this, &AActionCharacter::OnInteractPressed);
 
+		EIC->BindAction(IA_Attack, ETriggerEvent::Started, this, &AActionCharacter::OnAttackPressed);
+
+		// 인벤토리 토글
+		EIC->BindAction(IA_InventoryToggle, ETriggerEvent::Started, this, &AActionCharacter::OnInventoryTogglePressed);
+
+		// 벨트슬롯 단축키(1~6) — 인벤토리가 열려있는 동안엔 DefaultMappingContext 자체가 빠져있어서
+		// 이 액션들도 같이 안 눌린다(ActionPlayerController::SetInventoryInputState 참고).
+		EIC->BindAction(IA_Use_BeltSlot_1, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 0);
+		EIC->BindAction(IA_Use_BeltSlot_2, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 1);
+		EIC->BindAction(IA_Use_BeltSlot_3, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 2);
+		EIC->BindAction(IA_Use_BeltSlot_4, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 3);
+		EIC->BindAction(IA_Use_BeltSlot_5, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 4);
+		EIC->BindAction(IA_Use_BeltSlot_6, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 5);
+	
 		// 공격 (좌클릭 / 도구 주 액션)
 		if (IA_Attack)
 		{
-			EIC->BindAction(IA_Attack, ETriggerEvent::Started, this, &AActionCharacter::OnAttackPressed);
+			//EIC->BindAction(IA_Attack, ETriggerEvent::Started, this, &AActionCharacter::OnAttackPressed);
 		}
 
 		// 보조 액션 (우클릭 / 도구 보조 기능 / 조준 등)
@@ -154,6 +180,8 @@ void AActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		{
 			HeldItemComponent->GetCurrentHeldItem()->SetupInputComponent(EIC);
 		}
+
+		//EIC->BindAction(IA_BuildingPlacement, ETriggerEvent::Started, this, &AActionCharacter::OnBuildingPlacementPressed);
 	}
 }
 
@@ -231,6 +259,22 @@ void AActionCharacter::ProcessAttack()
 	{
 		UE_LOG(LogTemp, Display, TEXT("아무도 것도 맞지 않았습니다."));
 	}
+}
+
+void AActionCharacter::Die()
+{
+	// 애니메이션 중지
+	GetMesh()->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+	GetMesh()->Stop();
+	// 메쉬 랙돌 전환
+	GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
+	GetMesh()->SetSimulatePhysics(true);
+	// 컨트롤러 연결 해제
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		PC->UnPossess();
+	}
+
 }
 
 
@@ -386,11 +430,52 @@ void AActionCharacter::OnJumpPressed()
 	Jump();
 }
 
+void AActionCharacter::OnBuildingPlacementPressed()
+{
+	UE_LOG(LogTemp, Display, TEXT("OnBuildingPlacementPressed"));
+	// 플레이어 컨트롤러에게 건축 배치를 맡김
+	if (AActionPlayerController* PlayerController = Cast<AActionPlayerController>(GetController()))
+		PlayerController->OnConfirmBuildingPlacement();
+}
+
 void AActionCharacter::OnInteractPressed()
 {
 	InteractionComponent->TryInteract();
 
 	//UE_LOG(LogTemp, Log, TEXT("TryInteract()"));
+}
+
+void AActionCharacter::OnInventoryTogglePressed()
+{
+	AActionPlayerController* PC = Cast<AActionPlayerController>(GetController());
+	UE_LOG(LogTemp, Warning, TEXT("[InvToggle] OnInventoryTogglePressed. PC=%s"), *GetNameSafe(PC));
+	if (!PC)
+	{
+		return;
+	}
+
+	AMainHUD* HUD = PC->GetHUD<AMainHUD>();
+	UMainHUDWidget* MainHudWidget = HUD ? HUD->GetMainHudWidget() : nullptr;
+	UE_LOG(LogTemp, Warning, TEXT("[InvToggle] HUD=%s, MainHudWidget=%s"), *GetNameSafe(HUD), *GetNameSafe(MainHudWidget));
+	if (!MainHudWidget)
+	{
+		return;
+	}
+
+	const bool bIsOpen = MainHudWidget->ToggleInventoryPanel();
+	UE_LOG(LogTemp, Warning, TEXT("[InvToggle] ToggleInventoryPanel returned bIsOpen=%d"), bIsOpen);
+	PC->SetInventoryInputState(bIsOpen);
+}
+
+void AActionCharacter::OnUseBeltSlotPressed(int32 BeltIndex)
+{
+	// InventoryComponent 멤버 대신 FindComponentByClass로 찾는다 — BP_PlayerCharacter의
+	// 상속 컴포넌트 템플릿이 깨져서 멤버 포인터가 널로 읽히는 환경 문제가 있어(원인 조사 중),
+	// UInventoryWidget/UBeltBarWidget이 이미 쓰고 있는 것과 같은 방식으로 우회한다.
+	if (UInventoryComponent* Inventory = FindComponentByClass<UInventoryComponent>())
+	{
+		Inventory->UseBeltSlot(BeltIndex);
+	}
 }
 
 void AActionCharacter::OnAttackPressed()
