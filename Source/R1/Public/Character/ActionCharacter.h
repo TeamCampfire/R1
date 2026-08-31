@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.25
+﻿/// 최초작성 : 2026.08.25
 /// 작 성 자 : 최 요 환
 
 // Fill out your copyright notice in the Description page of Project Settings.
@@ -97,6 +97,13 @@ protected:
 	void OnInteractPressed();			// 상호작용 시도
 	void OnInventoryTogglePressed();	// 인벤토리 패널 토글
 	void OnUseBeltSlotPressed(int32 BeltIndex);	// 벨트슬롯 단축키(1~6, 0-based 인덱스로 받음)
+
+	// 공격 몽타주 재생 RPC (리슨 서버 및 멀티플레이어 동기화)
+	UFUNCTION(Server, Reliable)
+	void Server_PlayAttackMontage();
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_PlayAttackMontage();
 
 	// 무브먼트 값 갱신
 	void ApplyMovementSettings();

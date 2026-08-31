@@ -496,8 +496,37 @@ void AActionCharacter::OnAttackPressed()
 	if (UAnimInstance* Instance = GetMesh()->GetAnimInstance())
 	{
 		if (!Instance->IsAnyMontagePlaying())
+		{
+			// 1) 로컬 클라이언트 선행 재생 (인풋 랙 제거)
 			PlayAnimMontage(AM_Attack);
+
+			// 2) 리슨 서버 및 다른 클라이언트 동기화
+			if (!HasAuthority())
+			{
+				Server_PlayAttackMontage();
+			}
+			else
+			{
+				Multicast_PlayAttackMontage();
+			}
+		}
 	}
+}
+
+void AActionCharacter::Server_PlayAttackMontage_Implementation()
+{
+	Multicast_PlayAttackMontage();
+}
+
+void AActionCharacter::Multicast_PlayAttackMontage_Implementation()
+{
+	// 이미 로컬에서 선행 재생한 공격자 본인은 중복 재생 방지를 위해 건너뜀
+	if (IsLocallyControlled())
+	{
+		return;
+	}
+
+	PlayAnimMontage(AM_Attack);
 }
 
 
