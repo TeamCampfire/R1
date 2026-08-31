@@ -82,14 +82,23 @@ void UMultiplayerSessionSubsystem::FindSessions(int32 MaxSearchResults)
 
 void UMultiplayerSessionSubsystem::JoinSession(int32 SessionIndex)
 {
-	if (!SessionInterface.IsValid() || !SessionSearch.IsValid())
+	if (!SessionInterface.IsValid() ||
+		!SessionSearch.IsValid() ||
+		!SessionSearch->SearchResults.IsValidIndex(SessionIndex))
 	{
 		UE_LOG(LogTemp, Error, TEXT("JoinSession failed (session index: %d"), SessionIndex);
 		OnJoinSessionResult.Broadcast(false);
 		return;
 	}
 
-	
+	JoinSessionDelegateHandle = SessionInterface->AddOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegate);
+
+	if (!SessionInterface->JoinSession(0, NAME_GameSession, SessionSearch->SearchResults[SessionIndex]))
+	{
+		SessionInterface->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionDelegateHandle);
+
+		OnJoinSessionResult.Broadcast(false);
+	}
 }
 
 void UMultiplayerSessionSubsystem::DestroySession()
@@ -103,7 +112,10 @@ void UMultiplayerSessionSubsystem::OnCreateSessionComplete(FName SessionName, bo
 	OnCreateSessionResult.Broadcast(bWasSuccessful);
 
 	if (!bWasSuccessful)
+	{
+		UE_LOG(LogTemp, Error, TEXT("CreateSession failed"));
 		return;
+	}
 
 	UWorld* World = GetWorld();
 	if (!World)
@@ -112,7 +124,7 @@ void UMultiplayerSessionSubsystem::OnCreateSessionComplete(FName SessionName, bo
 		return;
 	}
 
-	//World->ServerTravel(TEXT("\Game\Maps\Lv01_PlayerMoveTest?listen"));
+	World->ServerTravel(TEXT("/Game/Maps/Lv01_PlayerMoveTest?listen"));
 }
 
 void UMultiplayerSessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
@@ -121,11 +133,63 @@ void UMultiplayerSessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 
 	if (!bWasSuccessful || !SessionSearch.IsValid())
 	{
-		
+		UE_LOG(LogTemp, Error, TEXT("FindSessions failed"));
+		OnFindSessionsResult.Broadcast(false);
 		return;
 	}
+
+	for (int32 i = 0; i < SessionSearch->SearchResults.Num(); ++i)
+	{
+		const FOnlineSessionSearchResult& Result = SessionSearch->SearchResults[i];
+
+		FString ServerName;
+
+		Result.Session.SessionSettings.Get(FName("SERVER_NAME"), ServerName);
+
+		const int32 MaxPlayers = Result.Session.SessionSettings.NumPublicConnections;
+
+		const int32 CurrentPlayers = MaxPlayers - Result.Session.NumOpenPublicConnections;
+
+		const int32 Ping = Result.PingInMs;
+
+		UE_LOG(LogTemp, Log, TEXT("%s: %d/%d Ping=%d"), *ServerName, CurrentPlayers, MaxPlayers, Ping);
+	}
+
+	OnFindSessionsResult.Broadcast(true);
 }
 
 void UMultiplayerSessionSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result)
 {
+	SessionInterface->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionDelegateHandle);
+
+	if (Result != EOnJoinSessionCompleteResult::Success)
+	{
+		UE_LOG(LogTemp, Error, TEXT("JoinSessionResult Failed"));
+		OnJoinSessionResult.Broadcast(false);
+		return;
+	}
+
+	FString ConnectString;
+
+	// 검색된 세션의 실제 접속 정보 얻기
+	// IP를 UI에서 다룰 필요 X
+	if (!SessionInterface->GetResolvedConnectString(NAME_GameSession, ConnectString))
+	{
+		UE_LOG(LogTemp, Error, TEXT("ConnectString Failed"));
+		OnJoinSessionResult.Broadcast(false);
+		return;
+	}
+
+	APlayerController* PlayerController = GetGameInstance()->GetFirstLocalPlayerController();
+
+	if (!PlayerController)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Playercontroller Failed"));
+		OnJoinSessionResult.Broadcast(false);
+		return;
+	}
+
+	PlayerController->ClientTravel(ConnectString, TRAVEL_Absolute);
+
+	OnJoinSessionResult.Broadcast(true);
 }
