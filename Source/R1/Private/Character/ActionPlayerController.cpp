@@ -6,6 +6,14 @@
 #include "EnhancedInputComponent.h"
 #include "InputMappingContext.h"
 
+#include "BuildingSystem/Component/BuildingPlacementComponent.h"
+
+AActionPlayerController::AActionPlayerController()
+{
+	// 빌딩 배치 컴포넌트 생성
+	BuildingPlacementComponent = CreateDefaultSubobject<UBuildingPlacementComponent>(TEXT("BuildingPlacementComp"));
+}
+
 void AActionPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
@@ -26,7 +34,12 @@ void AActionPlayerController::BeginPlay()
 			SubSystem->AddMappingContext(UIMappingContext, UIInputPriority);
 		}
 	}
+}
 
+void AActionPlayerController::OnConfirmBuildingPlacement()
+{
+	if (true == IsValid(BuildingPlacementComponent))
+		BuildingPlacementComponent->ConfirmPlacement();
 }
 
 void AActionPlayerController::SetInventoryInputState(bool bOpen)

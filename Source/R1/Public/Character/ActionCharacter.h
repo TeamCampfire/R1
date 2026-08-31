@@ -92,6 +92,8 @@ protected:
 	void OnSecondaryActionPressed();	// 보조 액션 시작 (우클릭 / 도구 보조 기능 / 조준)
 	void OnSecondaryActionReleased();	// 보조 액션 종료 (우클릭 뗌)
 
+	void OnBuildingPlacementPressed();
+
 	void OnInteractPressed();			// 상호작용 시도
 	void OnInventoryTogglePressed();	// 인벤토리 패널 토글
 	void OnUseBeltSlotPressed(int32 BeltIndex);	// 벨트슬롯 단축키(1~6, 0-based 인덱스로 받음)
@@ -129,6 +131,10 @@ protected:
 	// 크라우치
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UInputAction> IA_Crouch;
+
+	// 건축물 설치 확정 좌클릭
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UInputAction> IA_BuildingPlacement;
 
 	// 상호작용
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)

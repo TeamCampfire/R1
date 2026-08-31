@@ -428,6 +428,13 @@ void AActionCharacter::OnJumpPressed()
 	Jump();
 }
 
+void AActionCharacter::OnBuildingPlacementPressed()
+{
+	// 플레이어 컨트롤러에게 건축 배치를 맡김
+	if (AActionPlayerController* PlayerController = Cast<AActionPlayerController>(GetController()))
+		PlayerController->OnConfirmBuildingPlacement();
+}
+
 void AActionCharacter::OnInteractPressed()
 {
 	InteractionComponent->TryInteract();
