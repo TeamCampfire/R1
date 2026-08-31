@@ -31,6 +31,8 @@ class R1_API UBeltBarWidget : public UUserWidget
 
 protected:
 	//~ Begin UUserWidget Interface
+	// WBP 디자이너 프리뷰 전용 — InventoryWidget과 동일한 이유(아래 NativePreConstruct 참고).
+	virtual void NativePreConstruct() override;
 	virtual void NativeOnInitialized() override;
 	virtual void NativeDestruct() override;
 	//~ End UUserWidget Interface
@@ -50,7 +52,7 @@ private:
 	void HandleInventoryChanged();
 
 	UFUNCTION()
-	void HandleSlotDropped(FInventorySlotRef FromSlot, FInventorySlotRef ToSlot);
+	void HandleSlotDropped(FInventorySlotRef FromSlot, FInventorySlotRef ToSlot, int32 Count, bool bAutoHalfSplitOnEmptyTarget);
 
 	UFUNCTION()
 	void HandleSlotClicked(FInventorySlotRef SlotRef);

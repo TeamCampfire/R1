@@ -472,12 +472,18 @@ void AActionCharacter::OnInventoryTogglePressed()
 
 void AActionCharacter::OnUseBeltSlotPressed(int32 BeltIndex)
 {
+	/// 임시 코드
 	// InventoryComponent 멤버 대신 FindComponentByClass로 찾는다 — BP_PlayerCharacter의
 	// 상속 컴포넌트 템플릿이 깨져서 멤버 포인터가 널로 읽히는 환경 문제가 있어(원인 조사 중),
 	// UInventoryWidget/UBeltBarWidget이 이미 쓰고 있는 것과 같은 방식으로 우회한다.
-	if (UInventoryComponent* Inventory = FindComponentByClass<UInventoryComponent>())
+	//if (UInventoryComponent* Inventory = FindComponentByClass<UInventoryComponent>())
+	//{
+	//	Inventory->UseBeltSlot(BeltIndex);
+	//}
+
+	if (InventoryComponent)
 	{
-		Inventory->UseBeltSlot(BeltIndex);
+		InventoryComponent->UseBeltSlot(BeltIndex);
 	}
 }
 

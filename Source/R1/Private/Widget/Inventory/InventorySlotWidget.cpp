@@ -25,6 +25,7 @@ void UInventorySlotWidget::EnsureGridSlots(
 	int32 GridColumns,
 	TFunctionRef<void(UInventorySlotWidget*)> OnSlotCreated,
 	TFunctionRef<bool(const FInventorySlotRef&)> IsSelectedFn,
+	TFunctionRef<bool(const FInventorySlotRef&)> IsHeldFn,
 	TArray<TObjectPtr<UInventorySlotWidget>>& OutWidgets)
 {
 	if (!Container || !SlotWidgetClass || !OwningWidget)
@@ -66,6 +67,7 @@ void UInventorySlotWidget::EnsureGridSlots(
 		{
 			OutWidgets[i]->Refresh(Slots[i]);
 			OutWidgets[i]->SetClickSelected(IsSelectedFn(FInventorySlotRef{ Category, i }));
+			OutWidgets[i]->SetHeldHighlighted(IsHeldFn(FInventorySlotRef{ Category, i }));
 		}
 	}
 }
@@ -135,6 +137,17 @@ void UInventorySlotWidget::SetClickSelected(bool bInSelected)
 	UpdateSelectionVisual();
 }
 
+void UInventorySlotWidget::SetHeldHighlighted(bool bInHeld)
+{
+	if (bIsHeldHighlighted == bInHeld)
+	{
+		return;
+	}
+
+	bIsHeldHighlighted = bInHeld;
+	UpdateSelectionVisual();
+}
+
 void UInventorySlotWidget::NotifyDragCancelled()
 {
 	OnSlotDragCancelled.Broadcast(SlotRef);
@@ -147,14 +160,14 @@ void UInventorySlotWidget::UpdateSelectionVisual()
 		return;
 	}
 
-	// 드래그 하이라이트(노란색)가 클릭 선택(파란색)보다 우선한다.
+	// 드래그 하이라이트(노란색)가 클릭 선택/손에 듦(파란색, 둘 다 같은 색이라 OR로 묶는다)보다 우선한다.
 	if (bIsDragHovering)
 	{
-		SelectionBorder->SetBrushColor(FLinearColor(1.f, 0.85f, 0.1f, 0.9f));
+		SelectionBorder->SetBrushColor(FLinearColor(1.f, 0.85f, 0.1f, 0.3f));
 	}
-	else if (bIsClickSelected)
+	else if (bIsClickSelected || bIsHeldHighlighted)
 	{
-		SelectionBorder->SetBrushColor(FLinearColor(0.2f, 0.55f, 1.f, 0.9f));
+		SelectionBorder->SetBrushColor(FLinearColor(0.2f, 0.55f, 1.f, 0.3f));
 	}
 	else
 	{
@@ -164,18 +177,31 @@ void UInventorySlotWidget::UpdateSelectionVisual()
 
 FReply UInventorySlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	if (CachedInstance.IsValid())
+	// 좌클릭 선택은 빈 슬롯도 허용한다 — 아이템이 있으면 드래그 후보로도 등록하고,
+	// 없으면(빈 슬롯) 옮길 게 없으니 그냥 눌림만 소비해서 뗄 때(Up) 선택 클릭으로 이어지게 한다.
+	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
 	{
-		if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+		if (CachedInstance.IsValid())
 		{
+			bPendingMiddleButtonDrag = false;
 			return FReply::Handled().DetectDrag(TakeWidget(), EKeys::LeftMouseButton);
 		}
+		return FReply::Handled();
+	}
 
-		// 우클릭은 드래그가 없다 — 눌린 걸 소비만 해두고 실제 액션은 뗄 때(NativeOnMouseButtonUp) 발생시킨다.
-		if (InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
-		{
-			return FReply::Handled();
-		}
+	// 휠클릭(가운데 버튼) 드래그 — 좌클릭 드래그와 동일하게 등록하되, 이 드래그가 빈 슬롯에
+	// 놓였을 때 TransferItem이 절반만 옮기도록 NativeOnDragDetected에 표시를 남겨둔다.
+	if (CachedInstance.IsValid() && InMouseEvent.GetEffectingButton() == EKeys::MiddleMouseButton)
+	{
+		bPendingMiddleButtonDrag = true;
+		return FReply::Handled().DetectDrag(TakeWidget(), EKeys::MiddleMouseButton);
+	}
+
+	// 우클릭(빠른 이동)은 옮길 아이템이 있는 슬롯에서만 의미가 있다.
+	if (CachedInstance.IsValid() && InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
+	{
+		// 드래그가 없는 액션이라 눌린 걸 소비만 해두고 실제 액션은 뗄 때(NativeOnMouseButtonUp) 발생시킨다.
+		return FReply::Handled();
 	}
 
 	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
@@ -183,20 +209,20 @@ FReply UInventorySlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry
 
 FReply UInventorySlotWidget::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	if (CachedInstance.IsValid())
+	// 드래그로 이어지지 않고 그냥 눌렀다 뗀 경우(클릭) — 빈 슬롯이어도 이 슬롯을 선택 상태로
+	// 알린다. InventoryComponent::SelectSlot/GetSelectedItemInstance가 애초에 슬롯 내용물과
+	// 무관하게 동작해서(빈 슬롯이면 GetSelectedItemInstance가 무효 인스턴스를 돌려줌), 여기서
+	// CachedInstance 유효성을 따로 검사할 필요가 없다.
+	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
 	{
-		// 드래그로 이어지지 않고 그냥 눌렀다 뗀 경우(클릭) — 이 슬롯을 선택 상태로 알린다.
-		if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
-		{
-			OnSlotClicked.Broadcast(SlotRef);
-			return FReply::Handled();
-		}
+		OnSlotClicked.Broadcast(SlotRef);
+		return FReply::Handled();
+	}
 
-		if (InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
-		{
-			OnSlotRightClicked.Broadcast(SlotRef);
-			return FReply::Handled();
-		}
+	if (CachedInstance.IsValid() && InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
+	{
+		OnSlotRightClicked.Broadcast(SlotRef);
+		return FReply::Handled();
 	}
 
 	return Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
@@ -214,6 +240,7 @@ void UInventorySlotWidget::NativeOnDragDetected(const FGeometry& InGeometry, con
 	UInventoryDragDropOperation* DragOp = NewObject<UInventoryDragDropOperation>(this);
 	DragOp->SourceSlotRef = SlotRef;
 	DragOp->SourceWidget = this;
+	DragOp->bAutoHalfSplitOnEmptyTarget = bPendingMiddleButtonDrag;
 	DragOp->Pivot = EDragPivot::CenterCenter;
 
 	UImage* DragVisual = NewObject<UImage>(this);
@@ -257,7 +284,7 @@ bool UInventorySlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDrag
 
 	if (UInventoryDragDropOperation* DragOp = Cast<UInventoryDragDropOperation>(InOperation))
 	{
-		OnSlotDropped.Broadcast(DragOp->SourceSlotRef, SlotRef);
+		OnSlotDropped.Broadcast(DragOp->SourceSlotRef, SlotRef, DragOp->Count, DragOp->bAutoHalfSplitOnEmptyTarget);
 		return true;
 	}
 
