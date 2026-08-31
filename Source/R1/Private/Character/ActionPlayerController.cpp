@@ -2,6 +2,7 @@
 
 
 #include "Character/ActionPlayerController.h"
+#include "Character/ActionCharacter.h"
 #include "EnhancedInputSubsystems.h"
 #include "EnhancedInputComponent.h"
 #include "InputMappingContext.h"
@@ -42,6 +43,14 @@ void AActionPlayerController::OnConfirmBuildingPlacement()
 		BuildingPlacementComponent->ConfirmPlacement();
 }
 
+void AActionPlayerController::PossessChar(AActionCharacter* InNewChar)
+{
+	if (!InNewChar) return;
+
+	Possess(InNewChar);
+	OnPossessedCharChange.Broadcast();
+}
+
 void AActionPlayerController::SetInventoryInputState(bool bOpen)
 {
 	bShowMouseCursor = bOpen;
@@ -73,5 +82,20 @@ void AActionPlayerController::SetInventoryInputState(bool bOpen)
 	{
 		SetInputMode(FInputModeGameOnly());
 	}
+}
+
+void AActionPlayerController::SetRespawnPoint(AActor* InRespawnPoint)
+{
+	if (!InRespawnPoint) return;
+
+	if (!InRespawnPoint->GetClass()->ImplementsInterface(URespawnPointInterface::StaticClass())) return;
+
+	UE_LOG(LogTemp, Warning, TEXT("%s 의 리스폰 지점이 %s 로 지정되었습니다."), * GetName(), *InRespawnPoint->GetName());
+	RespawnPoint = InRespawnPoint;
+}
+
+AActor* AActionPlayerController::GetRespawnPoint()
+{
+	return RespawnPoint;
 }
 

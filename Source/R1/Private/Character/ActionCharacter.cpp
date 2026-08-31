@@ -263,9 +263,12 @@ void AActionCharacter::ProcessAttack()
 
 void AActionCharacter::Die()
 {
+	// 캡슐 컴포넌트 충돌 끄기
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	// 애니메이션 중지
-	GetMesh()->SetAnimationMode(EAnimationMode::AnimationSingleNode);
-	GetMesh()->Stop();
+	//GetMesh()->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+	//GetMesh()->Stop();
+	GetMesh()->SetAnimInstanceClass(nullptr);
 	// 메쉬 랙돌 전환
 	GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
 	GetMesh()->SetSimulatePhysics(true);

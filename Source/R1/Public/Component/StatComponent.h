@@ -1,6 +1,6 @@
 ﻿/// 최초작성 : 2026.08.26
 /// 작 성 자 : 강 진 구
-
+/// 캐릭터의 생존 스탯(체력, 허기, 갈증) 전반 담당하는 컴포넌트
 #pragma once
 
 #include "CoreMinimal.h"
@@ -140,7 +140,7 @@ protected:
 
 	// Debug
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float DebugDamage = 10.0f;
+	float DebugDamage = 50.0f;
 
 private:
 	bool bAlive = false;

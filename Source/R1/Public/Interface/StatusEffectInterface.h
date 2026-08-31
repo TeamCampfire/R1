@@ -6,6 +6,7 @@
 #include "UObject/Interface.h"
 #include "StatusEffectInterface.generated.h"
 
+// 디버프 종류 ENUM
 UENUM(BlueprintType, meta = (Bitflags))
 enum class EStatusEffect : uint8
 {
