@@ -155,3 +155,16 @@ bool ABuildingActor::TryGetSnapPointWorldTransform(const UPrimitiveComponent* Ta
 	// -> 소켓의 월드 Transform 획득 성공
 	return true;
 }
+
+FPlacedBuildingPart* ABuildingActor::FindPlacedPartByID(const FGuid& InPartID)
+{
+	if (false == InPartID.IsValid()) return nullptr;
+
+	for (FPlacedBuildingPart& _placedPart : PlacedParts)
+	{
+		if (InPartID == _placedPart.PartID)
+			return &_placedPart; // 찾았어요
+	}
+
+	return nullptr;
+}

@@ -35,9 +35,14 @@ public:
 	void ConfirmPlacement();
 
 protected:
-	// 클라이언트가 서버에 새로운 건물 생성을 요청
+	// 클라이언트가 서버에 새로운 건축물 생성을 요청
 	UFUNCTION(Server, Reliable)
 	void ServerPlaceNewBuilding(UBuildingPartDefinition* Definition, const FTransform& InPlacementTransform);
+
+	// 클라이언트가 서버에 스냅 건물 파츠 생성을 요청
+	UFUNCTION(Server, Reliable)
+	void ServerPlaceSnappedPart(UBuildingPartDefinition* Definition, 
+		class ABuildingActor* TargetBuilding, FGuid TargetPartID, FName SocketName);
 
 	// Foundation Type의 지면 배치 프리뷰를 갱신
 	void UpdateFoundationPreview(APlayerController* PlayerController);
@@ -54,7 +59,7 @@ protected:
 private:
 	// 현재 프리뷰 액터 영역이 다른 오브젝트들과 겹치는지 검사, true : 겹침(설치 불가)
 	// SupportingComponent : 프리뷰를 받치고 있는 지면 컴포넌트
-	bool HasPlacementOverlap(const UPrimitiveComponent* SupportingComponent) const;
+	bool HasPlacementOverlap(const UPrimitiveComponent* SupportingComponent, const ABuildingActor* IgnoredBuilding = nullptr) const;
 	
 	// 프리뷰 위치를 세팅하고, 겹침 결과에 따라 머티리얼 변경
 	void ShowPreviewAtLocation(const FVector& InPreviewLocation, const FVector& InSurfaceNormal, UPrimitiveComponent* SupportingComponent);
@@ -78,7 +83,8 @@ private:
 	UStaticMeshComponent* GetOrCreateServerValidationMesh();
 
 	// 요청받은 Transform에서 실제 메시 콜리전이 장애물과 겹치는지 검사
-	bool HasServerPlacementOverlap(const UBuildingPartDefinition* Definition, const FTransform& InPlacementTransform);
+	bool HasServerPlacementOverlap(const UBuildingPartDefinition* Definition, const FTransform& InPlacementTransform, 
+		const UPrimitiveComponent* IgnoredSupportingComponent = nullptr, const ABuildingActor* IgnoredBuilding = nullptr);
 
 	// 파츠의 PlacementType에 맞는 서버 배치 검사
 	bool IsServerPlacementRuleValid(const UBuildingPartDefinition* Definition, const FTransform& InPlacementTransform);

@@ -146,16 +146,135 @@ void UBuildingPlacementComponent::ConfirmPlacement()
 		return;
 	}
 
-	if (nullptr == BuildingActorClass)
+	// 배치되는 방식(EBuildingPlacementType)에 따라 서버에 요청하는 방식이 달라요
+	switch (SelectedDefinition->PlacementType)
 	{
-		UE_LOG(LogTemp, Log, TEXT("[UBuildingPlacementComponent::ConfirmPlacement()] : BuildingActorClass가 설정되지 않았습니다."));
+	case EBuildingPlacementType::FOUNDATION:
+	{
+		if (nullptr == BuildingActorClass)
+		{
+			UE_LOG(LogTemp, Log, TEXT("[UBuildingPlacementComponent::ConfirmPlacement()] : BuildingActorClass가 설정되지 않았습니다."));
+			return;
+		}
+
+		const FTransform PlacementTransform = PreviewActor->GetActorTransform(); // 프리뷰의 트랜스폼 가져오기
+		ServerPlaceNewBuilding(SelectedDefinition.Get(), PlacementTransform); // 실제 건축물 생성은 서버에 요청해요
+
+		break;
+	}
+	case EBuildingPlacementType::STRUCTURE_SNAP:
+	{
+		if (false == CurrentSnapBuilding.IsValid() || false == CurrentSnapTargetPartID.IsValid() || true == CurrentSnapSocketName.IsNone())
+		{
+			UE_LOG(LogTemp, Log, TEXT("[UBuildingPlacementComponent::ConfirmPlacement()] : 유효한 스냅 대상이 없습니다."));
+			return;
+		}
+
+		// 실제 건축 파츠 스냅은 서버에 요청해요
+		ServerPlaceSnappedPart(SelectedDefinition.Get(), CurrentSnapBuilding.Get(), CurrentSnapTargetPartID, CurrentSnapSocketName);
+
+		break;
+	}
+	case EBuildingPlacementType::SURFACE:
+	case EBuildingPlacementType::ATTACHMENT:
+	default:
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UBuildingPlacementComponent::ConfirmPlacement()] : 아직 지원하지 않는 배치 방식입니다..."));
+		break;
+	}
+	}
+}
+
+void UBuildingPlacementComponent::ServerPlaceSnappedPart_Implementation(UBuildingPartDefinition* Definition, ABuildingActor* TargetBuilding, FGuid TargetPartID, FName SocketName)
+{
+	if (false == IsValid(Definition) || false == IsValid(Definition->PartMesh) ||
+		false == IsValid(TargetBuilding) || false == TargetPartID.IsValid() || true == SocketName.IsNone())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 유효하지 않은 요청 데이터입니다."));
 		return;
 	}
 
-	//UE_LOG(LogTemp, Log, TEXT("ConfirmPlacement: 설치 가능 위치입니다. Location=%s"), *PreviewActor->GetActorLocation().ToString());
+	// Structure 파츠만...
+	if (Definition->PlacementType != EBuildingPlacementType::STRUCTURE_SNAP)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : StructureSnap 파츠가 아닙니다."));
+		return;
+	}
 
-	const FTransform PlacementTransform = PreviewActor->GetActorTransform(); // 프리뷰의 트랜스폼 가져오기
-	ServerPlaceNewBuilding(SelectedDefinition.Get(), PlacementTransform); // 실제 건축물 생성은 서버에 요청해요
+	// 서버 기준의 건축 파츠 배열에서 대상 파츠를 PartID로 다시 검색
+	FPlacedBuildingPart* TargetPart = TargetBuilding->FindPlacedPartByID(TargetPartID);
+	if (nullptr == TargetPart || false == IsValid(TargetPart->Definition) || false == IsValid(TargetPart->MeshComponent))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 대상 파츠를 찾을 수 없습니다."));
+		return;
+	}
+
+	// 이미 사용된 소켓인지 검사
+	if (TargetPart->OccupiedSnapPoints.Contains(SocketName))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 이미 점유된 소켓입니다. Socket=%s"), *SocketName.ToString());
+		return;
+	}
+
+	//서버가 Definition과 실제 메시 소켓을 이용해 직!접! 최종 월드 Transform을 계산해요
+	FTransform SocketWorldTransform;
+	if (false == TargetBuilding->TryGetSnapPointWorldTransform( 
+		TargetPart->MeshComponent.Get(), Definition, SocketName, SocketWorldTransform))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 호환되는 스냅 소켓이 아닙니다."));
+		return;
+	}
+
+	const FTransform SafeSnapTransform(SocketWorldTransform.GetRotation(), SocketWorldTransform.GetLocation(), FVector::OneVector);
+	if (SafeSnapTransform.ContainsNaN())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 소켓 Transform이 유효하지 않습니다."));
+		return;
+	}
+
+	// 서버가 알고 있는 플레이어 위치를 기준으로 거리 검사
+	if (false == IsWithinServerPlacementDistance(SafeSnapTransform.GetLocation()))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 허용 설치 거리를 벗어났습니다."));
+		return;
+	}
+
+	// 설치Target Foundation은 의도적으로 맞닿으므로 제외하고(마지막 인자) 다른 건축 파츠 및 장애물과의 겹침을 검사해요
+	if (true == HasServerPlacementOverlap(Definition, SafeSnapTransform, TargetPart->MeshComponent.Get(), TargetBuilding))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 외부 장애물과 겹치는 위치입니다."));
+		return;
+	}
+
+	// 소켓의 월드 Transform을 -> 기존 BuildingActor 기준 상대 Transform으로 변환시켜요
+	const FTransform RelativeTransform = SafeSnapTransform.GetRelativeTransform(TargetBuilding->GetActorTransform());
+	if (RelativeTransform.ContainsNaN()) 
+		return;
+
+	// 새 BuildingActor를 만들지 않고 기존 건물에 해당 스냅 파츠를 추가해요
+	UStaticMeshComponent* NewPart = TargetBuilding->AddPart(Definition, RelativeTransform);
+	if (false == IsValid(NewPart))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 파츠 추가에 실패했습니다."));
+		return;
+	}
+
+	// AddPart()가 PlacedParts 배열에 새 요소를 추가하면서 배열 메모리가 재할당될 수 있으므로,
+	// 기존 TargetPart 포인터를 사용하지 않고 PartID로 다시 찾아요
+	FPlacedBuildingPart* UpdatedTargetPart = TargetBuilding->FindPlacedPartByID(TargetPartID);
+	if (nullptr == UpdatedTargetPart)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 설치 후 대상 파츠 재검색에 실패했습니다."));
+		return;
+	}
+
+	// 설치에 사용한 소켓을 사용된 상태로 기록
+	UpdatedTargetPart->OccupiedSnapPoints.AddUnique(SocketName);
+
+	// PlacedParts 변경을 클라이언트에 빠르게 전달
+	TargetBuilding->ForceNetUpdate();
+
+	UE_LOG(LogTemp, Log, TEXT(" [UBuildingPlacementComponent::ServerPlaceSnappedPart] : 스냅 파츠 설치 완료. Socket=%s"), *SocketName.ToString());
 }
 
 void UBuildingPlacementComponent::UpdateFoundationPreview(APlayerController* PlayerController)
@@ -320,6 +439,10 @@ void UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* 
 
 	for (const FBuildingSnapPointDefinition& SnapPoint : TargetPart->Definition->SnapPoints)
 	{
+		// 이미 사용된 소켓이면 제외
+		if (TargetPart->OccupiedSnapPoints.Contains(SnapPoint.SocketName))
+			continue;
+
 		FTransform CandidateTransform;
 
 		// 소켓 존재 여부와 파츠 타입 호환성을 함께 검사
@@ -359,7 +482,7 @@ void UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* 
 	PreviewActor->SetActorTransform(BestSocketTransform);
 
 	// 대상 Foundation 컴포넌트는 이미 의도적으로 겹친 상태니까 겹침 검사 대상에서 제외시켜요
-	const bool bHasOverlap = HasPlacementOverlap(HitResult.GetComponent());
+	const bool bHasOverlap = HasPlacementOverlap(HitResult.GetComponent(), HitBuilding);
 
 	bCanPlace = false == bHasOverlap;
 
@@ -466,7 +589,7 @@ void UBuildingPlacementComponent::ServerPlaceNewBuilding_Implementation(UBuildin
 	UE_LOG(LogTemp, Log, TEXT("ServerPlaceNewBuilding: 건축물 설치 완료. Location=%s"), *SafePlacementTransform.GetLocation().ToString());
 }
 
-bool UBuildingPlacementComponent::HasPlacementOverlap( const UPrimitiveComponent* SupportingComponent) const
+bool UBuildingPlacementComponent::HasPlacementOverlap( const UPrimitiveComponent* SupportingComponent, const ABuildingActor* IgnoredBuilding) const
 {
 	if ((false == IsValid(SelectedDefinition)) || false == IsValid(SelectedDefinition->PartMesh)) return true;
 
@@ -495,6 +618,11 @@ bool UBuildingPlacementComponent::HasPlacementOverlap( const UPrimitiveComponent
 	// 왜냐면요 Foundation 다리는 지면과 겹칠 수 있기 때문에..
 	if (true == IsValid(SupportingComponent))
 		QueryParams.AddIgnoredComponent(SupportingComponent);
+
+	// 유효한 스냅 소켓이 제공하는 위치는 무!조!건! 신뢰하는 걸로 하기 때문에
+	// 해당 소켓을 소유한 BuildingActor 내부 파츠들은 겹침 장애물에서 제외시켜요
+	if (true == IsValid(IgnoredBuilding))
+		QueryParams.AddIgnoredActor(IgnoredBuilding);
 
 	// 진짜 충돌 검사
 	TArray<FOverlapResult> OverlapResults;
@@ -665,7 +793,7 @@ UStaticMeshComponent* UBuildingPlacementComponent::GetOrCreateServerValidationMe
 	return ServerValidationMeshComponent;
 }
 
-bool UBuildingPlacementComponent::HasServerPlacementOverlap(const UBuildingPartDefinition* Definition, const FTransform& InPlacementTransform)
+bool UBuildingPlacementComponent::HasServerPlacementOverlap(const UBuildingPartDefinition* Definition, const FTransform& InPlacementTransform, const UPrimitiveComponent* IgnoredSupportingComponent, const ABuildingActor* IgnoredBuilding)
 {
 	if (false == IsValid(Definition) || false == IsValid(Definition->PartMesh)) return true;
 
@@ -687,6 +815,14 @@ bool UBuildingPlacementComponent::HasServerPlacementOverlap(const UBuildingPartD
 	ObjectQueryParams.AddObjectTypesToQuery(ECC_Pawn);
 
 	FComponentQueryParams QueryParams;
+
+	// 스냅 대상 파츠는 의도적으로 닿는 것이기에 겹침 겹사에서는 제외
+	if (true == IsValid(IgnoredSupportingComponent))
+		QueryParams.AddIgnoredComponent(IgnoredSupportingComponent);
+
+	// 서버가 검증한 소켓 위치에 추가되는 파츠니까 같은 건물을 구성하는 기존 파츠와의 의도된 겹침은 허용하기로 해요.
+	if (true == IsValid(IgnoredBuilding))
+		QueryParams.AddIgnoredActor(IgnoredBuilding);
 
 	AActor* OwnerActor = GetOwner();
 	if (true == IsValid(OwnerActor))

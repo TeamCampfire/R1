@@ -25,6 +25,9 @@ struct FPlacedBuildingPart
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	TObjectPtr<UStaticMeshComponent> MeshComponent; // 실제로 월드에 표시되는 런타임 메시 컴포넌트
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	TArray<FName> OccupiedSnapPoints; 	// 이 파츠가 제공하는 스냅 포인트 중 이미 다른 파츠가 설치된(사용된?) 소켓!! 이름
 };
 
 // 건축 조각들이 모여 만들어진 건축물 하나 단위의 껍데기 액터 클래스
@@ -54,6 +57,10 @@ public:
 	bool TryGetSnapPointWorldTransform(const UPrimitiveComponent* TargetComponent,
 		const UBuildingPartDefinition* IncomingDefinition, const FName& InSocketName,
 		FTransform& OutWorldTransform) const;
+
+	// (서버용) PartID를 이용해 설치된 파츠를 확인
+	FPlacedBuildingPart* FindPlacedPartByID(const FGuid& InPartID);
+
 	//  ===================================================================================
 
 protected:
