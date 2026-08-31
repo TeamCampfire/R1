@@ -165,7 +165,7 @@ void AActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		// 공격 (좌클릭 / 도구 주 액션)
 		if (IA_Attack)
 		{
-			EIC->BindAction(IA_Attack, ETriggerEvent::Started, this, &AActionCharacter::OnAttackPressed);
+			//EIC->BindAction(IA_Attack, ETriggerEvent::Started, this, &AActionCharacter::OnAttackPressed);
 		}
 
 		// 보조 액션 (우클릭 / 도구 보조 기능 / 조준 등)
@@ -180,6 +180,8 @@ void AActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		{
 			HeldItemComponent->GetCurrentHeldItem()->SetupInputComponent(EIC);
 		}
+
+		//EIC->BindAction(IA_BuildingPlacement, ETriggerEvent::Started, this, &AActionCharacter::OnBuildingPlacementPressed);
 	}
 }
 
@@ -430,6 +432,7 @@ void AActionCharacter::OnJumpPressed()
 
 void AActionCharacter::OnBuildingPlacementPressed()
 {
+	UE_LOG(LogTemp, Display, TEXT("OnBuildingPlacementPressed"));
 	// 플레이어 컨트롤러에게 건축 배치를 맡김
 	if (AActionPlayerController* PlayerController = Cast<AActionPlayerController>(GetController()))
 		PlayerController->OnConfirmBuildingPlacement();
