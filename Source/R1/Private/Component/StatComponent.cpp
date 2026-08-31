@@ -333,6 +333,7 @@ void UStatComponent::DrainSurvivalStats()
 	Execute_DecreaseHydration(this, DefaultHydrationDropRate);
 }
 
+
 void UStatComponent::BeginPlay()
 {
 	Super::BeginPlay();

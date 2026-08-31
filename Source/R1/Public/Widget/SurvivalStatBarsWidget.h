@@ -11,6 +11,7 @@ class UParameterBarWidget;
 class UParameterBarWidgetTest;
 class UStatusBarWidget;
 class UVerticalBox;
+class UStatComponent;
 enum class EStatusEffect:uint8;
 
 /**
@@ -25,10 +26,16 @@ protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
+	// 상태이상 업데이트 함수
 	UFUNCTION()
 	void UpdateStatusEffects();
 
+	// 스탯 UI 초기화 함수
+	UFUNCTION()
 	void InitializeSurvivalStatBars();
+
+	// 스탯컴포넌트<->UI 델리게이트 구독 해제 함수
+	void UnbindStatDelegates();
 private:
 
 public:
@@ -49,5 +56,8 @@ protected:
 
 	UPROPERTY()
 	TMap<EStatusEffect, TObjectPtr<UStatusBarWidget>> StatusBarWidgets;
+
+	UPROPERTY()
+	TObjectPtr<UStatComponent> StatComp;
 
 };
