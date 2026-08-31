@@ -6,6 +6,7 @@
 #include "Data/Item/EquipmentItemData.h"
 #include "Item/ItemPickup.h"
 #include "GameFramework/Character.h"
+#include "Component/HeldItemComponent.h"
 
 // Sets default values for this component's properties
 UInventoryComponent::UInventoryComponent()
@@ -334,10 +335,20 @@ void UInventoryComponent::UseBeltSlot(int32 BeltIndex)
 
 		case EItemCategory::Weapon:
 		case EItemCategory::Tool:
-			// 선택 = 손에 듦, 이미 든 같은 칸을 다시 선택 = 손을 내림. 다른 벨트 슬롯은 건드리지 않는다.
-			HeldBeltIndex = (HeldBeltIndex == BeltIndex) ? INDEX_NONE : BeltIndex;
+		{
+			// 1. 현재 선택된 벨트 슬롯 갱신
+			HeldBeltIndex = BeltIndex;
+			// 2. HeldItemComponent를 찾아 도구 장착 실행
+			if (UHeldItemComponent* HeldItemComp = GetOwner() ? GetOwner()->FindComponentByClass<UHeldItemComponent>() : nullptr)
+			{
+				if (UEquipmentItemData* EquipData = Cast<UEquipmentItemData>(Instance.ItemData))
+				{
+					HeldItemComp->EquipHeldItemByData(EquipData);
+				}
+			}
 			OnInventoryChanged.Broadcast();
 			break;
+		}
 
 		case EItemCategory::Consumable:
 		{
