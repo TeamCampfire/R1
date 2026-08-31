@@ -9,15 +9,21 @@
 
 /**
  * 아이템 대분류.
- * - Equipment: 착용 가능, 외형/스탯 변화
- * - Consumable: 장비 불가, 사용 시 효과 적용
+ * - Equipment: 착용 가능(모자/상의/하의 등), 장비슬롯을 점유하며 외형/스탯 변화
+ * - Weapon: 총/칼 등. 장비슬롯 없음 — 벨트(퀵슬롯)에서 선택하면 손에 들고, 같은 칸을
+ *   다시 선택하면 손에서 내린다(UInventoryComponent::UseBeltSlot 참고).
+ * - Tool: 곡괭이 등. 슬롯 동작은 Weapon과 동일하고, 채집량 같은 상세 스탯만 나중에 별도로 가짐.
+ * - Consumable: 장비/보유 슬롯 불가, 사용 시 효과 적용 후 소모.
  * - Misc: 데이터(이름/설명)만 존재, 제작/건설 재료용 — 별도 서브클래스 없이
- *   UItemDataBase를 그대로 사용하고 이 값으로만 구분한다.
+ *   UItemDataBase를 그대로 사용하고 이 값으로만 구분한다. Weapon/Tool도 상세 스탯이
+ *   생기기 전까지는 같은 방식(서브클래스 없이 이 값으로만 구분)으로 취급한다.
  */
 UENUM(BlueprintType)
 enum class EItemCategory : uint8
 {
 	Equipment	UMETA(DisplayName = "Equipment"),
+	Weapon		UMETA(DisplayName = "Weapon"),
+	Tool		UMETA(DisplayName = "Tool"),
 	Consumable	UMETA(DisplayName = "Consumable"),
 	Misc		UMETA(DisplayName = "Misc")
 };
@@ -35,10 +41,12 @@ enum class EPickupMode : uint8
 };
 
 /**
- * 장비 슬롯 종류.
- * Head/Chest/Legs/Feet = 외형 전용 방어구 슬롯
- * Weapon/Tool = 손에 드는 슬롯
+ * 장비(착용) 슬롯 종류 — 순수 착용형 부위만 표현한다.
  * 목록은 확정이 아니라 초안이므로 실제 방어구 부위(장갑 등)가 늘어나면 추가하면 된다.
+ *
+ * 실제 Rust 화면 확인 결과, 이 값은 "고정 배열 인덱스"가 아니라 "같은 부위 유일성 제약"으로만
+ * 쓰인다 — UInventoryComponent::EquipmentSlots는 부위별로 고정 배정된 칸이 없는 자유 배열이고,
+ * 같은 EquipSlot 값을 가진 아이템은 동시에 하나만 착용 가능하다는 제약만 이 값으로 검사한다.
  */
 UENUM(BlueprintType)
 enum class EEquipmentSlotType : uint8
@@ -47,9 +55,7 @@ enum class EEquipmentSlotType : uint8
 	Head	UMETA(DisplayName = "Head"),
 	Chest	UMETA(DisplayName = "Chest"),
 	Legs	UMETA(DisplayName = "Legs"),
-	Feet	UMETA(DisplayName = "Feet"),
-	Weapon	UMETA(DisplayName = "Weapon (Hand)"),
-	Tool	UMETA(DisplayName = "Tool (Hand)")
+	Feet	UMETA(DisplayName = "Feet")
 };
 
 /**

@@ -44,6 +44,14 @@ void AItemPickup::InitializeFromItem(UItemDataBase* InItemData, int32 InCount)
 	RefreshVisual();
 }
 
+void AItemPickup::AddThrowImpulse(const FVector& Impulse)
+{
+	if (Mesh)
+	{
+		Mesh->AddImpulse(Impulse);
+	}
+}
+
 // Called when the game starts or when spawned
 void AItemPickup::BeginPlay()
 {
