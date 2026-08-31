@@ -17,7 +17,7 @@ public class R1 : ModuleRules
 			"AnimGraphRuntime",
 			"UMG",
 			"Slate",
-			"SlateCore"
+			"SlateCore",
 			"Water",
 			"CableComponent",
 			"Niagara",
