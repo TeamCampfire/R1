@@ -14,11 +14,16 @@ UInteractionComponent::UInteractionComponent()
 	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = true;
 
-	// ...
+	// 리플리케이트 되는 컴포넌트 설정
+	SetIsReplicatedByDefault(true);
 }
 
 void UInteractionComponent::TryInteract()
 {
+	UE_LOG(LogTemp, Log, TEXT("[PIE %d][%s] TryInteract 호출됨"),
+		UE::GetPlayInEditorID(),
+		GetOwner() && GetOwner()->HasAuthority() ? TEXT("SERVER") : TEXT("CLIENT"));
+
 	if (!CurrentTarget || !CurrentTarget->Implements<UInteractableInterface>())
 	{
 		return;
@@ -27,7 +32,26 @@ void UInteractionComponent::TryInteract()
 	APawn* OwnerPawn = Cast<APawn>(GetOwner());
 	if (IInteractableInterface::Execute_CanInteract(CurrentTarget, OwnerPawn))
 	{
-		IInteractableInterface::Execute_Interact(CurrentTarget, OwnerPawn);
+		Server_TryInteract(CurrentTarget);	// <- 클라이언트는 "이거 상호작용 하고 싶다"는 요청만 서버로 보내고, 실제 상호작용은 서버에서 실행한다.
+	}
+}
+
+bool UInteractionComponent::Server_TryInteract_Validate(AActor* Target)
+{
+	return Target != nullptr;
+}
+
+void UInteractionComponent::Server_TryInteract_Implementation(AActor* Target)
+{
+	if (!Target || !Target->Implements<UInteractableInterface>())
+	{
+		return;
+	}
+
+	APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	if (IInteractableInterface::Execute_CanInteract(Target, OwnerPawn))
+	{
+		IInteractableInterface::Execute_Interact(Target, OwnerPawn);	// <- 실제 상호작용은 서버에서 실행한다.
 	}
 }
 

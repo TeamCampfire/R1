@@ -57,7 +57,11 @@ public:
 	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
-	
+
+	//~ Begin AActor Interface
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	//~ End AActor Interface
+
 	//~ Begin IInteractable Interface
 	virtual FText GetInteractionDisplayName_Implementation() const override;
 	virtual bool CanInteract_Implementation(APawn* Interactor) const override;
@@ -87,15 +91,23 @@ private:
 	// Count를 줄인 채 액터를 그대로 남긴다(인벤토리가 꽉 찬 경우 등).
 	void TryGrantToInventory(APawn* Interactor);
 
+	// ItemData가 리플리케이트되어 도착했을 때(드랍으로 새로 스폰된 픽업이 클라이언트에
+	// 처음 동기화되는 시점) 메시를 다시 갱신한다 — 그 전까지는 클라이언트의 ItemData가
+	// null이라 RefreshVisual()이 메시를 지운 상태로 남아있기 때문.
+	UFUNCTION()
+	void OnRep_ItemData();
+
 public:
 	// 이 픽업을 주웠을 때 인벤토리에 들어갈 아이템 정의.
 	// 레벨에 배치할 때 디테일 패널에서 직접 지정하거나, 드랍 로직에서
-	// 스폰 직후 InitializeFromItem으로 지정한다.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item")
+	// 스폰 직후 InitializeFromItem으로 지정한다. 드랍으로 동적 스폰되는 픽업은
+	// 클라이언트가 서버로부터 이 값을 리플리케이션으로 받아야 시각적으로 보이므로
+	// ReplicatedUsing으로 걸어둔다.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_ItemData, Category = "Item")
 	TObjectPtr<UItemDataBase> ItemData;
 
 	// 스택형 아이템의 수량. 장비 아이템은 항상 1로 취급.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item", meta = (ClampMin = "1"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Replicated, Category = "Item", meta = (ClampMin = "1"))
 	int32 Count = 1;
 
 protected:

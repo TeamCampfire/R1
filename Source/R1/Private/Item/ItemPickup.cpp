@@ -7,12 +7,17 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/SphereComponent.h"
 #include "GameFramework/Pawn.h"
+#include "Net/UnrealNetwork.h"
 
 // Sets default values
 AItemPickup::AItemPickup()
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
+
+	// 리플리케이트 적용
+	bReplicates = true;
+
 
 	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
 	SetRootComponent(Mesh);
@@ -22,11 +27,15 @@ AItemPickup::AItemPickup()
 	// 뺀다. BlockAllDynamic 프로파일을 그대로 쓰면 Pawn도 Block이라 캐릭터가 부딪혀
 	// 밀려나는 부자연스러운 충돌이 생긴다 — 플레이어와의 상호작용 판정은 어차피
 	// InteractionSphere(Overlap)가 전담하므로 Mesh가 Pawn을 막을 이유가 없다.
+	// 픽업끼리도 서로 Block이면(둘 다 ObjectType=PhysicsBody라) 무더기로 드랍/스폰됐을 때
+	// 서로 밀어내며 튕기므로, PhysicsBody 채널도 Ignore로 빼서 바닥/벽(WorldStatic 등)과는
+	// 계속 충돌하되 아이템끼리는 그냥 겹쳐 쌓이게 한다.
 	/// 추후 콜리전 채널 세분화 되면 수정 필요
 	Mesh->SetCollisionObjectType(ECC_PhysicsBody);
 	Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	Mesh->SetCollisionResponseToAllChannels(ECR_Block);
-	Mesh->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);	
+	Mesh->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+	Mesh->SetCollisionResponseToChannel(ECC_PhysicsBody, ECR_Ignore);
 	Mesh->SetSimulatePhysics(true);
 
 	InteractionSphere = CreateDefaultSubobject<USphereComponent>(TEXT("InteractionSphere"));
@@ -41,6 +50,19 @@ void AItemPickup::InitializeFromItem(UItemDataBase* InItemData, int32 InCount)
 {
 	ItemData = InItemData;
 	Count = FMath::Max(1, InCount);
+	RefreshVisual();
+}
+
+void AItemPickup::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AItemPickup, ItemData);
+	DOREPLIFETIME(AItemPickup, Count);
+}
+
+void AItemPickup::OnRep_ItemData()
+{
 	RefreshVisual();
 }
 

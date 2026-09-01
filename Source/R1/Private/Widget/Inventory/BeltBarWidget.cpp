@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Widget/Inventory/BeltBarWidget.h"
@@ -96,7 +96,7 @@ void UBeltBarWidget::HandleSlotDropped(FInventorySlotRef FromSlot, FInventorySlo
 		return;
 	}
 
-	Inventory->TransferItem(FromSlot, ToSlot, Count, bAutoHalfSplitOnEmptyTarget);
+	Inventory->Server_TransferItem(FromSlot, ToSlot, Count, bAutoHalfSplitOnEmptyTarget);
 }
 
 void UBeltBarWidget::HandleSlotClicked(FInventorySlotRef SlotRef)
@@ -111,7 +111,7 @@ void UBeltBarWidget::HandleSlotRightClicked(FInventorySlotRef SlotRef)
 {
 	if (UInventoryComponent* Inventory = BoundInventory.Get())
 	{
-		Inventory->QuickMoveItem(SlotRef);
+		Inventory->Server_QuickMoveItem(SlotRef);
 	}
 }
 
@@ -119,6 +119,6 @@ void UBeltBarWidget::HandleSlotDragCancelled(FInventorySlotRef SlotRef)
 {
 	if (UInventoryComponent* Inventory = BoundInventory.Get())
 	{
-		Inventory->ThrowItem(SlotRef, 0);
+		Inventory->Server_ThrowItem(SlotRef, 0);
 	}
 }

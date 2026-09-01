@@ -43,8 +43,13 @@ public:
 	UInteractionComponent();
 
 	// 현재 조준 중인 대상에게 실제 상호작용을 실행한다. 입력 액션에 바인딩해서 호출.
+	// 상호작용 가능 판단 후 서버에 요청만 함.
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	void TryInteract();
+
+	// 실제로 상호작용 동작하는 서버측 실행 함수
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_TryInteract(AActor* Target);
 
 protected:
 	// Called when the game starts

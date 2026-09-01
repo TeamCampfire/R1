@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Widget/Inventory/InventoryWidget.h"
@@ -190,7 +190,7 @@ void UInventoryWidget::HandleSlotDropped(FInventorySlotRef FromSlot, FInventoryS
 
 	// Count<=0 => 전량 이동, 양수면 분할 드래그(DetailInfoWidget)에서 지정한 수량만.
 	// bAutoHalfSplitOnEmptyTarget=true(휠클릭 드래그)면 빈 슬롯에 놓았을 때 절반만 옮긴다.
-	Inventory->TransferItem(FromSlot, ToSlot, Count, bAutoHalfSplitOnEmptyTarget);
+	Inventory->Server_TransferItem(FromSlot, ToSlot, Count, bAutoHalfSplitOnEmptyTarget);
 }
 
 void UInventoryWidget::HandleSlotClicked(FInventorySlotRef SlotRef)
@@ -205,7 +205,7 @@ void UInventoryWidget::HandleSlotRightClicked(FInventorySlotRef SlotRef)
 {
 	if (UInventoryComponent* Inventory = BoundInventory.Get())
 	{
-		Inventory->QuickMoveItem(SlotRef);
+		Inventory->Server_QuickMoveItem(SlotRef);
 	}
 }
 
@@ -213,6 +213,6 @@ void UInventoryWidget::HandleSlotDragCancelled(FInventorySlotRef SlotRef)
 {
 	if (UInventoryComponent* Inventory = BoundInventory.Get())
 	{
-		Inventory->ThrowItem(SlotRef, 0);
+		Inventory->Server_ThrowItem(SlotRef, 0);
 	}
 }

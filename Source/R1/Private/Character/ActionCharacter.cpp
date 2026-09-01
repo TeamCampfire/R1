@@ -235,8 +235,7 @@ void AActionCharacter::ProcessAttack()
 				{
 					if (ItemRes.ItemData)
 					{
-						int32 RemainCnt = 0;
-						InventoryComponent->AddItem(ItemRes.ItemData, ItemRes.Count, RemainCnt);
+						Server_GrantHarvestReward(ItemRes.ItemData, ItemRes.Count);
 
 						//TODO RemainCnt
 						//바닥에 소환하기
@@ -259,6 +258,22 @@ void AActionCharacter::ProcessAttack()
 	{
 		UE_LOG(LogTemp, Display, TEXT("아무도 것도 맞지 않았습니다."));
 	}
+}
+
+bool AActionCharacter::Server_GrantHarvestReward_Validate(UItemDataBase* ItemData, int32 Count)
+{
+	return ItemData != nullptr && Count > 0;
+}
+
+void AActionCharacter::Server_GrantHarvestReward_Implementation(UItemDataBase* ItemData, int32 Count)
+{
+	if (!InventoryComponent)
+	{
+		return;
+	}
+
+	int32 RemainCnt = 0;
+	InventoryComponent->AddItem(ItemData, Count, RemainCnt);
 }
 
 void AActionCharacter::Die()
@@ -483,7 +498,7 @@ void AActionCharacter::OnUseBeltSlotPressed(int32 BeltIndex)
 
 	if (InventoryComponent)
 	{
-		InventoryComponent->UseBeltSlot(BeltIndex);
+		InventoryComponent->Server_UseBeltSlot(BeltIndex);
 	}
 }
 

@@ -272,14 +272,14 @@ void UDetailInfoWidget::HandleDiscardClicked()
 		return;
 	}
 
-	Inventory->ThrowItem(Inventory->SelectedSlotRef);
+	Inventory->Server_ThrowItem(Inventory->SelectedSlotRef, 0);
 }
 
 void UDetailInfoWidget::HandleUseClicked()
 {
 	if (UInventoryComponent* Inventory = BoundInventory.Get())
 	{
-		Inventory->UseSelectedItem();
+		Inventory->Server_UseSelectedItem();
 	}
 }
 
