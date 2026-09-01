@@ -38,6 +38,14 @@ AItemPickup::AItemPickup()
 	Mesh->SetCollisionResponseToChannel(ECC_PhysicsBody, ECR_Ignore);
 	Mesh->SetSimulatePhysics(true);
 
+	// UInteractionComponent가 조준 시 스텐실 값만 바꿔 하이라이트를 켜고 끌 수 있도록
+	// CustomDepth 렌더링 자체는 스폰 시점(등록 전)에 미리 켜둔다. 컴포넌트가 등록되기
+	// 전에 설정하는 것이라 씬 프록시 재생성 비용이 없다 — 조준하는 그 순간 처음 켜면
+	// MarkRenderStateDirty()로 프록시가 다시 만들어지면서 TSR 히스토리가 깨져 한두
+	// 프레임 노이즈가 튀는데, 스폰 시점에 미리 켜두면 그 비용을 게임플레이 중이 아니라
+	// 아무도 안 보고 있는 스폰 시점에 미리 치르게 된다.
+	Mesh->SetRenderCustomDepth(true);
+
 	InteractionSphere = CreateDefaultSubobject<USphereComponent>(TEXT("InteractionSphere"));
 	InteractionSphere->SetupAttachment(RootComponent);
 	InteractionSphere->SetSphereRadius(120.f);

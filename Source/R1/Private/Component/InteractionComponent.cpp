@@ -5,7 +5,7 @@
 #include "Interface/InteractableInterface.h"
 #include "GameFramework/Pawn.h"
 #include "Camera/CameraComponent.h"
-#include "Components/StaticMeshComponent.h"
+#include "Components/PrimitiveComponent.h"
 
 // Sets default values for this component's properties
 UInteractionComponent::UInteractionComponent()
@@ -57,46 +57,44 @@ void UInteractionComponent::Server_TryInteract_Implementation(AActor* Target)
 
 void UInteractionComponent::SetActorHighlight(AActor* Actor, bool bEnable)
 {
-	if (!bEnable)
-	{
-		if (HighlightCloneMesh)
-		{
-			HighlightCloneMesh->SetVisibility(false);
-		}
-		return;
-	}
-
 	if (!IsValid(Actor))
 	{
 		return;
 	}
 
 	/// 아웃라인 하이라이트용 코드
-	// 지금은 아이템 픽업처럼 스태틱 메시 하나로 이루어진 액터만 지원한다.
-	UStaticMeshComponent* TargetMesh = Actor->FindComponentByClass<UStaticMeshComponent>();
-	if (!TargetMesh || !TargetMesh->GetStaticMesh())
-	{
-		return;
-	}
+	// 복제 메시로 덧씌우는 대신, 대상의 모든 프리미티브 컴포넌트에 CustomDepth
+	// 렌더링을 직접 켜고 끈다 — 레벨의 PostProcessVolume에 등록된
+	// M_InteractionOutline_PostProcess가 CustomDepth 스텐실 값을 읽어 외곽선을
+	// 그린다. 메시 개수/모양이나 카메라 각도와 무관하게 실제 실루엣을 그대로
+	// 따라가므로, 인버티드 헐 복제 방식과 달리 시야각에 따라 테두리가 빠지거나
+	// 면이 통째로 덮이는 문제가 생기지 않는다.
+	TArray<UPrimitiveComponent*> PrimitiveComponents;
+	Actor->GetComponents<UPrimitiveComponent>(PrimitiveComponents);
 
-	if (!HighlightCloneMesh)
+	for (UPrimitiveComponent* PrimComp : PrimitiveComponents)
 	{
-		// 대상이 바뀔 때마다 새로 만들고 지우는 대신, 하나만 만들어 재사용한다
-		// (한 번에 대상 하나만 하이라이트되므로 충분함).
-		HighlightCloneMesh = NewObject<UStaticMeshComponent>(GetOwner());
-		HighlightCloneMesh->RegisterComponentWithWorld(GetWorld());
-		HighlightCloneMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		HighlightCloneMesh->SetCastShadow(false);
-		HighlightCloneMesh->SetReceivesDecals(false);
+		if (!PrimComp)
+		{
+			continue;
+		}
+
+		// SetRenderCustomDepth()는 값이 바뀔 때 내부적으로 MarkRenderStateDirty()를
+		// 호출해 씬 프록시를 다시 만든다 — 조준할 때마다 껐다 켰다 하면 그 순간
+		// TSR 히스토리 재투영이 깨지면서 한두 프레임 동안 노이즈/줄무늬가 튄다.
+		// 그래서 CustomDepth 자체는 한 번 켜면 계속 켜둔 채로 두고, on/off는 프록시
+		// 재생성이 필요 없는 SetCustomDepthStencilValue만으로 처리한다 — 스텐실 값
+		// 0은 배경과 같아서 외곽선 머티리얼이 그리지 않으므로 시각적으로는 동일하다.
+		if (bEnable)
+		{
+			PrimComp->SetRenderCustomDepth(true);
+			PrimComp->SetCustomDepthStencilValue(HighlightStencilValue);
+		}
+		else
+		{
+			PrimComp->SetCustomDepthStencilValue(0);
+		}
 	}
-	
-	HighlightCloneMesh->SetStaticMesh(TargetMesh->GetStaticMesh());
-	HighlightCloneMesh->SetMaterial(0, HighlightOverlayMaterial);
-	HighlightCloneMesh->AttachToComponent(TargetMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
-	HighlightCloneMesh->SetRelativeLocation(FVector::ZeroVector);
-	HighlightCloneMesh->SetRelativeRotation(FRotator::ZeroRotator);
-	HighlightCloneMesh->SetRelativeScale3D(FVector(HighlightScaleMultiplier));
-	HighlightCloneMesh->SetVisibility(true);
 }
 
 // Called when the game starts
@@ -161,12 +159,10 @@ void UInteractionComponent::UpdateTargeting()
 	// 않으면 UI 쪽에서 매 프레임 갱신 이벤트를 처리해야 한다.
 	if (NewTarget != CurrentTarget || !bCurrentTargetStillValid)
 	{
-		// 이전 대상이 이미 Destroy()돼서 더 이상 유효하지 않아도(예: 인벤토리로
-		// 획득되며 즉시 파괴) 하이라이트는 반드시 꺼야 한다 — 안 그러면 HighlightCloneMesh가
-		// 파괴된 대상에 붙어 있던 자리에 그대로 남아(부착 대상 컴포넌트가 없어지며 고아
-		// 상태로 남음) 다음에 새 대상을 조준하기 전까지 화면에 계속 떠 있게 된다.
-		// SetActorHighlight(..., false)는 Actor 인자를 쓰지 않으므로 CurrentTarget이
-		// 이미 무효(Pending Kill/nullptr)여도 안전하게 호출할 수 있다.
+		// 이전 대상이 이미 Destroy()돼서 더 이상 유효하지 않다면(예: 인벤토리로
+		// 획득되며 즉시 파괴) CustomDepth를 끌 대상 자체가 사라진 것이므로 굳이 끌
+		// 필요가 없다 — SetActorHighlight 내부에서 IsValid(Actor) 체크로 안전하게
+		// 걸러진다.
 		SetActorHighlight(CurrentTarget, false);
 
 		CurrentTarget = IsValid(NewTarget) ? NewTarget : nullptr;
