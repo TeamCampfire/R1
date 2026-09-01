@@ -34,6 +34,9 @@ public:
 	// 현재 프리뷰 위치에 건축물 설치를 요청
 	void ConfirmPlacement();
 
+	// 키를 누를 때 마다 프리뷰 상태에서 데이터에 의해 파츠 회전을 진행하는 함수 
+	void RotateBuildingPart();
+
 protected:
 	// 클라이언트가 서버에 새로운 건축물 생성을 요청
 	UFUNCTION(Server, Reliable)
@@ -42,7 +45,7 @@ protected:
 	// 클라이언트가 서버에 스냅 건물 파츠 생성을 요청
 	UFUNCTION(Server, Reliable)
 	void ServerPlaceSnappedPart(UBuildingPartDefinition* Definition, 
-		class ABuildingActor* TargetBuilding, FGuid TargetPartID, FName SocketName);
+		class ABuildingActor* TargetBuilding, FGuid TargetPartID, FName SocketName, int32 SnapYawwOffsetIdx);
 
 	// Foundation Type의 지면 배치 프리뷰를 갱신
 	void UpdateFoundationPreview(APlayerController* PlayerController);
@@ -91,7 +94,13 @@ private:
 
 	// Foundation의 지면·경사·장애물 조건을 검사 (기존)
 	bool IsServerFoundationPlacementValid(const UBuildingPartDefinition* Definition, const FTransform& InPlacementTransform);
-	
+
+	// 현재 건축 파츠의 회전값이 든 배열(AllowedSnapYawOffsets)의 인덱스를 순환시키는 함수
+	void CycleSnapYawOffset();
+
+	// 건축 파츠의 회전값이 든 배열(AllowedSnapYawOffsets)[CurSnapYawOffsetIdx]
+	float GetCurSnapYawOffset();
+
 	//  ===================================================================================
 private:
 	// 최대 건축 지점 거리
@@ -140,4 +149,6 @@ protected:
 
 private:
 	bool bIsPlacing = false; // 현재 건축물 배치중인가요?
+
+	int CurSnapYawOffsetIdx = 0; // 현재 선택된 UBuildingPartDefinition->AllowedSnapYawOffsets 배열의 인덱스
 };

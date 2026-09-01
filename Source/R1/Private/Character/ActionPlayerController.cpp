@@ -42,6 +42,12 @@ void AActionPlayerController::OnConfirmBuildingPlacement()
 		BuildingPlacementComponent->ConfirmPlacement();
 }
 
+void AActionPlayerController::OnRotateBuildingPart()
+{
+	if (true == IsValid(BuildingPlacementComponent))
+		BuildingPlacementComponent->RotateBuildingPart();
+}
+
 void AActionPlayerController::SetInventoryInputState(bool bOpen)
 {
 	bShowMouseCursor = bOpen;

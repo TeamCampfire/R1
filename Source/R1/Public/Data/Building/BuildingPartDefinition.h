@@ -1,4 +1,4 @@
-// 작업 시작일 : 8/28
+﻿// 작업 시작일 : 8/28
 // 작업자 : 우진
 
 #pragma once
@@ -28,7 +28,8 @@ enum class EBuildingPartType : uint8
 	FLOOR,
 	STAIR,
 	DOOR,
-	DEPLOYABLE // 모닥불, 제작대처럼 구조물이 아닌 설치물
+	DEPLOYABLE, // 모닥불, 제작대처럼 구조물이 아닌 설치물
+	ROOF
 };
 
 // 스냅되어 붙을 수 있는 것들의 정보가 담긴 구조체
@@ -83,4 +84,7 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Building|Placement", meta = (TitleProperty = "SocketName"))
 	TArray<FBuildingSnapPointDefinition> SnapPoints; // 이 파츠가 다른 파츠에 제공하는 스냅 위치들
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snapping")
+	TArray<float> AllowedSnapYawOffsets = { 0.f }; // 소켓의 회전을 기준으로 선택할 수 있는 상대 Yaw 각도들
 };

@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.25
+﻿/// 최초작성 : 2026.08.25
 /// 작 성 자 : 최 요 환
 
 // Fill out your copyright notice in the Description page of Project Settings.
@@ -93,6 +93,7 @@ protected:
 	void OnSecondaryActionReleased();	// 보조 액션 종료 (우클릭 뗌)
 
 	void OnBuildingPlacementPressed();
+	void OnRotateBuildingPartPressed();
 
 	void OnInteractPressed();			// 상호작용 시도
 	void OnInventoryTogglePressed();	// 인벤토리 패널 토글
@@ -135,6 +136,10 @@ protected:
 	// 건축물 설치 확정 좌클릭
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UInputAction> IA_BuildingPlacement;
+
+	// 건축 파츠 회전 휠클릭
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UInputAction> IA_RotateBuildingPart;
 
 	// 상호작용
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)

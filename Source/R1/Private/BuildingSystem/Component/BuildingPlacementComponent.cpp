@@ -80,6 +80,8 @@ void UBuildingPlacementComponent::StartPlacement(UBuildingPartDefinition* Defini
 
 	SelectedDefinition = Definition;
 	CurFoundationLegLength = 0.f;
+	CurSnapYawOffsetIdx = 0;
+
 	if (SelectedDefinition->PlacementType == EBuildingPlacementType::FOUNDATION)
 	{
 		// Foundation 전용 : 메시 피벗 아래쪽으로 내려간 다리기둥 길이 계산
@@ -171,7 +173,7 @@ void UBuildingPlacementComponent::ConfirmPlacement()
 		}
 
 		// 실제 건축 파츠 스냅은 서버에 요청해요
-		ServerPlaceSnappedPart(SelectedDefinition.Get(), CurrentSnapBuilding.Get(), CurrentSnapTargetPartID, CurrentSnapSocketName);
+		ServerPlaceSnappedPart(SelectedDefinition.Get(), CurrentSnapBuilding.Get(), CurrentSnapTargetPartID, CurrentSnapSocketName, CurSnapYawOffsetIdx);
 
 		break;
 	}
@@ -185,7 +187,13 @@ void UBuildingPlacementComponent::ConfirmPlacement()
 	}
 }
 
-void UBuildingPlacementComponent::ServerPlaceSnappedPart_Implementation(UBuildingPartDefinition* Definition, ABuildingActor* TargetBuilding, FGuid TargetPartID, FName SocketName)
+void UBuildingPlacementComponent::RotateBuildingPart()
+{
+	CycleSnapYawOffset();
+	UE_LOG(LogTemp, Log, TEXT("현재 스냅 Yaw Offset: %.1f"), GetCurSnapYawOffset());
+}
+
+void UBuildingPlacementComponent::ServerPlaceSnappedPart_Implementation(UBuildingPartDefinition* Definition, ABuildingActor* TargetBuilding, FGuid TargetPartID, FName SocketName, int32 _SnapYawOffsetIdx)
 {
 	if (false == IsValid(Definition) || false == IsValid(Definition->PartMesh) ||
 		false == IsValid(TargetBuilding) || false == TargetPartID.IsValid() || true == SocketName.IsNone())
@@ -225,7 +233,26 @@ void UBuildingPlacementComponent::ServerPlaceSnappedPart_Implementation(UBuildin
 		return;
 	}
 
-	const FTransform SafeSnapTransform(SocketWorldTransform.GetRotation(), SocketWorldTransform.GetLocation(), FVector::OneVector);
+	//스냅 Yaw 회전값을 Definition에서 직접 받아와 Trasform에 적용해요
+	float SnapYawOffset = 0.f;
+	if (Definition->AllowedSnapYawOffsets.Num() > 0)
+	{
+		if (false == Definition->AllowedSnapYawOffsets.IsValidIndex(_SnapYawOffsetIdx))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 허용되지 않은 회전 인덱스입니다. Index=%d"), _SnapYawOffsetIdx);
+			return;
+		}
+
+		SnapYawOffset = Definition->AllowedSnapYawOffsets[_SnapYawOffsetIdx];
+	}
+	else if (_SnapYawOffsetIdx != 0)
+		return;
+
+	FQuat YawOffsetRotation = FRotator(0.f, SnapYawOffset, 0.f).Quaternion(); // 진짜 YawOffset만 든 값
+	FQuat FinalSnapRotation = SocketWorldTransform.GetRotation() * YawOffsetRotation; // 을 적용시켜요
+	FinalSnapRotation.Normalize();
+
+	FTransform SafeSnapTransform(FinalSnapRotation, SocketWorldTransform.GetLocation(), FVector::OneVector);
 	if (SafeSnapTransform.ContainsNaN())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 소켓 Transform이 유효하지 않습니다."));
@@ -479,8 +506,19 @@ void UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* 
 		return;
 	}
 
-	// 프리뷰를 선택된 소켓에 배치!!!
-	PreviewActor->SetActorTransform(BestSocketTransform);
+	// 적용할 Yaw 회전값을 가져와 세팅된 값만이 담긴 회전 쿼터니언으로 만들었어요
+	FTransform RotatedSnapTransform = BestSocketTransform;
+	float SnapYawOffset = GetCurSnapYawOffset();
+	FQuat YawOffsetRotation = FRotator(0.f, SnapYawOffset, 0.f).Quaternion();
+
+	// BestSocketTransform의 회전에 적용시켜요
+	FQuat FinalRotation = BestSocketTransform.GetRotation() * YawOffsetRotation;
+
+	FinalRotation.Normalize();
+	RotatedSnapTransform.SetRotation(FinalRotation);
+
+	// 회전값까지 적용된 Transform을 프리뷰에 적용해 배치 !!
+	PreviewActor->SetActorTransform(RotatedSnapTransform);
 
 	// 대상 Foundation 컴포넌트는 이미 의도적으로 겹친 상태니까 겹침 검사 대상에서 제외시켜요
 	const bool bHasOverlap = HasPlacementOverlap(HitResult.GetComponent(), HitBuilding);
@@ -922,4 +960,28 @@ bool UBuildingPlacementComponent::IsServerFoundationPlacementValid(const UBuildi
 	}
 
 	return true;
+}
+
+void UBuildingPlacementComponent::CycleSnapYawOffset()
+{
+	if (false == IsValid(SelectedDefinition)) return;
+
+	const int32 OffsetCnt = SelectedDefinition->AllowedSnapYawOffsets.Num();
+
+	if (OffsetCnt <= 0)
+	{
+		CurSnapYawOffsetIdx = 0;
+		return;
+	}
+
+	// 배열의 마지막 인덱스에서 다시 배열의 0번째 인덱스로 돌아가요
+	CurSnapYawOffsetIdx = (CurSnapYawOffsetIdx + 1) % OffsetCnt;
+}
+
+float UBuildingPlacementComponent::GetCurSnapYawOffset()
+{
+	if (false == IsValid(SelectedDefinition)) return 0.f;
+	if (false == SelectedDefinition->AllowedSnapYawOffsets.IsValidIndex(CurSnapYawOffsetIdx)) return 0.f;
+
+	return SelectedDefinition->AllowedSnapYawOffsets[CurSnapYawOffsetIdx];
 }

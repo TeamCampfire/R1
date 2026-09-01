@@ -181,7 +181,11 @@ void AActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 			HeldItemComponent->GetCurrentHeldItem()->SetupInputComponent(EIC);
 		}
 
-		EIC->BindAction(IA_BuildingPlacement, ETriggerEvent::Started, this, &AActionCharacter::OnBuildingPlacementPressed);
+		if(IA_BuildingPlacement)
+			EIC->BindAction(IA_BuildingPlacement, ETriggerEvent::Started, this, &AActionCharacter::OnBuildingPlacementPressed);
+
+		if (IA_RotateBuildingPart)
+			EIC->BindAction(IA_RotateBuildingPart, ETriggerEvent::Started, this, &AActionCharacter::OnRotateBuildingPartPressed);
 	}
 }
 
@@ -436,6 +440,12 @@ void AActionCharacter::OnBuildingPlacementPressed()
 	// 플레이어 컨트롤러에게 건축 배치를 맡김
 	if (AActionPlayerController* PlayerController = Cast<AActionPlayerController>(GetController()))
 		PlayerController->OnConfirmBuildingPlacement();
+}
+
+void AActionCharacter::OnRotateBuildingPartPressed()
+{
+	if (AActionPlayerController* PlayerController = Cast<AActionPlayerController>(GetController()))
+		PlayerController->OnRotateBuildingPart();
 }
 
 void AActionCharacter::OnInteractPressed()
