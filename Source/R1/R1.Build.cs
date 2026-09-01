@@ -27,6 +27,11 @@ public class R1 : ModuleRules
 
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
+
+		if (Target.bBuildEditor)
+		{
+			PrivateDependencyModuleNames.AddRange(new string[] { "UnrealEd", "UMGEditor" });
+		}
 		
 		// Uncomment if you are using online features
 		// PrivateDependencyModuleNames.Add("OnlineSubsystem");
