@@ -45,7 +45,11 @@ void UBuildingPlacementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 	switch (SelectedDefinition->PlacementType)
 	{
 	case EBuildingPlacementType::FOUNDATION:
-		UpdateFoundationPreview(PlayerController);
+	{
+		// 기존 Foundation에서 스냅 될 수 있는 소켓을 찾았다면 스냅 프리뷰를 사용하고.  찾지 못했을 때만 기존의 지면 자유 배치를 실행합니다
+		if(false == UpdateStructureSnapPreview(PlayerController))
+			UpdateFoundationPreview(PlayerController);
+	}
 		break;
 
 	case EBuildingPlacementType::STRUCTURE_SNAP:
@@ -153,6 +157,17 @@ void UBuildingPlacementComponent::ConfirmPlacement()
 	{
 	case EBuildingPlacementType::FOUNDATION:
 	{
+		const bool bHasFoundationSnapTarget = CurrentSnapBuilding.IsValid() && CurrentSnapTargetPartID.IsValid() && false == CurrentSnapSocketName.IsNone();
+		if (true == bHasFoundationSnapTarget)
+		{
+			// 기존 Foundation에 스냅하는 경우
+			ServerPlaceSnappedPart(SelectedDefinition.Get(), CurrentSnapBuilding.Get(),
+				CurrentSnapTargetPartID, CurrentSnapSocketName, CurSnapYawOffsetIdx);
+
+			break;
+		}
+
+		// 근처에 스냅될 수 있는 소켓이 없다면 기존처럼 지면에 새로운 BuildingActor를 생성
 		if (nullptr == BuildingActorClass)
 		{
 			UE_LOG(LogTemp, Log, TEXT("[UBuildingPlacementComponent::ConfirmPlacement()] : BuildingActorClass가 설정되지 않았습니다."));
@@ -202,10 +217,14 @@ void UBuildingPlacementComponent::ServerPlaceSnappedPart_Implementation(UBuildin
 		return;
 	}
 
-	// Structure 파츠만...
-	if (Definition->PlacementType != EBuildingPlacementType::STRUCTURE_SNAP)
+	bool bSupportsSnapPlacement =
+		Definition->PlacementType == EBuildingPlacementType::STRUCTURE_SNAP ||
+		Definition->PlacementType == EBuildingPlacementType::FOUNDATION;
+
+	if (false == bSupportsSnapPlacement)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : StructureSnap 파츠가 아닙니다."));
+		UE_LOG(LogTemp, Warning,
+			TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 스냅을 지원하지 않는 파츠입니다."));
 		return;
 	}
 
@@ -402,14 +421,14 @@ void UBuildingPlacementComponent::UpdateFoundationPreview(APlayerController* Pla
 	PreviewActor->SetActorHiddenInGame(false);
 }
 
-void UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* PlayerController)
+bool UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* PlayerController)
 {
 	ClearCurrentSnapTarget();
 
 	if (false == IsValid(PlayerController) || false == IsValid(SelectedDefinition) || false == IsValid(PreviewActor))
 	{
 		HidePlacementPreview();
-		return;
+		return false;
 	}
 
 	// 컨트롤러에서 플레이어 카메라가 보고 있는 현재 위치와 회전을 가져와요
@@ -440,7 +459,7 @@ void UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* 
 	if (false == bHit)
 	{
 		HidePlacementPreview();
-		return;
+		return false;
 	}
 
 	// 트레이스 맞힌 액터가 BuildingActor인지 확인합니다
@@ -448,7 +467,7 @@ void UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* 
 	if (false == IsValid(HitBuilding) || false == IsValid(HitResult.GetComponent()))
 	{
 		HidePlacementPreview();
-		return;
+		return false;
 	}
 
 	// 트레이스 맞힌 메시 컴포넌트의 건축 파츠가 있는지 확인
@@ -456,11 +475,16 @@ void UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* 
 	if (nullptr == TargetPart || false == IsValid(TargetPart->Definition) || false == IsValid(TargetPart->MeshComponent))
 	{
 		HidePlacementPreview();
-		return;
+		return false;
 	}
 
 	// 조준 지점에서 가장 가까운 호환(AllowedPartTypes) 소켓을 찾아요
 	bool bFoundSnapPoint = false;
+
+	const float CurrentSnapPointSearchRadius =
+		SelectedDefinition->PlacementType == EBuildingPlacementType::FOUNDATION ?
+		FoundationSnapPointSearchRadius: SnapPointSearchRadius;
+
 	float BestDistanceSquared = FMath::Square(SnapPointSearchRadius);
 	FName BestSocketName = NAME_None;
 	FTransform BestSocketTransform = FTransform::Identity;
@@ -495,7 +519,7 @@ void UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* 
 	if (false == bFoundSnapPoint) // 사실 못 찾았습니다
 	{
 		HidePlacementPreview();
-		return;
+		return false;
 	}
 
 	// 클라이언트에서도 최대 설치 수평거리 확인
@@ -503,7 +527,7 @@ void UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* 
 	if (PlacementDistanceSquared > FMath::Square(MaxPlacementDistance))
 	{
 		HidePlacementPreview();
-		return;
+		return false;
 	}
 
 	// 적용할 Yaw 회전값을 가져와 세팅된 값만이 담긴 회전 쿼터니언으로 만들었어요
@@ -532,6 +556,8 @@ void UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* 
 	CurrentSnapBuilding = HitBuilding;
 	CurrentSnapTargetPartID = TargetPart->PartID;
 	CurrentSnapSocketName = BestSocketName;
+
+	return true;
 }
 
 void UBuildingPlacementComponent::ClearCurrentSnapTarget()

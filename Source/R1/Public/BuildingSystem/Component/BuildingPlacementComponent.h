@@ -51,7 +51,7 @@ protected:
 	void UpdateFoundationPreview(APlayerController* PlayerController);
 
 	// Structure_Snap Type의 지면 배치 프리뷰를 갱신
-	void UpdateStructureSnapPreview(APlayerController* PlayerController);
+	bool UpdateStructureSnapPreview(APlayerController* PlayerController);
 
 	// Structure_Snap 대상 초기화 함수
 	void ClearCurrentSnapTarget();
@@ -147,6 +147,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Building|Server")
 	float ServerPlacementDistanceTolerance = 50.f; // 서버 허용 오차 (네트워크 지연이나 부동소수점 계산 차이)
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|Snapping")
+	float FoundationSnapPointSearchRadius = 280.f; // 기존 Foundation 가장자리에서 인접 Foundation 중심 소켓을 찾는 반경 (Foundation끼리의 스냅을 위한)
 private:
 	bool bIsPlacing = false; // 현재 건축물 배치중인가요?
 

@@ -23,6 +23,7 @@ enum class EBuildingPartType : uint8
 {
 	NONE,
 	FOUNDATION,
+	FOUNDATION_TRIANGLE,
 	WALL,
 	WALL_DOORFRAME,
 	FLOOR,
