@@ -236,11 +236,24 @@ void UBuildingPlacementComponent::ServerPlaceSnappedPart_Implementation(UBuildin
 		return;
 	}
 
-	// 이미 사용된 소켓인지 검사
+	// 이미 점유된 소켓인지 검사
 	if (TargetPart->OccupiedSnapPoints.Contains(SocketName))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 이미 점유된 소켓입니다. Socket=%s"), *SocketName.ToString());
+		UE_LOG(
+			LogTemp, Warning, TEXT("[Snap Occupancy] 이미 점유된 소켓 차단 | PartID=%s | Socket=%s"),
+			*TargetPart->PartID.ToString(), *SocketName.ToString());
 		return;
+	}
+
+	// AddPart() 이후에는 PlacedParts 배열이 재할당될 수 있으므로.. 지금 사용한 대상 소켓의 연결 정보를 미리 값으로 복사해둬요
+	FName ConnectedPartSocketName = NAME_None;
+	for (const FBuildingSnapPointDefinition& SnapPoint : TargetPart->Definition->SnapPoints)
+	{
+		if (SnapPoint.SocketName != SocketName)
+			continue;
+
+		ConnectedPartSocketName = SnapPoint.ConnectedPartSocketName;
+		break;
 	}
 
 	//서버가 Definition과 실제 메시 소켓을 이용해 직!접! 최종 월드 Transform을 계산해요
@@ -278,6 +291,15 @@ void UBuildingPlacementComponent::ServerPlaceSnappedPart_Implementation(UBuildin
 		return;
 	}
 
+	// 소켓이 달라도... 고리를 따라 배치하게 되면 이미 Foundation이 있는 위치에 다시 도착할 수 있어요
+	// 서버에서도 이걸 체크합니다!!
+	if (Definition->PlacementType == EBuildingPlacementType::FOUNDATION && TargetBuilding->HasFoundationAtTransform(SafeSnapTransform))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ServerPlaceSnappedPart] 이미 Foundation이 점유한 Transform입니다. Location=%s"),
+			*SafeSnapTransform.GetLocation().ToString());
+		return;
+	}
+
 	// 서버가 알고 있는 플레이어 위치를 기준으로 거리 검사
 	if (false == IsWithinServerPlacementDistance(SafeSnapTransform.GetLocation()))
 	{
@@ -305,22 +327,27 @@ void UBuildingPlacementComponent::ServerPlaceSnappedPart_Implementation(UBuildin
 		return;
 	}
 
-	// AddPart()가 PlacedParts 배열에 새 요소를 추가하면서 배열 메모리가 재할당될 수 있으므로,
-	// 기존 TargetPart 포인터를 사용하지 않고 PartID로 다시 찾아요
+	// AddPart()가 PlacedParts 배열에 새 요소를 추가하면서 배열 메모리가
+    // 재할당될 수 있으므로 기존 TargetPart 포인터는 다시 사용하지 않아요
 	FPlacedBuildingPart* UpdatedTargetPart = TargetBuilding->FindPlacedPartByID(TargetPartID);
-	if (nullptr == UpdatedTargetPart)
+	FPlacedBuildingPart* NewPlacedPart = TargetBuilding->FindPlacedPartByComponent(NewPart);
+
+	if (nullptr == UpdatedTargetPart || nullptr == NewPlacedPart)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 설치 후 대상 파츠 재검색에 실패했습니다."));
+		UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 설치 후 파츠 재검색에 실패했습니다."));
 		return;
 	}
 
-	// 설치에 사용한 소켓을 사용된 상태로 기록
+	// 기존 대상 파츠에서 설치에 사용된 소켓 점유
 	UpdatedTargetPart->OccupiedSnapPoints.AddUnique(SocketName);
 
-	// PlacedParts 변경을 클라이언트에 빠르게 전달
+	// 새로 설치된 파츠에서도 맞닿은 소켓 점유
+	if (false == ConnectedPartSocketName.IsNone())
+		NewPlacedPart->OccupiedSnapPoints.AddUnique(ConnectedPartSocketName);
+
 	TargetBuilding->ForceNetUpdate();
 
-	UE_LOG(LogTemp, Log, TEXT(" [UBuildingPlacementComponent::ServerPlaceSnappedPart] : 스냅 파츠 설치 완료. Socket=%s"), *SocketName.ToString());
+	UE_LOG(LogTemp, Log, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 스냅 파츠 설치 완료. Socket=%s"),*SocketName.ToString());
 }
 
 void UBuildingPlacementComponent::UpdateFoundationPreview(APlayerController* PlayerController)
@@ -547,7 +574,16 @@ bool UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* 
 	// 대상 Foundation 컴포넌트는 이미 의도적으로 겹친 상태니까 겹침 검사 대상에서 제외시켜요
 	const bool bHasOverlap = HasPlacementOverlap(HitResult.GetComponent(), HitBuilding);
 
-	bCanPlace = false == bHasOverlap;
+	// 서버 검사와 동일하게 Foundation의 위치 점유 여부를 확인해서 이미 사용된 칸이라면 설치 불가 프리뷰로 표시해요
+	const bool bHasDuplicateFoundation = SelectedDefinition->PlacementType ==
+		EBuildingPlacementType::FOUNDATION && HitBuilding->HasFoundationAtTransform(BestSocketTransform);
+
+	bCanPlace = false == bHasOverlap && false == bHasDuplicateFoundation;
+
+	//if (true == bHasDuplicateFoundation)
+	//{
+	//	UE_LOG(LogTemp, Warning, TEXT("[Foundation Preview] 이미 Foundation이 점유한 Transform입니다. Location=%s"), *BestSocketTransform.GetLocation().ToString());
+	//}
 
 	PreviewActor->SetPlacementValid(bCanPlace);
 	PreviewActor->SetActorHiddenInGame(false);

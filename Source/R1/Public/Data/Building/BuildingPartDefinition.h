@@ -44,6 +44,9 @@ struct FBuildingSnapPointDefinition
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TArray<EBuildingPartType> AllowedPartTypes; // 이 위치에 설치할 수 있는 파츠의 종류
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	FName ConnectedPartSocketName = NAME_None; // 이 소켓에 새 파츠가 연결될 때 새로 설치된 파츠에서 함께 점유할 연결 소켓 이름
 };
 
 // 곧 사라질 수도 있음

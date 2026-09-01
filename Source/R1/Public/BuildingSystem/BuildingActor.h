@@ -1,4 +1,4 @@
-// 작업 시작일 : 8/28
+﻿// 작업 시작일 : 8/28
 // 작업자 : 우진
 #pragma once
 
@@ -52,6 +52,8 @@ public:
 	// (인자로 들어오는 게 라인트레이스로 맞춘 파츠의 메시 컴포넌트)
 	const FPlacedBuildingPart* FindPlacedPartByComponent(const UPrimitiveComponent* InComponent) const;
 
+	FPlacedBuildingPart* FindPlacedPartByComponent(UPrimitiveComponent* InComponent);
+
 	// 해당 건축 파츠가 제공하는 소켓의 월드 Transform을 가져오는 함수 -> 가져옴 : true 반환
 	// 두번째 인자 : 이번에 새로 설치될 건축 파츠 데이터
 	bool TryGetSnapPointWorldTransform(const UPrimitiveComponent* TargetComponent,
@@ -61,6 +63,9 @@ public:
 	// (서버용) PartID를 이용해 설치된 파츠를 확인
 	FPlacedBuildingPart* FindPlacedPartByID(const FGuid& InPartID);
 
+	// 인자로 들어온 Transform 위치에 기존 Foundation이 이미 존재하는지 확인
+	// Foundation 고리 때문에 점유 체크와는 별개로 위치 중복 검사가 필요해요
+	bool HasFoundationAtTransform(const FTransform& InWorldTransform, float LocationTolerance = 2.f) const;
 	//  ===================================================================================
 
 protected:

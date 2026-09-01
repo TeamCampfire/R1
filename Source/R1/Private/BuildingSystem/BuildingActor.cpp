@@ -1,4 +1,4 @@
-#include "BuildingSystem/BuildingActor.h"
+﻿#include "BuildingSystem/BuildingActor.h"
 #include "Data/Building/BuildingPartDefinition.h"
 #include "Net/UnrealNetwork.h"
 ABuildingActor::ABuildingActor()
@@ -105,6 +105,19 @@ const FPlacedBuildingPart* ABuildingActor::FindPlacedPartByComponent(const UPrim
 	return nullptr;
 }
 
+FPlacedBuildingPart* ABuildingActor::FindPlacedPartByComponent(UPrimitiveComponent* InComponent)
+{
+	if (false == IsValid(InComponent)) return nullptr;
+
+	for (FPlacedBuildingPart& PlacedPart : PlacedParts)
+	{
+		if (PlacedPart.MeshComponent.Get() == InComponent)
+			return &PlacedPart;
+	}
+
+	return nullptr;
+}
+
 bool ABuildingActor::TryGetSnapPointWorldTransform(const UPrimitiveComponent* TargetComponent, const UBuildingPartDefinition* IncomingDefinition, const FName& InSocketName, FTransform& OutWorldTransform) const
 {
 	// Wall 설치할 때 라인트레이스가 걸려서 이 함수로 들어온 상태
@@ -167,4 +180,25 @@ FPlacedBuildingPart* ABuildingActor::FindPlacedPartByID(const FGuid& InPartID)
 	}
 
 	return nullptr;
+}
+
+bool ABuildingActor::HasFoundationAtTransform(const FTransform& InWorldTransform, float LocationTolerance) const
+{
+	const float LocationToleranceSquared = FMath::Square(LocationTolerance); // 오차 허용 및 미리 제곱
+
+	for (const FPlacedBuildingPart& PlacedPart : PlacedParts)
+	{
+		if (false == IsValid(PlacedPart.Definition) || false == IsValid(PlacedPart.MeshComponent))
+			continue; // 유효하지 않은 거 제외
+
+		if (PlacedPart.Definition->PlacementType != EBuildingPlacementType::FOUNDATION)
+			continue; // Foundation 아니면 제외
+
+		const FVector ExistingLocation = PlacedPart.MeshComponent->GetComponentLocation();
+		bool bSameLocation = FVector::DistSquared(ExistingLocation, InWorldTransform.GetLocation()) <= LocationToleranceSquared;
+
+		// Foundation은 같은 위치라면 회전과 관계없이(삼각 Foundation떄문에) 이미 점유된 칸
+		if (true == bSameLocation) return true;
+	}
+	return false;
 }
