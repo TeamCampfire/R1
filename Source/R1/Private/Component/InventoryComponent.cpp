@@ -425,10 +425,16 @@ void UInventoryComponent::Server_UseBeltSlot_Implementation(int32 BeltIndex)
 	UseBeltSlot(BeltIndex);
 }
 
-bool UInventoryComponent::UseSelectedItem()
+bool UInventoryComponent::UseSelectedItem(const FInventorySlotRef& SlotRef)
 {
-	const FItemInstance Instance = GetSelectedItemInstance();
-	if (!Instance.IsValid() || Instance.ItemData->Category != EItemCategory::Consumable)
+	const TArray<FItemInstance>& Array = GetSlotArray(SlotRef.Category);
+	if (!Array.IsValidIndex(SlotRef.Index) || !Array[SlotRef.Index].IsValid())
+	{
+		return false;
+	}
+
+	const FItemInstance Instance = Array[SlotRef.Index];
+	if (Instance.ItemData->Category != EItemCategory::Consumable)
 	{
 		return false;
 	}
@@ -436,18 +442,18 @@ bool UInventoryComponent::UseSelectedItem()
 	// TODO(효과 적용): 실제 효과(Heal/RestoreHunger/RestoreThirst 등) 적용은 StatComponent 연동 후 처리.
 	// 지금은 UseBeltSlot의 Consumable 분기와 동일하게 수량 차감만 담당한다.
 	const int32 Remaining = Instance.StackCount - 1;
-	SetSlot(SelectedSlotRef.Category, SelectedSlotRef.Index, Remaining > 0 ? FItemInstance(Instance.ItemData, Remaining) : FItemInstance());
+	SetSlot(SlotRef.Category, SlotRef.Index, Remaining > 0 ? FItemInstance(Instance.ItemData, Remaining) : FItemInstance());
 	return true;
 }
 
-bool UInventoryComponent::Server_UseSelectedItem_Validate()
+bool UInventoryComponent::Server_UseSelectedItem_Validate(FInventorySlotRef SlotRef)
 {
 	return true;
 }
 
-void UInventoryComponent::Server_UseSelectedItem_Implementation()
+void UInventoryComponent::Server_UseSelectedItem_Implementation(FInventorySlotRef SlotRef)
 {
-	UseSelectedItem();
+	UseSelectedItem(SlotRef);
 }
 
 bool UInventoryComponent::DropItem(FInventorySlotRef Slot, int32 Count, const FTransform& DropTransform, const FVector& ThrowImpulse)

@@ -35,8 +35,11 @@ enum class EItemEffectType : uint8;
  * - IconImage             : 아이템 아이콘. 아이콘이 없는 아이템은 자동으로 숨겨진다.
  * - InfoRowsContainer     : "정보" 섹션의 스탯 행이 채워질 패널(VerticalBox 권장) — 장비/도구는
  *                           라벨+StatBarWidgetClass 바, 소비는 색상 있는 텍스트 한 줄씩 채워진다.
- * - ActionButtonsContainer: 카테고리별 조건부 액션 버튼이 채워질 패널 — 지금은 Consumable일 때만
- *                           "사용" 버튼 하나(UInventoryComponent::UseSelectedItem 호출).
+ * - ActionButtonsContainer: 카테고리별 조건부 액션 버튼들을 담는 레이아웃용 컨테이너(선택 사항 —
+ *                           버튼 자체는 런타임 생성이 아니라 아래처럼 WBP에 미리 배치해둔다).
+ * - UseButton             : "사용" 버튼 — Consumable일 때만 보이고 그 외엔 Collapsed
+ *                           (UInventoryComponent::UseSelectedItem 호출). 버튼이 늘어나면 같은
+ *                           패턴(BindWidgetOptional + RebuildActionButtons에서 SetVisibility)으로 추가.
  * - DiscardButton         : "버리기" 버튼 — ThrowItem 호출.
  * - SplitPanel            : 분할 섹션 전체를 감싸는 컨테이너. 스택 불가/StackCount<=1이면 Collapsed.
  * - SplitQuantitySlider   : "나눌 수량" 슬라이더(1 ~ StackCount-1, 최소 1개는 항상 원본에 남긴다).
@@ -85,7 +88,8 @@ private:
 	// 구분되게 각각 다른 색을 쓴다.
 	static FLinearColor GetEffectColor(EItemEffectType EffectType);
 
-	// 조건부 액션 버튼("사용" 등) 재생성 — 지금은 Consumable에만 버튼을 하나 채운다.
+	// 조건부 액션 버튼("사용" 등) 표시/숨김 갱신 — 버튼은 WBP에 미리 배치돼 있고 여기서는
+	// 카테고리에 맞는 것만 Visibility를 켜고 나머지는 Collapsed로 둔다.
 	void RebuildActionButtons(const FItemInstance& Selected);
 
 	UFUNCTION()
@@ -118,6 +122,10 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UButton> DiscardButton;
+
+	// Consumable일 때만 보이는 "사용" 버튼 — WBP에 미리 배치, 카테고리에 따라 Visibility만 토글한다.
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UButton> UseButton;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UWidget> SplitPanel;

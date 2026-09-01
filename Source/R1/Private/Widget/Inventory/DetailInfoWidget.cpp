@@ -36,6 +36,11 @@ void UDetailInfoWidget::NativeOnInitialized()
 		DiscardButton->OnClicked.AddDynamic(this, &UDetailInfoWidget::HandleDiscardClicked);
 	}
 
+	if (UseButton)
+	{
+		UseButton->OnClicked.AddDynamic(this, &UDetailInfoWidget::HandleUseClicked);
+	}
+
 	if (SplitQuantitySlider)
 	{
 		SplitQuantitySlider->OnValueChanged.AddDynamic(this, &UDetailInfoWidget::HandleSplitQuantityChanged);
@@ -242,26 +247,13 @@ FLinearColor UDetailInfoWidget::GetEffectColor(EItemEffectType EffectType)
 
 void UDetailInfoWidget::RebuildActionButtons(const FItemInstance& Selected)
 {
-	if (!ActionButtonsContainer)
+	// 버튼은 런타임에 만들지 않고 WBP에 미리 배치해둔 걸(UseButton 등) 카테고리에 따라
+	// 보이거나 숨기기만 한다 — 나중에 액션 버튼이 늘어나도 같은 방식으로 추가하면 된다.
+	if (UseButton)
 	{
-		return;
+		const bool bIsConsumable = Selected.ItemData && Selected.ItemData->Category == EItemCategory::Consumable;
+		UseButton->SetVisibility(bIsConsumable ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 	}
-
-	ActionButtonsContainer->ClearChildren();
-
-	if (Selected.ItemData->Category != EItemCategory::Consumable)
-	{
-		return;
-	}
-
-	UButton* UseButton = NewObject<UButton>(this);
-	UseButton->OnClicked.AddDynamic(this, &UDetailInfoWidget::HandleUseClicked);
-
-	UTextBlock* UseButtonLabel = NewObject<UTextBlock>(this);
-	UseButtonLabel->SetText(NSLOCTEXT("DetailInfoWidget", "UseButtonLabel", "사용"));
-	UseButton->AddChild(UseButtonLabel);
-
-	ActionButtonsContainer->AddChild(UseButton);
 }
 
 void UDetailInfoWidget::HandleDiscardClicked()
@@ -277,10 +269,13 @@ void UDetailInfoWidget::HandleDiscardClicked()
 
 void UDetailInfoWidget::HandleUseClicked()
 {
-	if (UInventoryComponent* Inventory = BoundInventory.Get())
+	UInventoryComponent* Inventory = BoundInventory.Get();
+	if (!Inventory || !Inventory->bHasSelection)
 	{
-		Inventory->Server_UseSelectedItem();
+		return;
 	}
+
+	Inventory->Server_UseSelectedItem(Inventory->SelectedSlotRef);
 }
 
 void UDetailInfoWidget::HandleSplitQuantityChanged(float Value)

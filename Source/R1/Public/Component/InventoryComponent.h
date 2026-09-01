@@ -127,14 +127,15 @@ public:
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_UseBeltSlot(int32 BeltIndex);
 
-	// 현재 선택된 슬롯(SelectedSlotRef, 장비/메인/벨트 무관)의 아이템을 사용한다.
-	// Consumable만 처리(1개 소모, 효과 적용은 StatComponent 연동 후 TODO) — 그 외 카테고리는
-	// 무동작(장착/손에 들기는 QuickMoveItem/UseBeltSlot이 전담). DetailInfoWidget의 사용 버튼이 호출한다.
+	// 지정한 슬롯의 아이템을 사용한다. Consumable만 처리(1개 소모, 효과 적용은 StatComponent
+	// 연동 후 TODO) — 그 외 카테고리는 무동작(장착/손에 들기는 QuickMoveItem/UseBeltSlot이 전담).
+	// SelectedSlotRef는 서버로 리플리케이트되지 않는 순수 로컬 상태라, 서버가 뭘 써야 할지
+	// 알려면 호출하는 쪽(클라이언트)이 슬롯을 직접 파라미터로 넘겨야 한다 — ThrowItem과 동일한 이유.
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
-	bool UseSelectedItem();
+	bool UseSelectedItem(const FInventorySlotRef& SlotRef);
 
 	UFUNCTION(Server, Reliable, WithValidation)
-	void Server_UseSelectedItem();
+	void Server_UseSelectedItem(FInventorySlotRef SlotRef);
 
 	// 지정한 슬롯에서 Count만큼(0 이하이면 전체) 빼서 DropTransform 위치에 AItemPickup으로 스폰한다.
 	// ThrowImpulse가 0이 아니면 스폰 직후 그 방향/크기로 밀어준다(던지는 연출용).
