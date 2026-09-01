@@ -13,7 +13,8 @@ UMainHUDWidget* AMainHUD::GetMainHudWidget() const
 void AMainHUD::BeginPlay()
 {
 	Super::BeginPlay();
-
+	APlayerController* PC = GetOwningPlayerController();
+	APawn* Pawn = PC ? PC->GetPawn() : nullptr;
 	if (MainHudWidgetClass)
 	{
 		MainHudWidgetInstance = CreateWidget<UMainHUDWidget>(GetWorld(), MainHudWidgetClass);

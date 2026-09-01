@@ -30,6 +30,8 @@ AActionCharacter::AActionCharacter()
 {
  	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
+	// Replicate 설정
+	bReplicates = true;
 
 	// Head메시 생성
 	HeadMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("HeadMesh"));
@@ -63,6 +65,7 @@ AActionCharacter::AActionCharacter()
 
 	// 스탯 컴포넌트 세팅
 	StatComponent = CreateDefaultSubobject<UStatComponent>(TEXT("StatComponent"));
+	StatComponent->SetIsReplicated(true);
 
 	/// 컴포넌트 생성
 	InteractionComponent = CreateDefaultSubobject<UInteractionComponent>(TEXT("Interact"));
@@ -261,6 +264,14 @@ void AActionCharacter::ProcessAttack()
 
 void AActionCharacter::Die()
 {
+	if (!HasAuthority()) return;
+
+	MulticastDie();
+
+}
+
+void AActionCharacter::MulticastDie_Implementation()
+{
 	// 캡슐 컴포넌트 충돌 끄기
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	// 애니메이션 중지
@@ -275,7 +286,6 @@ void AActionCharacter::Die()
 	{
 		PC->UnPossess();
 	}
-
 }
 
 
