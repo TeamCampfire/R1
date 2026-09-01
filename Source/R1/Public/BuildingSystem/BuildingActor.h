@@ -63,9 +63,8 @@ public:
 	// (서버용) PartID를 이용해 설치된 파츠를 확인
 	FPlacedBuildingPart* FindPlacedPartByID(const FGuid& InPartID);
 
-	// 인자로 들어온 Transform 위치에 기존 Foundation이 이미 존재하는지 확인
-	// Foundation 고리 때문에 점유 체크와는 별개로 위치 중복 검사가 필요해요
-	bool HasFoundationAtTransform(const FTransform& InWorldTransform, float LocationTolerance = 2.f) const;
+	// 새 Foundation과 이미 설치된 Foundation 사이에서 서로 맞닿은 모든 연결면을 찾아 양쪽 소켓을 점유 처리하는 함수
+	void ResolveAdjacentFoundationConnections(FGuid NewPartID, float AnchorTolerance);
 	//  ===================================================================================
 
 protected:

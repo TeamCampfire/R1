@@ -47,6 +47,10 @@ struct FBuildingSnapPointDefinition
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	FName ConnectedPartSocketName = NAME_None; // 이 소켓에 새 파츠가 연결될 때 새로 설치된 파츠에서 함께 점유할 연결 소켓 이름
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snapping")
+	FName ConnectionAnchorSocketName = NAME_None; // 이 스냅 포인트가 담당하는 실제 연결면의 중심 소켓
+	// (새 파츠 설치 후 다른 Foundation의 연결면과 맞닿았는지 검사할 때 사용)
 };
 
 // 곧 사라질 수도 있음

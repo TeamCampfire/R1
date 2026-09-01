@@ -149,6 +149,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|Snapping")
 	float FoundationSnapPointSearchRadius = 280.f; // 기존 Foundation 가장자리에서 인접 Foundation 중심 소켓을 찾는 반경 (Foundation끼리의 스냅을 위한)
+
+	UPROPERTY(EditDefaultsOnly, Category = "Building|Snapping", meta = (ClampMin = "0.0"))
+	float FoundationConnectionAnchorTolerance = 15.f; // Foundation 고리가 닫힐 때 발생할 수 있는 연결 앵커 사이의 작은 배치 오차를 허용해요
 private:
 	bool bIsPlacing = false; // 현재 건축물 배치중인가요?
 

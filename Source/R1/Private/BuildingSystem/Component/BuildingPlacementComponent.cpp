@@ -291,15 +291,6 @@ void UBuildingPlacementComponent::ServerPlaceSnappedPart_Implementation(UBuildin
 		return;
 	}
 
-	// 소켓이 달라도... 고리를 따라 배치하게 되면 이미 Foundation이 있는 위치에 다시 도착할 수 있어요
-	// 서버에서도 이걸 체크합니다!!
-	if (Definition->PlacementType == EBuildingPlacementType::FOUNDATION && TargetBuilding->HasFoundationAtTransform(SafeSnapTransform))
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[ServerPlaceSnappedPart] 이미 Foundation이 점유한 Transform입니다. Location=%s"),
-			*SafeSnapTransform.GetLocation().ToString());
-		return;
-	}
-
 	// 서버가 알고 있는 플레이어 위치를 기준으로 거리 검사
 	if (false == IsWithinServerPlacementDistance(SafeSnapTransform.GetLocation()))
 	{
@@ -344,6 +335,10 @@ void UBuildingPlacementComponent::ServerPlaceSnappedPart_Implementation(UBuildin
 	// 새로 설치된 파츠에서도 맞닿은 소켓 점유
 	if (false == ConnectedPartSocketName.IsNone())
 		NewPlacedPart->OccupiedSnapPoints.AddUnique(ConnectedPartSocketName);
+
+	// 새 Foundation이 고리를 닫으면서 다른 Foundation과도 맞닿았다면 직접 선택하지 않은 나머지 연결면까지 자동으로 점유해요
+	if (Definition->PlacementType == EBuildingPlacementType::FOUNDATION)
+		TargetBuilding->ResolveAdjacentFoundationConnections(NewPlacedPart->PartID, FoundationConnectionAnchorTolerance);
 
 	TargetBuilding->ForceNetUpdate();
 
@@ -512,7 +507,7 @@ bool UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* 
 		SelectedDefinition->PlacementType == EBuildingPlacementType::FOUNDATION ?
 		FoundationSnapPointSearchRadius: SnapPointSearchRadius;
 
-	float BestDistanceSquared = FMath::Square(SnapPointSearchRadius);
+	float BestDistanceSquared = FMath::Square(CurrentSnapPointSearchRadius);
 	FName BestSocketName = NAME_None;
 	FTransform BestSocketTransform = FTransform::Identity;
 
@@ -574,11 +569,7 @@ bool UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* 
 	// 대상 Foundation 컴포넌트는 이미 의도적으로 겹친 상태니까 겹침 검사 대상에서 제외시켜요
 	const bool bHasOverlap = HasPlacementOverlap(HitResult.GetComponent(), HitBuilding);
 
-	// 서버 검사와 동일하게 Foundation의 위치 점유 여부를 확인해서 이미 사용된 칸이라면 설치 불가 프리뷰로 표시해요
-	const bool bHasDuplicateFoundation = SelectedDefinition->PlacementType ==
-		EBuildingPlacementType::FOUNDATION && HitBuilding->HasFoundationAtTransform(BestSocketTransform);
-
-	bCanPlace = false == bHasOverlap && false == bHasDuplicateFoundation;
+	bCanPlace = false == bHasOverlap;
 
 	//if (true == bHasDuplicateFoundation)
 	//{

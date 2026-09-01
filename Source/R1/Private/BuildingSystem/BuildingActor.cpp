@@ -182,23 +182,96 @@ FPlacedBuildingPart* ABuildingActor::FindPlacedPartByID(const FGuid& InPartID)
 	return nullptr;
 }
 
-bool ABuildingActor::HasFoundationAtTransform(const FTransform& InWorldTransform, float LocationTolerance) const
+void ABuildingActor::ResolveAdjacentFoundationConnections(FGuid NewPartID, float AnchorTolerance)
 {
-	const float LocationToleranceSquared = FMath::Square(LocationTolerance); // 오차 허용 및 미리 제곱
+	FPlacedBuildingPart* NewPlacedPart = FindPlacedPartByID(NewPartID);
 
-	for (const FPlacedBuildingPart& PlacedPart : PlacedParts)
+	if (nullptr == NewPlacedPart || false == IsValid(NewPlacedPart->Definition) || false == IsValid(NewPlacedPart->MeshComponent)) return;
+
+	if (NewPlacedPart->Definition->PlacementType != EBuildingPlacementType::FOUNDATION) return;
+
+	const float AnchorToleranceSquared = FMath::Square(AnchorTolerance);
+
+	for (const FBuildingSnapPointDefinition& NewSnapPoint :
+		NewPlacedPart->Definition->SnapPoints)
 	{
-		if (false == IsValid(PlacedPart.Definition) || false == IsValid(PlacedPart.MeshComponent))
-			continue; // 유효하지 않은 거 제외
+		const bool bNewSocketOccupied = NewPlacedPart->OccupiedSnapPoints.Contains(NewSnapPoint.SocketName);
 
-		if (PlacedPart.Definition->PlacementType != EBuildingPlacementType::FOUNDATION)
-			continue; // Foundation 아니면 제외
+		const bool bHasAnchorName = false == NewSnapPoint.ConnectionAnchorSocketName.IsNone();
 
-		const FVector ExistingLocation = PlacedPart.MeshComponent->GetComponentLocation();
-		bool bSameLocation = FVector::DistSquared(ExistingLocation, InWorldTransform.GetLocation()) <= LocationToleranceSquared;
+		const bool bAnchorExists = bHasAnchorName && NewPlacedPart->MeshComponent->DoesSocketExist(NewSnapPoint.ConnectionAnchorSocketName);
 
-		// Foundation은 같은 위치라면 회전과 관계없이(삼각 Foundation떄문에) 이미 점유된 칸
-		if (true == bSameLocation) return true;
+		if (true == NewSnapPoint.ConnectionAnchorSocketName.IsNone())
+			continue;
+
+		// 직접 연결에 사용되어 이미 점유된 면은 다시 검사하지 않아요
+		if (NewPlacedPart->OccupiedSnapPoints.Contains(NewSnapPoint.SocketName))
+			continue;
+
+		if (false == NewPlacedPart->MeshComponent->DoesSocketExist(NewSnapPoint.ConnectionAnchorSocketName))
+			continue;
+
+		const FVector NewAnchorLocation = NewPlacedPart->MeshComponent->GetSocketLocation(NewSnapPoint.ConnectionAnchorSocketName);
+
+		bool bFoundConnection = false;
+
+		for (FPlacedBuildingPart& ExistingPart : PlacedParts)
+		{
+			if (ExistingPart.PartID == NewPartID)
+				continue;
+
+			if (false == IsValid(ExistingPart.Definition) || false == IsValid(ExistingPart.MeshComponent))
+				continue;
+
+			if (ExistingPart.Definition->PlacementType != EBuildingPlacementType::FOUNDATION)
+				continue;
+
+			for (const FBuildingSnapPointDefinition& ExistingSnapPoint : ExistingPart.Definition->SnapPoints)
+			{
+				if (true == ExistingSnapPoint.ConnectionAnchorSocketName.IsNone())
+					continue;
+
+				if (ExistingPart.OccupiedSnapPoints.Contains(ExistingSnapPoint.SocketName))
+					continue;
+
+				// 양쪽 스냅 포인트가 서로의 Foundation 타입을
+				// 허용하는지 확인해요
+				const bool bNewAllowsExisting = NewSnapPoint.AllowedPartTypes.Contains(ExistingPart.Definition->PartType);
+
+				const bool bExistingAllowsNew = ExistingSnapPoint.AllowedPartTypes.Contains(NewPlacedPart->Definition->PartType);
+
+				if (false == bNewAllowsExisting || false == bExistingAllowsNew)
+					continue;
+
+				if (false == ExistingPart.MeshComponent->DoesSocketExist(ExistingSnapPoint.ConnectionAnchorSocketName))
+					continue;
+
+				const FVector ExistingAnchorLocation = ExistingPart.MeshComponent->GetSocketLocation(ExistingSnapPoint.ConnectionAnchorSocketName);
+
+				const float DistanceSquared = FVector::DistSquared(NewAnchorLocation, ExistingAnchorLocation);
+
+				const float AnchorDistance = FMath::Sqrt(DistanceSquared);
+
+				if (DistanceSquared > AnchorToleranceSquared)
+					continue;
+
+				// 같은 위치에서 맞닿은 두 연결면을 모두 점유
+				NewPlacedPart->OccupiedSnapPoints.AddUnique(NewSnapPoint.SocketName);
+
+				ExistingPart.OccupiedSnapPoints.AddUnique(ExistingSnapPoint.SocketName);
+
+				UE_LOG(LogTemp, Warning,
+					TEXT("[Foundation Auto Connection] ") TEXT("NewPart=%s | NewSocket=%s | ")
+					TEXT("ExistingPart=%s | ExistingSocket=%s | Distance=%.3f"),
+					*NewPlacedPart->PartID.ToString(), *NewSnapPoint.SocketName.ToString(), *ExistingPart.PartID.ToString(),
+					*ExistingSnapPoint.SocketName.ToString(), FMath::Sqrt(DistanceSquared));
+
+				bFoundConnection = true;
+				break;
+			}
+
+			if (bFoundConnection)
+				break;
+		}
 	}
-	return false;
 }
