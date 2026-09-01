@@ -67,7 +67,9 @@ public:
 	// 사망
 	UFUNCTION(BlueprintCallable)
 	void Die();
-	
+
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastDie();
 
 protected:
 	virtual bool CanJumpInternal_Implementation() const override;

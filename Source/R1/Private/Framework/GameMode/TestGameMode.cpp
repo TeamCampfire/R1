@@ -74,52 +74,57 @@ bool ATestGameMode::FindRandomSpawnLocation(FVector& OutLocation) const
 {
 	UWorld* World = GetWorld();
 
-	if (!World) return false;
-
+	if (!World)
+		return false;
+	// 월드 원점
 	const FVector Origin = FVector::ZeroVector;
-
-	const float RandomX =
-		FMath::RandRange(
-			-SpawnRadius,
-			SpawnRadius
-		);
-
-	const float RandomY =
-		FMath::RandRange(
-			-SpawnRadius,
-			SpawnRadius
-		);
-
+	// 라인트레이스 길이
 	const float TraceHeight = 10000.0f;
+	// 리스폰 지점 탐색 최대횟수
+	const int32 MaxAttempts = 20;
 
-	const FVector TraceStart(
-		Origin.X + RandomX,
-		Origin.Y + RandomY,
-		TraceHeight
-	);
+	for (int32 Attempt = 0; Attempt < MaxAttempts; ++Attempt)
+	{
+		const float RandomX = FMath::RandRange(-SpawnRadius, SpawnRadius);
+		const float RandomY = FMath::RandRange(-SpawnRadius, SpawnRadius);
 
-	const FVector TraceEnd(
-		Origin.X + RandomX,
-		Origin.Y + RandomY,
-		-TraceHeight
-	);
+		const FVector TraceStart(
+			Origin.X + RandomX,
+			Origin.Y + RandomY,
+			TraceHeight
+		);
 
-	FHitResult Hit;
+		const FVector TraceEnd(
+			Origin.X + RandomX,
+			Origin.Y + RandomY,
+			-TraceHeight
+		);
 
-	FCollisionQueryParams Params;
-	Params.bTraceComplex = true;
+		FHitResult Hit;
 
-	const bool bHit = World->LineTraceSingleByChannel(
-		Hit,
-		TraceStart,
-		TraceEnd,
-		ECC_Visibility,
-		Params
-	);
+		FCollisionQueryParams Params;
+		Params.bTraceComplex = true;
 
-	if (!bHit) return false;
+		const bool bHit = World->LineTraceSingleByChannel(
+			Hit,
+			TraceStart,
+			TraceEnd,
+			ECC_Visibility,
+			Params
+		);
 
-	OutLocation = Hit.Location;
+		if (!bHit)
+			continue;
 
-	return true;
+		if (Hit.Component.IsValid() &&
+			Hit.Component->GetCollisionProfileName() == TEXT("WaterBodyCollision"))
+		{
+			continue;
+		}
+
+		OutLocation = Hit.Location;
+		return true;
+	}
+
+	return false;
 }

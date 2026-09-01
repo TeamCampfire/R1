@@ -41,6 +41,14 @@ void USurvivalStatBarsWidget::InitializeSurvivalStatBars()
 	{
 		if (StatComp = OwnerPlayer->GetStatComponent())
 		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("=== BIND HEALTH === Widget=%p Pawn=%p PawnName=%s StatComp=%p HealthBar=%p"),
+				this,
+				GetOwningPlayerPawn(),
+				*GetNameSafe(GetOwningPlayerPawn()),
+				StatComp.Get(),
+				HealthBar.Get());
+
 			StatComp->OnHealthChange.AddDynamic(HealthBar, &UParameterBarWidget::UpdateParameterBar);
 			StatComp->OnHydrationChange.AddDynamic(HydrationBar, &UParameterBarWidget::UpdateParameterBar);
 			StatComp->OnCaloryChange.AddDynamic(CaloriesBar, &UParameterBarWidget::UpdateParameterBar);

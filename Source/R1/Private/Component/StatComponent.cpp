@@ -1,10 +1,12 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.ㅇ
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Component/StatComponent.h"
+#include "Net/UnrealNetwork.h"
 
 UStatComponent::UStatComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	SetIsReplicatedByDefault(true);
 }
 
 void UStatComponent::InitializeStat()
@@ -27,6 +29,8 @@ float UStatComponent::GetMaxHealth_Implementation() const
 
 void UStatComponent::InflictDamage_Implementation(float InAmount)
 {
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+
 	DecreaseParameter(EParameterType::Health, InAmount);
 	//DEBUG
 	//ㄴUE_LOG(LogTemp, Log, TEXT("HP : %.1f / %.1f"), CurrentHealth, MaxHealth);
@@ -125,8 +129,21 @@ void UStatComponent::SetStatusEffect_Implementation(EStatusEffect InStatusEffect
 {
 }
 
+void UStatComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(UStatComponent, CurrentHealth);
+	DOREPLIFETIME(UStatComponent, CurrentHydration);
+	DOREPLIFETIME(UStatComponent, CurrentCalories);
+	DOREPLIFETIME(UStatComponent, PlayerStatusEffects);
+}
+
 void UStatComponent::IncreaseParameter(EParameterType InEParameterType, float InAmount)
 {
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+	if (!bAlive) return;
+
 	switch (InEParameterType)
 	{
 	case EParameterType::Health:
@@ -168,6 +185,7 @@ void UStatComponent::IncreaseParameter(EParameterType InEParameterType, float In
 			PlayerStatusEffects |= NewEffect;
 
 			OnStatusEffectChange.Broadcast();
+			UpdateStatusEffectDamage();
 		}
 
 		break;
@@ -205,6 +223,7 @@ void UStatComponent::IncreaseParameter(EParameterType InEParameterType, float In
 			PlayerStatusEffects |= NewEffect;
 
 			OnStatusEffectChange.Broadcast();
+			UpdateStatusEffectDamage();
 		}
 
 		break;
@@ -219,6 +238,9 @@ void UStatComponent::IncreaseParameter(EParameterType InEParameterType, float In
 
 void UStatComponent::DecreaseParameter(EParameterType InEParameterType, float InAmount)
 {
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+	if (!bAlive) return;
+
 	switch (InEParameterType)
 	{
 	case EParameterType::Health:
@@ -269,12 +291,19 @@ void UStatComponent::DecreaseParameter(EParameterType InEParameterType, float In
 
 		if (CurrentEffect != NewEffect)
 		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("=== STATUS CHANGED === Owner=%s Before=%d After=%d"),
+				*GetNameSafe(GetOwner()),
+				static_cast<uint8>(CurrentEffect),
+				static_cast<uint8>(NewEffect));
+
 			PlayerStatusEffects &= ~EStatusEffect::Thirsty;
 			PlayerStatusEffects &= ~EStatusEffect::Dehydrated;
 
 			PlayerStatusEffects |= NewEffect;
 
 			OnStatusEffectChange.Broadcast();
+			UpdateStatusEffectDamage();
 		}
 
 		break;
@@ -313,6 +342,7 @@ void UStatComponent::DecreaseParameter(EParameterType InEParameterType, float In
 			PlayerStatusEffects |= NewEffect;
 
 			OnStatusEffectChange.Broadcast();
+			UpdateStatusEffectDamage();
 		}
 
 		break;
@@ -329,8 +359,87 @@ void UStatComponent::DecreaseParameter(EParameterType InEParameterType, float In
 
 void UStatComponent::DrainSurvivalStats()
 {
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+
 	Execute_DecreaseCalories(this, DefaultCaloryDropRate);
 	Execute_DecreaseHydration(this, DefaultHydrationDropRate);
+}
+
+void UStatComponent::UpdateStatusEffectDamage()
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+
+	// Starving
+	if (EnumHasAnyFlags(PlayerStatusEffects, EStatusEffect::Starving))
+	{
+		if (!GetWorld()->GetTimerManager().IsTimerActive(StarvationDamageTimerHandle))
+		{
+			GetWorld()->GetTimerManager().SetTimer(
+				StarvationDamageTimerHandle,
+				this,
+				&UStatComponent::ApplyStarvationDamage,
+				SurvivalStatUpdateInterval,
+				true);
+		}
+	}
+	else
+	{
+		GetWorld()->GetTimerManager().ClearTimer(StarvationDamageTimerHandle);
+	}
+
+	// Dehydrated
+	if (EnumHasAnyFlags(PlayerStatusEffects, EStatusEffect::Dehydrated))
+	{
+		if (!GetWorld()->GetTimerManager().IsTimerActive(DehydrationDamageTimerHandle))
+		{
+			GetWorld()->GetTimerManager().SetTimer(
+				DehydrationDamageTimerHandle,
+				this,
+				&UStatComponent::ApplyDehydrationDamage,
+				SurvivalStatUpdateInterval,
+				true);
+		}
+	}
+	else
+	{
+		GetWorld()->GetTimerManager().ClearTimer(DehydrationDamageTimerHandle);
+	}
+}
+
+void UStatComponent::ApplyStarvationDamage()
+{
+	Execute_InflictDamage(this, StarvationDamage);
+}
+
+void UStatComponent::ApplyDehydrationDamage()
+{
+	Execute_InflictDamage(this, DehydrationDamage);
+}
+
+void UStatComponent::OnRep_CurrentHealth()
+{
+	OnHealthChange.Broadcast(CurrentHealth, MaxHealth);
+}
+
+void UStatComponent::OnRep_CurrentHydration()
+{
+	OnHydrationChange.Broadcast(CurrentHydration, MaxHydration);
+}
+
+void UStatComponent::OnRep_CurrentCalories()
+{
+	OnCaloryChange.Broadcast(CurrentCalories, MaxCalories);
+}
+
+void UStatComponent::OnRep_PlayerStatusEffects()
+{
+	UE_LOG(LogTemp, Warning,
+		TEXT("=== ONREP STATUS === Owner=%s Authority=%d Effects=%d"),
+		*GetNameSafe(GetOwner()),
+		GetOwner() ? GetOwner()->HasAuthority() : false,
+		static_cast<uint8>(PlayerStatusEffects));
+
+	OnStatusEffectChange.Broadcast();
 }
 
 
@@ -358,7 +467,10 @@ void UStatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 
 void UStatComponent::TestInflictDamage()
 {
-	Execute_InflictDamage(this, DebugDamage);
+	if (GetOwner() && GetOwner()->HasAuthority())
+	{
+		Execute_InflictDamage(this, DebugDamage);
+	}
 }
 
 void UStatComponent::TestDecreaseHydration()
