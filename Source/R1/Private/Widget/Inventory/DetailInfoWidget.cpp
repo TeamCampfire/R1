@@ -16,19 +16,15 @@
 #include "Data/Item/EquipmentItemData.h"
 #include "Data/Item/ConsumableItemData.h"
 #include "GameFramework/Pawn.h"
+#include "Character/ActionPlayerController.h"
 
 void UDetailInfoWidget::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
 
-	if (APawn* OwningPawn = GetOwningPlayerPawn())
+	if (AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer()))
 	{
-		if (UInventoryComponent* Inventory = OwningPawn->FindComponentByClass<UInventoryComponent>())
-		{
-			BoundInventory = Inventory;
-			Inventory->OnInventoryChanged.AddDynamic(this, &UDetailInfoWidget::HandleInventoryChanged);
-			Inventory->OnSelectionChanged.AddDynamic(this, &UDetailInfoWidget::HandleInventoryChanged);
-		}
+		PC->OnPossessedCharChange.AddDynamic(this, &UDetailInfoWidget::RebindInventory);
 	}
 
 	if (DiscardButton)
@@ -46,18 +42,46 @@ void UDetailInfoWidget::NativeOnInitialized()
 		SplitQuantitySlider->OnValueChanged.AddDynamic(this, &UDetailInfoWidget::HandleSplitQuantityChanged);
 	}
 
-	HandleInventoryChanged();
+	RebindInventory();
 }
 
 void UDetailInfoWidget::NativeDestruct()
+{
+	UnbindInventoryDelegates();
+
+	if (AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer()))
+	{
+		PC->OnPossessedCharChange.RemoveDynamic(this, &UDetailInfoWidget::RebindInventory);
+	}
+
+	Super::NativeDestruct();
+}
+
+void UDetailInfoWidget::UnbindInventoryDelegates()
 {
 	if (UInventoryComponent* Inventory = BoundInventory.Get())
 	{
 		Inventory->OnInventoryChanged.RemoveDynamic(this, &UDetailInfoWidget::HandleInventoryChanged);
 		Inventory->OnSelectionChanged.RemoveDynamic(this, &UDetailInfoWidget::HandleInventoryChanged);
 	}
+}
 
-	Super::NativeDestruct();
+void UDetailInfoWidget::RebindInventory()
+{
+	UnbindInventoryDelegates();
+	BoundInventory = nullptr;
+
+	if (APawn* OwningPawn = GetOwningPlayerPawn())
+	{
+		if (UInventoryComponent* Inventory = OwningPawn->FindComponentByClass<UInventoryComponent>())
+		{
+			BoundInventory = Inventory;
+			Inventory->OnInventoryChanged.AddDynamic(this, &UDetailInfoWidget::HandleInventoryChanged);
+			Inventory->OnSelectionChanged.AddDynamic(this, &UDetailInfoWidget::HandleInventoryChanged);
+		}
+	}
+
+	HandleInventoryChanged();
 }
 
 void UDetailInfoWidget::HandleInventoryChanged()

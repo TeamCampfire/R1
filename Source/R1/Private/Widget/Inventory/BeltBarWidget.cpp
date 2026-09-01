@@ -4,6 +4,7 @@
 #include "Widget/Inventory/BeltBarWidget.h"
 #include "Widget/Inventory/InventorySlotWidget.h"
 #include "GameFramework/Pawn.h"
+#include "Character/ActionPlayerController.h"
 
 void UBeltBarWidget::NativePreConstruct()
 {
@@ -30,6 +31,40 @@ void UBeltBarWidget::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
 
+	if (AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer()))
+	{
+		PC->OnPossessedCharChange.AddDynamic(this, &UBeltBarWidget::RebindInventory);
+	}
+
+	RebindInventory();
+}
+
+void UBeltBarWidget::NativeDestruct()
+{
+	UnbindInventoryDelegates();
+
+	if (AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer()))
+	{
+		PC->OnPossessedCharChange.RemoveDynamic(this, &UBeltBarWidget::RebindInventory);
+	}
+
+	Super::NativeDestruct();
+}
+
+void UBeltBarWidget::UnbindInventoryDelegates()
+{
+	if (UInventoryComponent* Inventory = BoundInventory.Get())
+	{
+		Inventory->OnInventoryChanged.RemoveDynamic(this, &UBeltBarWidget::HandleInventoryChanged);
+		Inventory->OnSelectionChanged.RemoveDynamic(this, &UBeltBarWidget::HandleInventoryChanged);
+	}
+}
+
+void UBeltBarWidget::RebindInventory()
+{
+	UnbindInventoryDelegates();
+	BoundInventory = nullptr;
+
 	if (APawn* OwningPawn = GetOwningPlayerPawn())
 	{
 		if (UInventoryComponent* Inventory = OwningPawn->FindComponentByClass<UInventoryComponent>())
@@ -41,17 +76,6 @@ void UBeltBarWidget::NativeOnInitialized()
 	}
 
 	HandleInventoryChanged();
-}
-
-void UBeltBarWidget::NativeDestruct()
-{
-	if (UInventoryComponent* Inventory = BoundInventory.Get())
-	{
-		Inventory->OnInventoryChanged.RemoveDynamic(this, &UBeltBarWidget::HandleInventoryChanged);
-		Inventory->OnSelectionChanged.RemoveDynamic(this, &UBeltBarWidget::HandleInventoryChanged);
-	}
-
-	Super::NativeDestruct();
 }
 
 void UBeltBarWidget::HandleInventoryChanged()

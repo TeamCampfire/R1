@@ -9,6 +9,7 @@
 #include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
 #include "Blueprint/UserWidget.h"
+#include "Character/ActionPlayerController.h"
 
 UInventoryWidget* UInventoryWidget::ShowInventoryTestWidget(UObject* WorldContextObject, TSubclassOf<UInventoryWidget> WidgetClass)
 {
@@ -77,6 +78,40 @@ void UInventoryWidget::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
 
+	if (AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer()))
+	{
+		PC->OnPossessedCharChange.AddDynamic(this, &UInventoryWidget::RebindInventory);
+	}
+
+	RebindInventory();
+}
+
+void UInventoryWidget::NativeDestruct()
+{
+	UnbindInventoryDelegates();
+
+	if (AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer()))
+	{
+		PC->OnPossessedCharChange.RemoveDynamic(this, &UInventoryWidget::RebindInventory);
+	}
+
+	Super::NativeDestruct();
+}
+
+void UInventoryWidget::UnbindInventoryDelegates()
+{
+	if (UInventoryComponent* Inventory = BoundInventory.Get())
+	{
+		Inventory->OnInventoryChanged.RemoveDynamic(this, &UInventoryWidget::HandleInventoryChanged);
+		Inventory->OnSelectionChanged.RemoveDynamic(this, &UInventoryWidget::HandleInventoryChanged);
+	}
+}
+
+void UInventoryWidget::RebindInventory()
+{
+	UnbindInventoryDelegates();
+	BoundInventory = nullptr;
+
 	if (APawn* OwningPawn = GetOwningPlayerPawn())
 	{
 		if (UInventoryComponent* Inventory = OwningPawn->FindComponentByClass<UInventoryComponent>())
@@ -89,17 +124,6 @@ void UInventoryWidget::NativeOnInitialized()
 	}
 
 	HandleInventoryChanged();
-}
-
-void UInventoryWidget::NativeDestruct()
-{
-	if (UInventoryComponent* Inventory = BoundInventory.Get())
-	{
-		Inventory->OnInventoryChanged.RemoveDynamic(this, &UInventoryWidget::HandleInventoryChanged);
-		Inventory->OnSelectionChanged.RemoveDynamic(this, &UInventoryWidget::HandleInventoryChanged);
-	}
-
-	Super::NativeDestruct();
 }
 
 void UInventoryWidget::HandleInventoryChanged()
