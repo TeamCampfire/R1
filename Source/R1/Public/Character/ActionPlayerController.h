@@ -44,6 +44,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	void SetInventoryInputState(bool bOpen);
 
+	// 옵션 패널이 열리면 마우스 커서를 보여주고 UI 입력을 받도록, 닫히면 다시 게임 전용 입력으로 되돌린다.
+	// SetInventoryInputState와 동일한 카운터(OpenUIPanelCount)를 공유하므로, 인벤토리와 옵션을
+	// 동시에 열어도 마지막 하나가 닫힐 때까지 게임 입력이 잘못 복구되지 않는다.
+	UFUNCTION(BlueprintCallable, Category = "Options")
+	void SetOptionsInputState(bool bOpen);
+
 	// 리스폰 지점(액터) 설정 함수
 	UFUNCTION(BlueprintCallable, Category = "Respawn")
 	void SetRespawnPoint(AActor* InRespawnPoint);
@@ -74,6 +80,11 @@ protected:
 	// 플레이어 리스폰 지점
 	UPROPERTY()
 	TObjectPtr<AActor> RespawnPoint;
+
+	// SetInventoryInputState/SetOptionsInputState가 공유하는 "현재 열려있는 UI 패널 개수" —
+	// 0→1로 바뀔 때만 게임 입력을 끄고, 1→0으로 바뀔 때만 게임 입력을 복구한다.
+	void ApplyUIInputState(bool bOpen);
+	int32 OpenUIPanelCount = 0;
 public:
 	// 컨트롤러 연결 캐릭터 변경 시 호출되는 델리게이트
 	FOnPossessedCharChange OnPossessedCharChange;

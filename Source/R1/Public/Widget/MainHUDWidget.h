@@ -13,6 +13,7 @@
 class UInteractionPromptWidget;
 class UInventoryWidget;
 class UBeltBarWidget;
+class UOptionsWidget;
 /**
  * 
  */
@@ -29,6 +30,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	bool IsInventoryPanelOpen() const;
 
+	// 옵션(환경설정) 패널을 열려있으면 닫고, 닫혀있으면 연다. 전환 후 열림 상태를 돌려준다.
+	UFUNCTION(BlueprintCallable, Category = "Options")
+	bool ToggleOptionsPanel();
+
+	UFUNCTION(BlueprintPure, Category = "Options")
+	bool IsOptionsPanelOpen() const;
+
 protected:
 	//~ Begin UUserWidget Interface
 	virtual void NativeOnInitialized() override;
@@ -42,4 +50,7 @@ protected:
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UBeltBarWidget> BeltBarWidget;
+
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UOptionsWidget> OptionsWidget;
 };

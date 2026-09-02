@@ -106,6 +106,7 @@ protected:
 
 	void OnInteractPressed();			// 상호작용 시도
 	void OnInventoryTogglePressed();	// 인벤토리 패널 토글
+	void OnOptionsTogglePressed();		// 옵션(환경설정) 패널 토글
 	void OnUseBeltSlotPressed(int32 BeltIndex);	// 벨트슬롯 단축키(1~6, 0-based 인덱스로 받음)
 
 	// 공격 몽타주 재생 RPC (리슨 서버 및 멀티플레이어 동기화)
@@ -160,6 +161,10 @@ protected:
 	// 인벤토리 토글
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UInputAction> IA_InventoryToggle;
+
+	// 옵션(환경설정) 패널 토글 (ESC)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UInputAction> IA_OptionsToggle;
 
 	/// 벨트슬롯 단축키
 	// 1

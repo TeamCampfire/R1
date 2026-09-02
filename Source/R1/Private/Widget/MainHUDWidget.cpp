@@ -3,6 +3,7 @@
 
 #include "Widget/MainHUDWidget.h"
 #include "Widget/Inventory/InventoryWidget.h"
+#include "Widget/Options/OptionsWidget.h"
 
 void UMainHUDWidget::NativeOnInitialized()
 {
@@ -14,6 +15,12 @@ void UMainHUDWidget::NativeOnInitialized()
 	if (InventoryWidget)
 	{
 		InventoryWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
+	// 옵션 패널도 마찬가지로 ESC 토글 전엔 닫힌 채로 시작한다.
+	if (OptionsWidget)
+	{
+		OptionsWidget->SetVisibility(ESlateVisibility::Collapsed);
 	}
 }
 
@@ -45,5 +52,23 @@ bool UMainHUDWidget::ToggleInventoryPanel()
 bool UMainHUDWidget::IsInventoryPanelOpen() const
 {
 	return InventoryWidget && InventoryWidget->GetVisibility() != ESlateVisibility::Collapsed;
+}
+
+bool UMainHUDWidget::ToggleOptionsPanel()
+{
+	if (!OptionsWidget)
+	{
+		return false;
+	}
+
+	const bool bNewOpenState = !IsOptionsPanelOpen();
+	OptionsWidget->SetVisibility(bNewOpenState ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+
+	return bNewOpenState;
+}
+
+bool UMainHUDWidget::IsOptionsPanelOpen() const
+{
+	return OptionsWidget && OptionsWidget->GetVisibility() != ESlateVisibility::Collapsed;
 }
 
