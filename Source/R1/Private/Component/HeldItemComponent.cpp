@@ -1,18 +1,29 @@
-/// 최초작성 : 2026.08.30
+﻿/// 최초작성 : 2026.08.30
 /// 작 성 자 : 주 형 진
 
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Component/HeldItemComponent.h"
+#include "Net/UnrealNetwork.h"
 #include "Item/HeldItemBase.h"
 #include "Data/Item/EquipmentItemData.h"
 #include "Character/ActionCharacter.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "EnhancedInputComponent.h"
+#include "UObject/ConstructorHelpers.h"
 
 UHeldItemComponent::UHeldItemComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	SetIsReplicatedByDefault(true);
+}
+
+void UHeldItemComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(UHeldItemComponent, CurrentHeldItem);
+	DOREPLIFETIME(UHeldItemComponent, CurrentEquippedItemData);
 }
 
 void UHeldItemComponent::BeginPlay()
@@ -21,14 +32,72 @@ void UHeldItemComponent::BeginPlay()
 
 	OwnerCharacter = Cast<AActionCharacter>(GetOwner());
 
-	// 에디터 디테일 패널에서 설정된 기본 아이템 데이터 자동 장착
-	if (DefaultItemData)
+	// 서버에서만 초기 아이템 자동 장착 수행
+	if (GetOwner() && GetOwner()->HasAuthority())
 	{
-		EquipHeldItemByData(DefaultItemData);
+		if (DefaultItemData)
+		{
+			EquipHeldItemByData(DefaultItemData);
+		}
+		else if (DefaultHeldItemClass)
+		{
+			EquipHeldItemByClass(DefaultHeldItemClass);
+		}
 	}
-	else if (DefaultHeldItemClass)
+}
+
+void UHeldItemComponent::AttachHeldItemToCharacter(AHeldItemBase* ItemToAttach)
+{
+	if (!ItemToAttach) return;
+	if (!OwnerCharacter)
 	{
-		EquipHeldItemByClass(DefaultHeldItemClass);
+		OwnerCharacter = Cast<AActionCharacter>(GetOwner());
+	}
+	if (!OwnerCharacter) return;
+
+	USkeletalMeshComponent* CharacterMesh = OwnerCharacter->GetMesh();
+	const FName HandSocket = (CharacterMesh && CharacterMesh->DoesSocketExist(FName(TEXT("r_handSocket"))))
+		? FName(TEXT("r_handSocket"))
+		: ((CharacterMesh && CharacterMesh->DoesSocketExist(FName(TEXT("RightHandSocket")))) ? FName(TEXT("RightHandSocket")) : FName(NAME_None));
+
+	if (HandSocket != NAME_None && CharacterMesh)
+	{
+		ItemToAttach->AttachToComponent(CharacterMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, HandSocket);
+	}
+	else
+	{
+		ItemToAttach->AttachToActor(OwnerCharacter, FAttachmentTransformRules::KeepRelativeTransform);
+		//ItemToAttach->SetActorRelativeLocation(FVector(40.f, 30.f, 0.f));
+	}
+}
+
+void UHeldItemComponent::OnRep_CurrentHeldItem(AHeldItemBase* PreviousHeldItem)
+{
+	if (!OwnerCharacter)
+	{
+		OwnerCharacter = Cast<AActionCharacter>(GetOwner());
+	}
+
+	// 1. 이전 아이템 해제 라이프사이클 처리
+	if (PreviousHeldItem && IsValid(PreviousHeldItem))
+	{
+		PreviousHeldItem->OnUnequipped();
+	}
+
+	// 2. 새 아이템 장착 및 소켓 부착
+	if (CurrentHeldItem && IsValid(CurrentHeldItem))
+	{
+		AttachHeldItemToCharacter(CurrentHeldItem);
+		CurrentHeldItem->OnEquipped(OwnerCharacter);
+
+		// 로컬 컨트롤러인 경우 입력 컴포넌트 바인딩 전달
+		if (OwnerCharacter && OwnerCharacter->IsLocallyControlled() && OwnerCharacter->InputComponent)
+		{
+			if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(OwnerCharacter->InputComponent))
+			{
+				CurrentHeldItem->SetupInputComponent(EIC);
+			}
+		}
 	}
 }
 
@@ -69,7 +138,18 @@ AHeldItemBase* UHeldItemComponent::EquipHeldItemByData(UEquipmentItemData* Equip
 
 AHeldItemBase* UHeldItemComponent::EquipHeldItemByClass(TSubclassOf<AHeldItemBase> ItemClass)
 {
+	// 장착/스폰은 반드시 서버에서만 실행
+	if (!GetOwner() || !GetOwner()->HasAuthority())
+	{
+		return nullptr;
+	}
+
 	UnequipHeldItem();
+
+	if (!OwnerCharacter)
+	{
+		OwnerCharacter = Cast<AActionCharacter>(GetOwner());
+	}
 
 	if (!OwnerCharacter || !ItemClass || !GetWorld())
 	{
@@ -85,25 +165,11 @@ AHeldItemBase* UHeldItemComponent::EquipHeldItemByClass(TSubclassOf<AHeldItemBas
 	if (CurrentHeldItem)
 	{
 		CurrentHeldItem->SetOwner(OwnerCharacter);
-
-		USkeletalMeshComponent* CharacterMesh = OwnerCharacter->GetMesh();
-		const FName HandSocket = (CharacterMesh && CharacterMesh->DoesSocketExist(FName(TEXT("r_handSocket"))))
-			? FName(TEXT("r_handSocket"))
-			: ((CharacterMesh && CharacterMesh->DoesSocketExist(FName(TEXT("RightHandSocket")))) ? FName(TEXT("RightHandSocket")) : FName(NAME_None));
-
-		if (HandSocket != NAME_None && CharacterMesh)
-		{
-			CurrentHeldItem->AttachToComponent(CharacterMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, HandSocket);
-		}
-		else
-		{
-			CurrentHeldItem->AttachToActor(OwnerCharacter, FAttachmentTransformRules::KeepRelativeTransform);
-			CurrentHeldItem->SetActorRelativeLocation(FVector(40.f, 30.f, 0.f));
-		}
-
+		AttachHeldItemToCharacter(CurrentHeldItem);
 		CurrentHeldItem->OnEquipped(OwnerCharacter);
 
-		if (OwnerCharacter && OwnerCharacter->InputComponent)
+		// 호스트(리슨 서버)의 로컬 캐릭터인 경우 입력 바인딩 설정
+		if (OwnerCharacter->IsLocallyControlled() && OwnerCharacter->InputComponent)
 		{
 			if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(OwnerCharacter->InputComponent))
 			{
@@ -120,7 +186,12 @@ void UHeldItemComponent::UnequipHeldItem()
 	if (CurrentHeldItem)
 	{
 		CurrentHeldItem->OnUnequipped();
-		CurrentHeldItem->Destroy();
+
+		// 액터 소멸은 서버에서만 호출 (클라이언트는 Replication으로 소멸됨)
+		if (GetOwner() && GetOwner()->HasAuthority())
+		{
+			CurrentHeldItem->Destroy();
+		}
 		CurrentHeldItem = nullptr;
 	}
 	CurrentEquippedItemData = nullptr;
