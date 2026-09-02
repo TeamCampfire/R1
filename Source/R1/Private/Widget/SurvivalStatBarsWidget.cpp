@@ -10,37 +10,45 @@
 #include "Interface/HydrationInterface.h"
 #include "Interface/CaloriesInterface.h"
 #include "Interface/StatusEffectInterface.h"
+#include "Character/ActionPlayerController.h"
 #include "Component/StatComponent.h"
 #include "Components/VerticalBox.h"
 
 void USurvivalStatBarsWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
+
+	AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer());
+	if (PC)
+	{
+		PC->OnPossessedCharChange.AddDynamic(
+			this,
+			&USurvivalStatBarsWidget::InitializeSurvivalStatBars
+		);
+	}
 	InitializeSurvivalStatBars();
 }
 
 void USurvivalStatBarsWidget::NativeDestruct()
 {
-    if (IStatInterface* OwnerActor = Cast<IStatInterface>(GetOwningPlayerPawn()))
-    {
-        if (UStatComponent* StatComp = OwnerActor->GetStatComponent())
-        {
-            StatComp->OnStatusEffectChange.RemoveDynamic(
-                this,
-                &USurvivalStatBarsWidget::UpdateStatusEffects
-            );
-        }
-    }
-    UE_LOG(LogTemp, Error, TEXT("SurvivalStatBars NativeDestruct"));
     Super::NativeDestruct();
 }
 
 void USurvivalStatBarsWidget::InitializeSurvivalStatBars()
 {
+	UnbindStatDelegates();
 	if (IStatInterface* OwnerPlayer = Cast<IStatInterface>(GetOwningPlayerPawn()))
 	{
-		if (UStatComponent* StatComp = OwnerPlayer->GetStatComponent())
+		if (StatComp = OwnerPlayer->GetStatComponent())
 		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("=== BIND HEALTH === Widget=%p Pawn=%p PawnName=%s StatComp=%p HealthBar=%p"),
+				this,
+				GetOwningPlayerPawn(),
+				*GetNameSafe(GetOwningPlayerPawn()),
+				StatComp.Get(),
+				HealthBar.Get());
+
 			StatComp->OnHealthChange.AddDynamic(HealthBar, &UParameterBarWidget::UpdateParameterBar);
 			StatComp->OnHydrationChange.AddDynamic(HydrationBar, &UParameterBarWidget::UpdateParameterBar);
 			StatComp->OnCaloryChange.AddDynamic(CaloriesBar, &UParameterBarWidget::UpdateParameterBar);
@@ -55,9 +63,20 @@ void USurvivalStatBarsWidget::InitializeSurvivalStatBars()
 			CaloriesBar->UpdateParameterBar(
 				ICaloriesInterface::Execute_GetCurrentCalories(StatComp),
 				ICaloriesInterface::Execute_GetMaxCalories(StatComp));
+			UpdateStatusEffects();
 		}
 	}
+}
 
+void USurvivalStatBarsWidget::UnbindStatDelegates()
+{
+	if (StatComp)
+	{
+		StatComp->OnHealthChange.RemoveDynamic(HealthBar, &UParameterBarWidget::UpdateParameterBar);
+		StatComp->OnHydrationChange.RemoveDynamic(HydrationBar, &UParameterBarWidget::UpdateParameterBar);
+		StatComp->OnCaloryChange.RemoveDynamic(CaloriesBar, &UParameterBarWidget::UpdateParameterBar);
+		StatComp->OnStatusEffectChange.RemoveDynamic(this, &USurvivalStatBarsWidget::UpdateStatusEffects);
+	}
 }
 
 void USurvivalStatBarsWidget::UpdateStatusEffects()
@@ -65,32 +84,18 @@ void USurvivalStatBarsWidget::UpdateStatusEffects()
 
     UWorld* World = GetWorld();
 
-    if (!World || World->bIsTearingDown)
-    {
-        return;
-    }
-
+    if (!World || World->bIsTearingDown) return;
     
-    if (!IsValid(StatusBarWidgetClass))
-    {
-        return;
-    }
+    if (!IsValid(StatusBarWidgetClass)) return;
 
     IStatInterface* OwnerActor =
         Cast<IStatInterface>(GetOwningPlayerPawn());
 
-    if (!OwnerActor)
-    {
-        return;
-    }
+    if (!OwnerActor) return;
 
-    UStatComponent* StatComp =
-        OwnerActor->GetStatComponent();
+    //UStatComponent* StatComp = OwnerActor->GetStatComponent();
 
-    if (!StatComp)
-    {
-        return;
-    }
+    if (!StatComp) return;
 
     const EStatusEffect ActiveEffects =
         IStatusEffectInterface::Execute_GetCurrentStatusEffect(

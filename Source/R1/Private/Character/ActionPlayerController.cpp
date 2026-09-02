@@ -2,9 +2,13 @@
 
 
 #include "Character/ActionPlayerController.h"
+#include "Character/ActionCharacter.h"
+#include "Component/StatComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "EnhancedInputComponent.h"
 #include "InputMappingContext.h"
+#include "GameFramework/PlayerState.h"
+#include "EngineUtils.h"
 
 #include "BuildingSystem/Component/BuildingPlacementComponent.h"
 
@@ -42,6 +46,36 @@ void AActionPlayerController::OnConfirmBuildingPlacement()
 		BuildingPlacementComponent->ConfirmPlacement();
 }
 
+void AActionPlayerController::OnPossess(APawn* InPawn)
+{
+	Super::OnPossess(InPawn);
+	AActionCharacter* NewCharacter = Cast<AActionCharacter>(InPawn);
+
+	if (!NewCharacter) return;
+
+	UE_LOG(LogTemp, Warning,
+		TEXT("=== POSSESS === World=%s NetMode=%d PC=%p PCName=%s Pawn=%p PawnName=%s IsLocal=%s StatComp=%p"),
+		*GetNameSafe(GetWorld()),
+		GetWorld() ? static_cast<int32>(GetWorld()->GetNetMode()) : -1,
+		this,
+		*GetNameSafe(this),
+		InPawn,
+		*GetNameSafe(InPawn),
+		IsLocalController() ? TEXT("TRUE") : TEXT("FALSE"),
+		NewCharacter ? NewCharacter->GetStatComponent() : nullptr
+	);
+
+	OnPossessedCharChange.Broadcast();
+}
+
+void AActionPlayerController::PossessChar(AActionCharacter* InNewChar)
+{
+	if (!InNewChar) return;
+
+	Possess(InNewChar);
+	//OnPossessedCharChange.Broadcast();
+}
+
 void AActionPlayerController::SetInventoryInputState(bool bOpen)
 {
 	bShowMouseCursor = bOpen;
@@ -75,3 +109,101 @@ void AActionPlayerController::SetInventoryInputState(bool bOpen)
 	}
 }
 
+void AActionPlayerController::SetRespawnPoint(AActor* InRespawnPoint)
+{
+	if (!InRespawnPoint) return;
+
+	if (!InRespawnPoint->GetClass()->ImplementsInterface(URespawnPointInterface::StaticClass())) return;
+
+	UE_LOG(LogTemp, Warning, TEXT("%s 의 리스폰 지점이 %s 로 지정되었습니다."), * GetName(), *InRespawnPoint->GetName());
+	RespawnPoint = InRespawnPoint;
+}
+
+AActor* AActionPlayerController::GetRespawnPoint()
+{
+	return RespawnPoint;
+}
+
+
+
+
+// Debug-----------------------------------------------------------------------------------------------------------------------
+void AActionPlayerController::TestDamage(int32 PlayerIndex)
+{
+	UE_LOG(LogTemp, Warning,
+		TEXT("=== TEST DAMAGE CMD === TargetPlayerIndex=%d"),
+		PlayerIndex);
+
+	for (TActorIterator<AActionCharacter> It(GetWorld()); It; ++It)
+	{
+		AActionCharacter* TargetCharacter = *It;
+
+		if (!TargetCharacter) continue;
+
+		APlayerState* TargetPlayerState = TargetCharacter->GetPlayerState();
+
+		if (!TargetPlayerState) continue;
+
+		UE_LOG(LogTemp, Warning,
+			TEXT("Character=%s PlayerId=%d Target=%d"),
+			*GetNameSafe(TargetCharacter),
+			TargetPlayerState->GetPlayerId(),
+			PlayerIndex);
+
+		if (TargetPlayerState->GetPlayerId() != PlayerIndex) continue;
+
+		UStatComponent* StatComp = TargetCharacter->GetStatComponent();
+
+		if (!StatComp) return;
+
+		UE_LOG(LogTemp, Warning,
+			TEXT("=== TARGET FOUND === %s"),
+			*GetNameSafe(TargetCharacter));
+
+		StatComp->TestInflictDamage();
+		return;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("=== TARGET NOT FOUND ==="));
+}
+
+void AActionPlayerController::TestHydrationDamage(int32 PlayerIndex)
+{
+	//if (!HasAuthority()) return;
+
+	for (TActorIterator<AActionCharacter> It(GetWorld()); It; ++It)
+	{
+		AActionCharacter* TargetCharacter = *It;
+
+		if (!TargetCharacter)
+			continue;
+
+		APlayerState* TargetPlayerState = TargetCharacter->GetPlayerState();
+		if (!TargetPlayerState) continue;
+
+		if (PlayerState->GetPlayerId() != PlayerIndex) continue;
+
+		UStatComponent* StatComp = TargetCharacter->GetStatComponent();
+
+		if (!StatComp) return;
+
+		StatComp->TestDecreaseHydration();
+		return;
+	}
+}
+
+void AActionPlayerController::ServerTestInflictDamage_Implementation()
+{
+	AActionCharacter* ActionChar = Cast<AActionCharacter>(GetPawn());
+
+	if (!ActionChar)
+		return;
+
+	UStatComponent* StatComp = ActionChar->GetStatComponent();
+
+	if (!StatComp)
+		return;
+
+	StatComp->Execute_InflictDamage(StatComp, 50.0f);
+}
+//------------------------------------------------------------------------------------------------------------------------------------------

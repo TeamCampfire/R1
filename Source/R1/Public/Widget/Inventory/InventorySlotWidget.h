@@ -18,7 +18,10 @@ class UTextBlock;
 class UWidget;
 class UPanelWidget;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnInventorySlotDropped, FInventorySlotRef, FromSlot, FInventorySlotRef, ToSlot);
+// Count/bAutoHalfSplitOnEmptyTarget은 UInventoryDragDropOperation의 동명 필드를 그대로 전달한
+// 것 — Count가 0 이하면 슬롯 전체 이동, 양수면 그만큼만(DetailInfoWidget의 분할 드래그).
+// bAutoHalfSplitOnEmptyTarget은 휠클릭 드래그 표시로, TransferItem에 그대로 넘기면 된다.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnInventorySlotDropped, FInventorySlotRef, FromSlot, FInventorySlotRef, ToSlot, int32, Count, bool, bAutoHalfSplitOnEmptyTarget);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotClicked, FInventorySlotRef, SlotRef);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotRightClicked, FInventorySlotRef, SlotRef);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotDragCancelled, FInventorySlotRef, SlotRef);
@@ -60,12 +63,19 @@ public:
 	// 소유 위젯(UInventoryWidget/UBeltBarWidget)이 매 갱신마다 호출해준다.
 	void SetClickSelected(bool bInSelected);
 
+	// 벨트에서 현재 손에 든(HeldBeltIndex) 무기/도구 슬롯인지(파란 테두리, 클릭 선택과 같은 색을
+	// 공유) — UBeltBarWidget이 매 갱신마다 InventoryComponent::HeldBeltIndex를 보고 호출해준다.
+	// 소비/기타/장비(의류)는 HeldBeltIndex 대상이 될 수 없으므로 이 값이 true가 될 일이 없다 —
+	// 즉 해당 카테고리는 기존 클릭 선택 동작만 그대로 적용된다.
+	void SetHeldHighlighted(bool bInHeld);
+
 	// Container에 Slots.Num()개의 슬롯 위젯을 채운다(최초 1회 생성, 이후엔 내용만 갱신) —
 	// 장비/메인/벨트 패널을 각각 다른 UUserWidget이 갖고 있어도 이 함수 하나로 공유한다.
 	// Container가 UniformGridPanel이면 GridColumns 기준으로 Row/Column을 배정한다.
 	// OnSlotCreated는 새로 생성된 슬롯 위젯마다 한 번씩 호출된다 — 호출부가 자기 클래스의
 	// HandleSlotDropped/HandleSlotClicked를 OnSlotDropped/OnSlotClicked.AddDynamic으로 직접 바인딩하는 용도.
-	// IsSelectedFn은 매 갱신(Refresh)마다 슬롯별로 호출되어 파란 선택 테두리를 켤지 결정한다.
+	// IsSelectedFn/IsHeldFn은 매 갱신(Refresh)마다 슬롯별로 호출되어 파란 테두리를 켤지 결정한다
+	// (클릭 선택과 손에 듦 둘 다 같은 파란색 — 호출부가 해당 없는 쪽은 항상 false를 반환하면 된다).
 	static void EnsureGridSlots(
 		UWidget* OwningWidget,
 		TSubclassOf<UInventorySlotWidget> SlotWidgetClass,
@@ -75,6 +85,7 @@ public:
 		int32 GridColumns,
 		TFunctionRef<void(UInventorySlotWidget*)> OnSlotCreated,
 		TFunctionRef<bool(const FInventorySlotRef&)> IsSelectedFn,
+		TFunctionRef<bool(const FInventorySlotRef&)> IsHeldFn,
 		TArray<TObjectPtr<UInventorySlotWidget>>& OutWidgets);
 
 	UPROPERTY(BlueprintAssignable, Category = "Inventory")
@@ -124,8 +135,8 @@ protected:
 	TObjectPtr<UBorder> SelectionBorder;
 
 private:
-	// 드래그 하이라이트(노란색)와 클릭 선택(파란색) 중 우선순위(드래그 우선)를 따져
-	// SelectionBorder 색상을 갱신한다.
+	// 드래그 하이라이트(노란색)와 클릭 선택/손에 듦(파란색, 둘 다 같은 색이라 우선순위 없이
+	// OR로 묶는다) 중 우선순위(드래그 우선)를 따져 SelectionBorder 색상을 갱신한다.
 	void UpdateSelectionVisual();
 
 	FInventorySlotRef SlotRef;
@@ -134,5 +145,12 @@ private:
 	FItemInstance CachedInstance;
 
 	bool bIsDragHovering = false;
+
+	// 벨트에서 현재 손에 든 무기/도구 슬롯인지 — SetHeldHighlighted로만 바뀐다.
+	bool bIsHeldHighlighted = false;
+
+	// NativeOnMouseButtonDown이 MiddleMouseButton으로 드래그를 등록했는지 — NativeOnDragDetected가
+	// 이 값을 보고 DragOp->bAutoHalfSplitOnEmptyTarget을 채운다.
+	bool bPendingMiddleButtonDrag = false;
 	bool bIsClickSelected = false;
 };

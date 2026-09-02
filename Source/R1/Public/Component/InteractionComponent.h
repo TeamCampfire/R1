@@ -11,9 +11,6 @@
 #include "Engine/EngineTypes.h"
 #include "InteractionComponent.generated.h"
 
-class UMaterialInterface;
-class UStaticMeshComponent;
-
 // Icon은 UI에서 바로 그릴 수 있게 이미 로드된 UTexture2D*로 넘긴다(대상이 바뀔 때만
 // 쏘는 이벤트라 동기 로드해도 비용이 크지 않음) 
 // — TSoftObjectPtr을 그대로 넘기면 UI(WBP) 쪽에서 매번 로드 처리를 해야 해서 델리게이트 소비 쪽이 번거로워진다.
@@ -43,8 +40,13 @@ public:
 	UInteractionComponent();
 
 	// 현재 조준 중인 대상에게 실제 상호작용을 실행한다. 입력 액션에 바인딩해서 호출.
+	// 상호작용 가능 판단 후 서버에 요청만 함.
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	void TryInteract();
+
+	// 실제로 상호작용 동작하는 서버측 실행 함수
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_TryInteract(AActor* Target);
 
 protected:
 	// Called when the game starts
@@ -75,26 +77,14 @@ public:
 	FOnInteractableTargetChanged OnInteractableTargetChanged;
 
 	/// outline 용 코드
-	// 인버티드 헐 복제 메시에 씌우는 평범한(Unlit/Opaque 등) 하이라이트 머티리얼 
+	// CustomDepth 스텐실 값 — 레벨의 PostProcessVolume에 등록한
+	// M_InteractionOutline_PostProcess가 참조하는 스텐실 값과 반드시 일치해야 한다.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interaction|Highlight")
-	TObjectPtr<UMaterialInterface> HighlightOverlayMaterial;
-
-	// 복제 메시를 원본보다 얼마나 키울지(1.0 = 같은 크기, 겹쳐서 안 보임). 너무 크면
-	// 테두리가 두꺼워 보이고, 너무 작으면 원본에 완전히 가려 안 보인다 — 1.02~1.08
-	// 사이에서 메시 크기에 맞게 튜닝 권장.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interaction|Highlight")
-	float HighlightScaleMultiplier = 1.03f;
+	int32 HighlightStencilValue = 1;
 	///-----------------------------------------------------------------------------------
 
 private:
 	// 현재 타겟
 	UPROPERTY()
 	TObjectPtr<AActor> CurrentTarget;
-
-	// 인버티드 헐 하이라이트용으로 런타임에 생성해 재사용하는 복제 메시 컴포넌트.
-	// 한 번에 대상 하나만 하이라이트되므로 대상이 바뀔 때마다 이 컴포넌트를 새
-	// 대상의 메시 컴포넌트에 다시 붙이고 스태틱 메시만 교체하는 식으로 재사용한다
-	// (매번 새로 만들고 지우는 대신).
-	UPROPERTY()
-	TObjectPtr<UStaticMeshComponent> HighlightCloneMesh;
 };

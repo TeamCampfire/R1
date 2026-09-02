@@ -7,6 +7,7 @@
 #include "Item/ItemPickup.h"
 #include "GameFramework/Character.h"
 #include "Component/HeldItemComponent.h"
+#include "Net/UnrealNetwork.h"   // DOREPLIFETIME 계열 매크로가 여기 정의돼 있음
 
 // Sets default values for this component's properties
 UInventoryComponent::UInventoryComponent()
@@ -15,7 +16,8 @@ UInventoryComponent::UInventoryComponent()
 	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = false;
 
-	// ...
+	// 리플리케이트 되는 컴포넌트 설정
+	SetIsReplicatedByDefault(true);
 }
 
 
@@ -31,18 +33,23 @@ bool UInventoryComponent::AddItem(UItemDataBase* ItemData, int32 Count, int32& O
 	// 1) 스택 가능한 아이템이면 같은 종류이고 아직 여유가 있는 기존 슬롯에 먼저 채운다.
 	if (ItemData->MaxStackSize > 1)
 	{
-		for (FItemInstance& Slot : MainSlots)
+		for (int32 Index = 0; Index < MainSlots.Num(); ++Index)
 		{
 			if (OutRemainder <= 0)
 			{
 				break;
 			}
 
+			const FItemInstance& Slot = MainSlots[Index];
 			if (Slot.ItemData == ItemData && Slot.StackCount < ItemData->MaxStackSize)
 			{
 				const int32 SpaceInSlot = ItemData->MaxStackSize - Slot.StackCount;	// 여유 공간(스택) 계산
 				const int32 AmountToAdd = FMath::Min(SpaceInSlot, OutRemainder);	// 추가할 스택 수 계산
-				Slot.StackCount += AmountToAdd;
+
+				FItemInstance UpdatedSlot = Slot; // 기존 슬롯 복사
+				UpdatedSlot.StackCount += AmountToAdd;
+				SetSlot(EInventorySlotCategory::Main, Index, UpdatedSlot);	// 슬롯 업데이트
+
 				OutRemainder -= AmountToAdd;
 			}
 		}
@@ -50,7 +57,7 @@ bool UInventoryComponent::AddItem(UItemDataBase* ItemData, int32 Count, int32& O
 
 	// 2) 남은 수량은 빈 슬롯에 새로 채운다. 장비처럼 스택 불가(MaxStackSize == 1)면
 	// 슬롯 하나에 항상 1개씩만 들어가므로, 여러 개면 자연스럽게 슬롯 여러 개를 쓴다.
-	for (FItemInstance& Slot : MainSlots)
+	for (int32 Index = 0; Index < MainSlots.Num(); ++Index)
 	{
 		if (OutRemainder <= 0)
 		{
@@ -58,19 +65,12 @@ bool UInventoryComponent::AddItem(UItemDataBase* ItemData, int32 Count, int32& O
 		}
 
 		// 빈슬롯 체크
-		if (!Slot.IsValid())
+		if (!MainSlots[Index].IsValid())
 		{
 			const int32 AmountToAdd = FMath::Min(ItemData->MaxStackSize, OutRemainder);
-			Slot = FItemInstance(ItemData, AmountToAdd);
+			SetSlot(EInventorySlotCategory::Main, Index, FItemInstance(ItemData, AmountToAdd));
 			OutRemainder -= AmountToAdd;
 		}
-	}
-
-	// 1개라도 아이템이 인벤토리에 들어간 경우
-	const bool bAddedAnything = OutRemainder < Count;
-	if (bAddedAnything)
-	{
-		OnInventoryChanged.Broadcast();
 	}
 
 	/// Test Call
@@ -111,6 +111,13 @@ const TArray<FItemInstance>& UInventoryComponent::GetSlotArray(EInventorySlotCat
 
 void UInventoryComponent::SetSlot(EInventorySlotCategory Category, int32 Index, const FItemInstance& NewValue)
 {
+	// 서버	권한이 없는 클라이언트에서 SetSlot을 호출하면 무시한다.
+	// (클라이언트는 서버가 리플리케이트한 슬롯 배열을 그대로 받아서 쓰기만 한다.)
+	if(!GetOwner() || !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
 	TArray<FItemInstance>& Array = GetSlotArray(Category);
 	if (!Array.IsValidIndex(Index))
 	{
@@ -199,7 +206,12 @@ EMoveSlotResult UInventoryComponent::EquipToSlot(const FInventorySlotRef& From, 
 	return EMoveSlotResult::Equipped;
 }
 
-EMoveSlotResult UInventoryComponent::TransferItem(FInventorySlotRef From, FInventorySlotRef To, int32 Count)
+void UInventoryComponent::OnRep_Slots()
+{
+	OnInventoryChanged.Broadcast();
+}
+
+EMoveSlotResult UInventoryComponent::TransferItem(FInventorySlotRef From, FInventorySlotRef To, int32 Count, bool bAutoHalfSplitIfTargetEmpty)
 {
 	if (From.Category == To.Category && From.Index == To.Index)
 	{
@@ -233,11 +245,18 @@ EMoveSlotResult UInventoryComponent::TransferItem(FInventorySlotRef From, FInven
 	// 대상이 비어있음 → 그냥 이동(장비슬롯에서 나오는 경우면 "해제"로 취급).
 	if (!TargetInstance.IsValid())
 	{
+		// 휠클릭 드래그(bAutoHalfSplitIfTargetEmpty)로 빈 슬롯에 놓았고 Count를 따로 지정하지
+		// 않았으면(0 이하), 2개 이상 쌓여있는 경우에 한해 절반만(내림) 떼어 옮긴다 — 나머지는
+		// 원래 자리에 남는다. 그 외에는 기존과 동일하게 MoveCount(전량 또는 지정 수량) 그대로.
+		const int32 ActualMoveCount = (bAutoHalfSplitIfTargetEmpty && Count <= 0 && SourceInstance.StackCount >= 2)
+			? (SourceInstance.StackCount / 2)
+			: MoveCount;
+
 		FItemInstance Moved = SourceInstance;
-		Moved.StackCount = MoveCount;
+		Moved.StackCount = ActualMoveCount;
 		SetSlot(To.Category, To.Index, Moved);
 
-		const int32 Remaining = SourceInstance.StackCount - MoveCount;
+		const int32 Remaining = SourceInstance.StackCount - ActualMoveCount;
 		SetSlot(From.Category, From.Index, Remaining > 0 ? FItemInstance(SourceInstance.ItemData, Remaining) : FItemInstance());
 
 		return bFromEquipment ? EMoveSlotResult::Unequipped : EMoveSlotResult::Moved;
@@ -269,6 +288,17 @@ EMoveSlotResult UInventoryComponent::TransferItem(FInventorySlotRef From, FInven
 	}
 
 	return EMoveSlotResult::Failed;
+}
+
+bool UInventoryComponent::Server_TransferItem_Validate(FInventorySlotRef From, FInventorySlotRef To, int32 Count, bool bAutoHalfSplitIfTargetEmpty)
+{
+	return true;	// 필요하면 인덱스 범위 등 검증 추가
+}
+
+
+void UInventoryComponent::Server_TransferItem_Implementation(FInventorySlotRef From, FInventorySlotRef To, int32 Count, bool bAutoHalfSplitIfTargetEmpty)
+{
+	TransferItem(From, To, Count, bAutoHalfSplitIfTargetEmpty);
 }
 
 EMoveSlotResult UInventoryComponent::QuickMoveItem(const FInventorySlotRef& SlotRef)
@@ -313,6 +343,16 @@ EMoveSlotResult UInventoryComponent::QuickMoveItem(const FInventorySlotRef& Slot
 	return TransferItem(SlotRef, FInventorySlotRef{ TargetCategory, EmptyIndex }, 0);
 }
 
+bool UInventoryComponent::Server_QuickMoveItem_Validate(FInventorySlotRef SlotRef)
+{
+	return true;	// 필요하면 인덱스 범위 등 검증 추가
+}
+
+void UInventoryComponent::Server_QuickMoveItem_Implementation(FInventorySlotRef SlotRef)
+{
+	QuickMoveItem(SlotRef);
+}
+
 void UInventoryComponent::UseBeltSlot(int32 BeltIndex)
 {
 	if (!BeltSlots.IsValidIndex(BeltIndex))
@@ -323,6 +363,13 @@ void UInventoryComponent::UseBeltSlot(int32 BeltIndex)
 	const FItemInstance Instance = BeltSlots[BeltIndex];
 	if (!Instance.IsValid())
 	{
+		// 빈 슬롯 단축키 — 지금 손에 든 무기/도구가 있으면 맨손으로 내려놓는다(Rust처럼 빈 칸
+		// 단축키가 "무장 해제" 역할). 아무것도 안 들고 있었으면 그대로 무동작.
+		if (HeldBeltIndex != INDEX_NONE)
+		{
+			HeldBeltIndex = INDEX_NONE;
+			OnInventoryChanged.Broadcast();
+		}
 		return;
 	}
 
@@ -347,6 +394,9 @@ void UInventoryComponent::UseBeltSlot(int32 BeltIndex)
 				}
 			}
 			OnInventoryChanged.Broadcast();
+
+			/// 헬드 컴포넌트에 아이템 장착
+
 			break;
 		}
 
@@ -363,6 +413,47 @@ void UInventoryComponent::UseBeltSlot(int32 BeltIndex)
 			// Misc 등 — 벨트에 있을 수는 있지만 사용 액션은 무동작.
 			break;
 	}
+}
+
+bool UInventoryComponent::Server_UseBeltSlot_Validate(int32 BeltIndex)
+{
+	return true;	// 필요하면 인덱스 범위 등 검증 추가
+}
+
+void UInventoryComponent::Server_UseBeltSlot_Implementation(int32 BeltIndex)
+{
+	UseBeltSlot(BeltIndex);
+}
+
+bool UInventoryComponent::UseSelectedItem(const FInventorySlotRef& SlotRef)
+{
+	const TArray<FItemInstance>& Array = GetSlotArray(SlotRef.Category);
+	if (!Array.IsValidIndex(SlotRef.Index) || !Array[SlotRef.Index].IsValid())
+	{
+		return false;
+	}
+
+	const FItemInstance Instance = Array[SlotRef.Index];
+	if (Instance.ItemData->Category != EItemCategory::Consumable)
+	{
+		return false;
+	}
+
+	// TODO(효과 적용): 실제 효과(Heal/RestoreHunger/RestoreThirst 등) 적용은 StatComponent 연동 후 처리.
+	// 지금은 UseBeltSlot의 Consumable 분기와 동일하게 수량 차감만 담당한다.
+	const int32 Remaining = Instance.StackCount - 1;
+	SetSlot(SlotRef.Category, SlotRef.Index, Remaining > 0 ? FItemInstance(Instance.ItemData, Remaining) : FItemInstance());
+	return true;
+}
+
+bool UInventoryComponent::Server_UseSelectedItem_Validate(FInventorySlotRef SlotRef)
+{
+	return true;
+}
+
+void UInventoryComponent::Server_UseSelectedItem_Implementation(FInventorySlotRef SlotRef)
+{
+	UseSelectedItem(SlotRef);
 }
 
 bool UInventoryComponent::DropItem(FInventorySlotRef Slot, int32 Count, const FTransform& DropTransform, const FVector& ThrowImpulse)
@@ -422,15 +513,27 @@ bool UInventoryComponent::ThrowItem(FInventorySlotRef Slot, int32 Count)
 	return DropItem(Slot, Count, FTransform(ViewRotation, SpawnLocation), Forward * ThrowImpulseStrength);
 }
 
+bool UInventoryComponent::Server_ThrowItem_Validate(FInventorySlotRef Slot, int32 Count)
+{
+	return true;	// 필요하면 인덱스 범위 등 검증 추가
+}
+
+void UInventoryComponent::Server_ThrowItem_Implementation(FInventorySlotRef Slot, int32 Count)
+{
+	ThrowItem(Slot, Count);
+}
+
 void UInventoryComponent::PrintInventoryInfo()
 {
-	auto PrintArray = [](const TCHAR* Label, const TArray<FItemInstance>& Array)
+	auto PrintArray = [this](const TCHAR* Label, const TArray<FItemInstance>& Array)
 	{
 		for (int32 i = 0; i < Array.Num(); ++i)
 		{
 			if (Array[i].IsValid())
 			{
-				UE_LOG(LogTemp, Log, TEXT("[%s %d] %s x%d"),
+				UE_LOG(LogTemp, Log, TEXT("[PIE %d][%s] - [%s %d] %s x%d"),
+					UE::GetPlayInEditorID(),
+					GetOwner() && GetOwner()->HasAuthority() ? TEXT("SERVER") : TEXT("CLIENT"),
 					Label,
 					i,
 					*(Array[i].ItemData->DisplayName.ToString()),
@@ -461,6 +564,22 @@ void UInventoryComponent::BeginPlay()
 	// BeginPlay보다 먼저 초기화되는 UI(레벨 블루프린트 등에서 만든 위젯)가 빈 배열을 스냅샷한
 	// 채로 이후 갱신을 못 받는 문제가 생긴다.
 	OnInventoryChanged.Broadcast();
+}
+
+void UInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);   // 부모(UActorComponent)의 리플리케이션 설정을 먼저 유지
+
+	// 메인, 벨트 슬롯은 소유자만 볼 수 있으므로 COND_OwnerOnly를 쓴다.(대역폭 최소화)
+	DOREPLIFETIME_CONDITION(UInventoryComponent, MainSlots, COND_OwnerOnly);	
+	DOREPLIFETIME_CONDITION(UInventoryComponent, BeltSlots, COND_OwnerOnly);
+
+	// 장비 슬롯은 다른 플레이어도 볼 수 있으므로 COND_OwnerOnly를 쓰지 않는다.
+	DOREPLIFETIME(UInventoryComponent, EquipmentSlots);
+
+	// 일단 장비 슬롯과 함께 다른 플레이어도 볼 수 있게 리플레이트. 필요하면 COND_OwnerOnly로 바꿀 수도 있다.
+	// AHeldItemBase, HeldComponent 동작 참고해서 판단
+	DOREPLIFETIME(UInventoryComponent, HeldBeltIndex);	
 }
 
 

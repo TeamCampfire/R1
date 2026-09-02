@@ -7,10 +7,44 @@
 #include "Components/Image.h"
 #include "Components/Widget.h"
 #include "GameFramework/Pawn.h"
+#include "Character/ActionPlayerController.h"
 
 void UInteractionPromptWidget::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
+
+	if (AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer()))
+	{
+		PC->OnPossessedCharChange.AddDynamic(this, &UInteractionPromptWidget::RebindInteraction);
+	}
+
+	RebindInteraction();
+}
+
+void UInteractionPromptWidget::NativeDestruct()
+{
+	UnbindInteractionDelegates();
+
+	if (AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer()))
+	{
+		PC->OnPossessedCharChange.RemoveDynamic(this, &UInteractionPromptWidget::RebindInteraction);
+	}
+
+	Super::NativeDestruct();
+}
+
+void UInteractionPromptWidget::UnbindInteractionDelegates()
+{
+	if (UInteractionComponent* InteractionComp = BoundInteractionComponent.Get())
+	{
+		InteractionComp->OnInteractableTargetChanged.RemoveDynamic(this, &UInteractionPromptWidget::HandleInteractionTargetChanged);
+	}
+}
+
+void UInteractionPromptWidget::RebindInteraction()
+{
+	UnbindInteractionDelegates();
+	BoundInteractionComponent = nullptr;
 
 	if (APawn* OwningPawn = GetOwningPlayerPawn())
 	{
@@ -21,18 +55,8 @@ void UInteractionPromptWidget::NativeOnInitialized()
 		}
 	}
 
-	// 시작 시점엔 조준 대상이 없는 상태로 초기화 — 대상 패널을 숨겨둔다.
+	// 대상 없음 상태로 초기화(부활 직후엔 아직 아무것도 조준 안 한 상태이므로).
 	HandleInteractionTargetChanged(nullptr, FText::GetEmpty(), nullptr);
-}
-
-void UInteractionPromptWidget::NativeDestruct()
-{
-	if (UInteractionComponent* InteractionComp = BoundInteractionComponent.Get())
-	{
-		InteractionComp->OnInteractableTargetChanged.RemoveDynamic(this, &UInteractionPromptWidget::HandleInteractionTargetChanged);
-	}
-
-	Super::NativeDestruct();
 }
 
 void UInteractionPromptWidget::HandleInteractionTargetChanged(AActor* NewTarget, const FText& DisplayName, UTexture2D* Icon)

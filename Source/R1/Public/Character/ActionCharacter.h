@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.25
+﻿/// 최초작성 : 2026.08.25
 /// 작 성 자 : 최 요 환
 
 // Fill out your copyright notice in the Description page of Project Settings.
@@ -30,6 +30,7 @@ class UStatComponent;
 class UInventoryComponent;
 class UInteractionComponent;
 class UEquipmentComponent;
+class UItemDataBase;
 
 UCLASS()
 class R1_API AActionCharacter : public ACharacter, public IStatInterface
@@ -64,10 +65,19 @@ public:
 	// 공격 프로세스
 	UFUNCTION(BlueprintCallable)
 	void ProcessAttack();
+
+	// 채집(ProcessAttack)으로 얻은 보상 아이템을 서버 권한으로 인벤토리에 지급 요청한다 —
+	// 히트 판정(DetectdObjectInAttackRange)/자원 소모(Execute_OnHitted) 자체는 아직 클라이언트
+	// 로컬로 계산되고(전투/채집 시스템 자체의 서버 권한화는 별도 작업), 그 결과로 뭘 얼마나
+	// 지급할지만 서버가 최종 승인한다 — AFishingRod::Server_FinishFishing과 동일한 패턴.
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_GrantHarvestReward(UItemDataBase* ItemData, int32 Count);
 	// 사망
 	UFUNCTION(BlueprintCallable)
 	void Die();
-	
+
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastDie();
 
 protected:
 	virtual bool CanJumpInternal_Implementation() const override;
@@ -97,6 +107,13 @@ protected:
 	void OnInteractPressed();			// 상호작용 시도
 	void OnInventoryTogglePressed();	// 인벤토리 패널 토글
 	void OnUseBeltSlotPressed(int32 BeltIndex);	// 벨트슬롯 단축키(1~6, 0-based 인덱스로 받음)
+
+	// 공격 몽타주 재생 RPC (리슨 서버 및 멀티플레이어 동기화)
+	UFUNCTION(Server, Reliable)
+	void Server_PlayAttackMontage();
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_PlayAttackMontage();
 
 	// 무브먼트 값 갱신
 	void ApplyMovementSettings();
@@ -235,9 +252,24 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
 	float AttackRange = 200.f;
 
-	/// Head 메시 (Body는 기본으로 있는거 BP에서 할당해서 사용)
+	/// Torso 메시 (Body는 기본으로 있는거 BP에서 할당해서 사용)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
-	TObjectPtr<USkeletalMeshComponent> HeadMesh;
+	TObjectPtr<USkeletalMeshComponent> TorsoMesh;
+
+	/// LegMesh
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
+	TObjectPtr<USkeletalMeshComponent> LegMesh;
+
+	/// HandMesh
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
+	TObjectPtr<USkeletalMeshComponent> HandMesh;
+
+	/// FeetMesh
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
+	TObjectPtr<USkeletalMeshComponent> FeetMesh;
+
+
+
 
 	/// 컴포넌트
 	// 인벤토리
@@ -247,9 +279,7 @@ protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Component")
 	TObjectPtr<UInteractionComponent> InteractionComponent;
 
-	/// Leg 메시
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
-	TObjectPtr<USkeletalMeshComponent> LegMesh;
+
 
 protected:
 	// 스프린트 모드

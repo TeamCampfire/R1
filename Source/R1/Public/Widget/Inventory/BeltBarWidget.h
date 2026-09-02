@@ -31,6 +31,8 @@ class R1_API UBeltBarWidget : public UUserWidget
 
 protected:
 	//~ Begin UUserWidget Interface
+	// WBP 디자이너 프리뷰 전용 — InventoryWidget과 동일한 이유(아래 NativePreConstruct 참고).
+	virtual void NativePreConstruct() override;
 	virtual void NativeOnInitialized() override;
 	virtual void NativeDestruct() override;
 	//~ End UUserWidget Interface
@@ -46,11 +48,20 @@ protected:
 	int32 GridColumns = 6;
 
 private:
+	// 인벤토리 컴포넌트 바인딩(최초 1회 + 부활 등으로 폰이 바뀔 때마다) — 옛 컴포넌트 델리게이트
+	// 해제 후 새 폰의 컴포넌트를 다시 찾아 구독한다. AActionPlayerController::OnPossessedCharChange에
+	// 구독해서 부활 시에도 다시 호출되게 한다.
+	UFUNCTION()
+	void RebindInventory();
+
+	// RebindInventory/NativeDestruct 양쪽에서 공유하는 델리게이트 해제 로직.
+	void UnbindInventoryDelegates();
+
 	UFUNCTION()
 	void HandleInventoryChanged();
 
 	UFUNCTION()
-	void HandleSlotDropped(FInventorySlotRef FromSlot, FInventorySlotRef ToSlot);
+	void HandleSlotDropped(FInventorySlotRef FromSlot, FInventorySlotRef ToSlot, int32 Count, bool bAutoHalfSplitOnEmptyTarget);
 
 	UFUNCTION()
 	void HandleSlotClicked(FInventorySlotRef SlotRef);

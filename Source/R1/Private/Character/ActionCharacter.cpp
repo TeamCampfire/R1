@@ -30,17 +30,34 @@ AActionCharacter::AActionCharacter()
 {
  	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
+	// Replicate 설정
+	bReplicates = true;
 
 	// Head메시 생성
-	HeadMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("HeadMesh"));
-	HeadMesh->SetupAttachment(GetMesh());
-	HeadMesh->SetLeaderPoseComponent(GetMesh());
+	TorsoMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("HeadMesh"));
+	TorsoMesh->SetupAttachment(GetMesh());
+	TorsoMesh->SetLeaderPoseComponent(GetMesh());
 
 	// Leg메시 생성
 	LegMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("LegMesh"));
 	LegMesh->SetupAttachment(GetMesh());
 	LegMesh->SetLeaderPoseComponent(GetMesh());
-	
+
+	// HandMesh 생성
+	HandMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("HandMesh"));
+	HandMesh->SetupAttachment(GetMesh());
+	HandMesh->SetLeaderPoseComponent(GetMesh());
+
+	// FeetMesh 생성
+	FeetMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("FeetMesh"));
+	FeetMesh->SetupAttachment(GetMesh());
+	FeetMesh->SetLeaderPoseComponent(GetMesh());
+
+	// 각 파트를 메인 메시의 본에 따라서 움직이도록 부착
+	TorsoMesh->SetLeaderPoseComponent(GetMesh());
+	LegMesh->SetLeaderPoseComponent(GetMesh());
+	HandMesh->SetLeaderPoseComponent(GetMesh());
+	FeetMesh->SetLeaderPoseComponent(GetMesh());
 
 	/// 카메라 생성 및 세팅
 	FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
@@ -57,12 +74,17 @@ AActionCharacter::AActionCharacter()
 	GetCapsuleComponent()->InitCapsuleSize(34.f, 88.f);		// Standing: Radius, HalfHeight
 	GetCharacterMovement()->SetCrouchedHalfHeight(60.f);		// Crouch 시 목표 HalfHeight
 
+	// 메시 초기 위치 세팅
+	FRotator Rot(0, -90, 0);
+	GetMesh()->SetRelativeLocationAndRotation(FVector(0, 0, -88.f), Rot);
+
 	// 눈높이(카메라) 포지션
 	DefaultEyeHeight = BaseEyeHeight;
 	CurrentWorldEyeHeight = GetActorLocation().Z + DefaultEyeHeight;
 
 	// 스탯 컴포넌트 세팅
 	StatComponent = CreateDefaultSubobject<UStatComponent>(TEXT("StatComponent"));
+	StatComponent->SetIsReplicated(true);
 
 	/// 컴포넌트 생성
 	InteractionComponent = CreateDefaultSubobject<UInteractionComponent>(TEXT("Interact"));
@@ -235,8 +257,7 @@ void AActionCharacter::ProcessAttack()
 				{
 					if (ItemRes.ItemData)
 					{
-						int32 RemainCnt = 0;
-						InventoryComponent->AddItem(ItemRes.ItemData, ItemRes.Count, RemainCnt);
+						Server_GrantHarvestReward(ItemRes.ItemData, ItemRes.Count);
 
 						//TODO RemainCnt
 						//바닥에 소환하기
@@ -261,11 +282,38 @@ void AActionCharacter::ProcessAttack()
 	}
 }
 
+bool AActionCharacter::Server_GrantHarvestReward_Validate(UItemDataBase* ItemData, int32 Count)
+{
+	return ItemData != nullptr && Count > 0;
+}
+
+void AActionCharacter::Server_GrantHarvestReward_Implementation(UItemDataBase* ItemData, int32 Count)
+{
+	if (!InventoryComponent)
+	{
+		return;
+	}
+
+	int32 RemainCnt = 0;
+	InventoryComponent->AddItem(ItemData, Count, RemainCnt);
+}
+
 void AActionCharacter::Die()
 {
+	if (!HasAuthority()) return;
+
+	MulticastDie();
+
+}
+
+void AActionCharacter::MulticastDie_Implementation()
+{
+	// 캡슐 컴포넌트 충돌 끄기
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	// 애니메이션 중지
-	GetMesh()->SetAnimationMode(EAnimationMode::AnimationSingleNode);
-	GetMesh()->Stop();
+	//GetMesh()->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+	//GetMesh()->Stop();
+	GetMesh()->SetAnimInstanceClass(nullptr);
 	// 메쉬 랙돌 전환
 	GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
 	GetMesh()->SetSimulatePhysics(true);
@@ -274,7 +322,6 @@ void AActionCharacter::Die()
 	{
 		PC->UnPossess();
 	}
-
 }
 
 
@@ -469,12 +516,18 @@ void AActionCharacter::OnInventoryTogglePressed()
 
 void AActionCharacter::OnUseBeltSlotPressed(int32 BeltIndex)
 {
+	/// 임시 코드
 	// InventoryComponent 멤버 대신 FindComponentByClass로 찾는다 — BP_PlayerCharacter의
 	// 상속 컴포넌트 템플릿이 깨져서 멤버 포인터가 널로 읽히는 환경 문제가 있어(원인 조사 중),
 	// UInventoryWidget/UBeltBarWidget이 이미 쓰고 있는 것과 같은 방식으로 우회한다.
-	if (UInventoryComponent* Inventory = FindComponentByClass<UInventoryComponent>())
+	//if (UInventoryComponent* Inventory = FindComponentByClass<UInventoryComponent>())
+	//{
+	//	Inventory->UseBeltSlot(BeltIndex);
+	//}
+
+	if (InventoryComponent)
 	{
-		Inventory->UseBeltSlot(BeltIndex);
+		InventoryComponent->Server_UseBeltSlot(BeltIndex);
 	}
 }
 
@@ -496,8 +549,37 @@ void AActionCharacter::OnAttackPressed()
 	if (UAnimInstance* Instance = GetMesh()->GetAnimInstance())
 	{
 		if (!Instance->IsAnyMontagePlaying())
+		{
+			// 1) 로컬 클라이언트 선행 재생 (인풋 랙 제거)
 			PlayAnimMontage(AM_Attack);
+
+			// 2) 리슨 서버 및 다른 클라이언트 동기화
+			if (!HasAuthority())
+			{
+				Server_PlayAttackMontage();
+			}
+			else
+			{
+				Multicast_PlayAttackMontage();
+			}
+		}
 	}
+}
+
+void AActionCharacter::Server_PlayAttackMontage_Implementation()
+{
+	Multicast_PlayAttackMontage();
+}
+
+void AActionCharacter::Multicast_PlayAttackMontage_Implementation()
+{
+	// 이미 로컬에서 선행 재생한 공격자 본인은 중복 재생 방지를 위해 건너뜀
+	if (IsLocallyControlled())
+	{
+		return;
+	}
+
+	PlayAnimMontage(AM_Attack);
 }
 
 

@@ -43,6 +43,15 @@ private:
 	UFUNCTION()
 	void HandleInteractionTargetChanged(AActor* NewTarget, const FText& DisplayName, UTexture2D* Icon);
 
+	// 상호작용 컴포넌트 바인딩(최초 1회 + 부활 등으로 폰이 바뀔 때마다) — 옛 컴포넌트 델리게이트
+	// 해제 후 새 폰의 컴포넌트를 다시 찾아 구독한다. AActionPlayerController::OnPossessedCharChange에
+	// 구독해서 부활 시에도 다시 호출되게 한다.
+	UFUNCTION()
+	void RebindInteraction();
+
+	// RebindInteraction/NativeDestruct 양쪽에서 공유하는 델리게이트 해제 로직.
+	void UnbindInteractionDelegates();
+
 protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UWidget> TargetPanel;

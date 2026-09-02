@@ -1,6 +1,6 @@
 ﻿/// 최초작성 : 2026.08.26
 /// 작 성 자 : 강 진 구
-
+/// 캐릭터의 생존 스탯(체력, 허기, 갈증) 전반 담당하는 컴포넌트
 #pragma once
 
 #include "CoreMinimal.h"
@@ -67,9 +67,32 @@ public:
 	virtual void SetStatusEffect_Implementation(EStatusEffect InStatusEffectType) override;
 
 protected:
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	// 파라미터 감소 내부처리 함수
 	void IncreaseParameter(EParameterType InEParameterType, float InAmount);
+	// 파라미터 증가 내부처리 함수
 	void DecreaseParameter(EParameterType inEParameterType, float inAmount);
+	// 틱마다 허기, 수분 감소
 	void DrainSurvivalStats();
+	// 굶주림, 갈증 데미지 효과 적용 함수
+	void UpdateStatusEffectDamage();
+
+	void ApplyStarvationDamage();
+	void ApplyDehydrationDamage();
+
+
+	// 현재 체력 리플리케이션 함수
+	UFUNCTION()
+	void OnRep_CurrentHealth();
+	// 현재 수분 리플리케이션 함수
+	UFUNCTION()
+	void OnRep_CurrentHydration();
+	// 현재 허기 리플리케이션 함수
+	UFUNCTION()
+	void OnRep_CurrentCalories();
+	// 현재 상태이상 리플리케이션 함수
+	UFUNCTION()
+	void OnRep_PlayerStatusEffects();
 protected:
 	//UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	//float CurrentStamina = 100.0f;
@@ -77,23 +100,23 @@ protected:
 	//UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	//float MaxStamina = 100.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(ReplicatedUsing = OnRep_CurrentHealth, EditAnywhere, BlueprintReadWrite)
 	float CurrentHealth = 100.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float MaxHealth = 100.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(ReplicatedUsing = OnRep_CurrentHydration, EditAnywhere, BlueprintReadWrite)
 	float CurrentHydration = 250.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float MaxHydration = 250.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(ReplicatedUsing = OnRep_CurrentCalories, EditAnywhere, BlueprintReadWrite)
 	float CurrentCalories = 500.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float MaxCalories = 500.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(ReplicatedUsing = OnRep_PlayerStatusEffects, EditAnywhere, BlueprintReadWrite)
 	EStatusEffect PlayerStatusEffects = EStatusEffect::None;
 
 	// 굶주림 데미지
@@ -105,10 +128,10 @@ protected:
 
 	// 초당 칼로리 감소율
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float DefaultCaloryDropRate = 0.016f;
+	float DefaultCaloryDropRate = 10.016f;
 	// 초당 수분 감소율
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float DefaultHydrationDropRate = 0.0032f;
+	float DefaultHydrationDropRate = 10.0032f;
 
 
 	// 목마름 시작 수치
@@ -133,14 +156,15 @@ protected:
 
 	FTimerHandle SurvivalStatTimerHandle;
 	FTimerHandle HealthRegenTimerHandle;
-	FTimerHandle TickDamageTimerHandle;
+	FTimerHandle StarvationDamageTimerHandle;
+	FTimerHandle DehydrationDamageTimerHandle;
 
 	float SurvivalStatUpdateInterval = 1.0f;
 
 
 	// Debug
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float DebugDamage = 10.0f;
+	float DebugDamage = 50.0f;
 
 private:
 	bool bAlive = false;
