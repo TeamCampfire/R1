@@ -24,6 +24,7 @@ private :
 	UPROPERTY(EditDefaultsOnly, Category = "Menu")
 	TSubclassOf<UMultiplayerMenuWidget> MultiplayerMenuWidgetClass;
 
+	// 뷰포트에 추가된 위젯이 컨트롤러 수명 동안 유지되도록 참조
 	UPROPERTY(Transient)
 	TObjectPtr<UMultiplayerMenuWidget> MultiplayerMenuWidget;
 

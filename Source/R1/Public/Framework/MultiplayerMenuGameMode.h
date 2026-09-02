@@ -13,5 +13,6 @@ class R1_API AMultiplayerMenuGameMode : public AGameModeBase
 	GENERATED_BODY()
 
 public:
+
 	AMultiplayerMenuGameMode();
 };

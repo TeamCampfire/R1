@@ -6,6 +6,8 @@ void AMultiplayerMenuPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
+	/* 자신의 메뉴 위젯과 UI 입력 모드 준비 */
+	
 	if (!IsLocalController() || !MultiplayerMenuWidgetClass)
 	{
 		return;

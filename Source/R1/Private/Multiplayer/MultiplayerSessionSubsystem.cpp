@@ -65,6 +65,14 @@ void UMultiplayerSessionSubsystem::Deinitialize()
 
 void UMultiplayerSessionSubsystem::CreateSession(int32 NumPublicConnections, const FString& ServerName)
 {
+	// 이미 다른 서버에 접속한 클라이언트는 호스트 세션을 만들거나 ServerTravel을 시작할 수 없다.
+	if (GetWorld() && GetWorld()->GetNetMode() == NM_Client)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("CreateSession rejected: clients cannot host a session"));
+		OnCreateSessionResult.Broadcast(false);
+		return;
+	}
+
 	// Interface, 입력값, 진행 상태를 먼저 검사해 잘못된 요청과 중복 클릭을 차단
 	if (!SessionInterface.IsValid() || NumPublicConnections <= 0 || ServerName.IsEmpty() ||
 		bCreateInProgress || bDestroyInProgress)
@@ -284,6 +292,14 @@ void UMultiplayerSessionSubsystem::OnCreateSessionComplete(FName SessionName, bo
 	if (!bWasSuccessful)
 	{
 		UE_LOG(LogTemp, Error, TEXT("CreateSession failed for %s"), *SessionName.ToString());
+		OnCreateSessionResult.Broadcast(false);
+		return;
+	}
+
+	// 요청 후 월드 역할이 Client로 바뀐 경우에도 절대로 ServerTravel을 호출하지 않는다.
+	if (GetWorld() && GetWorld()->GetNetMode() == NM_Client)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("CreateSession completed on a client; ServerTravel was blocked"));
 		OnCreateSessionResult.Broadcast(false);
 		return;
 	}
