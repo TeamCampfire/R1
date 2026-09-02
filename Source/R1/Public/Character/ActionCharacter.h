@@ -30,6 +30,7 @@ class UStatComponent;
 class UInventoryComponent;
 class UInteractionComponent;
 class UEquipmentComponent;
+class UItemDataBase;
 
 UCLASS()
 class R1_API AActionCharacter : public ACharacter, public IStatInterface
@@ -64,6 +65,13 @@ public:
 	// 공격 프로세스
 	UFUNCTION(BlueprintCallable)
 	void ProcessAttack();
+
+	// 채집(ProcessAttack)으로 얻은 보상 아이템을 서버 권한으로 인벤토리에 지급 요청한다 —
+	// 히트 판정(DetectdObjectInAttackRange)/자원 소모(Execute_OnHitted) 자체는 아직 클라이언트
+	// 로컬로 계산되고(전투/채집 시스템 자체의 서버 권한화는 별도 작업), 그 결과로 뭘 얼마나
+	// 지급할지만 서버가 최종 승인한다 — AFishingRod::Server_FinishFishing과 동일한 패턴.
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_GrantHarvestReward(UItemDataBase* ItemData, int32 Count);
 	// 사망
 	UFUNCTION(BlueprintCallable)
 	void Die();

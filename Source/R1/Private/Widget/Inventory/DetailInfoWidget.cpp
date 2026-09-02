@@ -2,7 +2,7 @@
 
 
 #include "Widget/Inventory/DetailInfoWidget.h"
-#include "Widget/ParameterBarWidget.h"
+#include "Blueprint/WidgetTree.h"
 #include "Widget/Inventory/InventoryDragDropOperation.h"
 #include "Components/Widget.h"
 #include "Components/TextBlock.h"
@@ -10,16 +10,64 @@
 #include "Components/Button.h"
 #include "Components/Slider.h"
 #include "Components/PanelWidget.h"
-#include "Components/HorizontalBox.h"
-#include "Components/HorizontalBoxSlot.h"
 #include "Data/Item/ItemDataBase.h"
 #include "Data/Item/EquipmentItemData.h"
 #include "Data/Item/ConsumableItemData.h"
 #include "GameFramework/Pawn.h"
+#include "Character/ActionPlayerController.h"
 
 void UDetailInfoWidget::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
+
+	if (AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer()))
+	{
+		PC->OnPossessedCharChange.AddDynamic(this, &UDetailInfoWidget::RebindInventory);
+	}
+
+	if (DiscardButton)
+	{
+		DiscardButton->OnClicked.AddDynamic(this, &UDetailInfoWidget::HandleDiscardClicked);
+	}
+
+	if (UseButton)
+	{
+		UseButton->OnClicked.AddDynamic(this, &UDetailInfoWidget::HandleUseClicked);
+	}
+
+	if (SplitQuantitySlider)
+	{
+		SplitQuantitySlider->OnValueChanged.AddDynamic(this, &UDetailInfoWidget::HandleSplitQuantityChanged);
+	}
+
+	RebindInventory();
+}
+
+void UDetailInfoWidget::NativeDestruct()
+{
+	UnbindInventoryDelegates();
+
+	if (AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer()))
+	{
+		PC->OnPossessedCharChange.RemoveDynamic(this, &UDetailInfoWidget::RebindInventory);
+	}
+
+	Super::NativeDestruct();
+}
+
+void UDetailInfoWidget::UnbindInventoryDelegates()
+{
+	if (UInventoryComponent* Inventory = BoundInventory.Get())
+	{
+		Inventory->OnInventoryChanged.RemoveDynamic(this, &UDetailInfoWidget::HandleInventoryChanged);
+		Inventory->OnSelectionChanged.RemoveDynamic(this, &UDetailInfoWidget::HandleInventoryChanged);
+	}
+}
+
+void UDetailInfoWidget::RebindInventory()
+{
+	UnbindInventoryDelegates();
+	BoundInventory = nullptr;
 
 	if (APawn* OwningPawn = GetOwningPlayerPawn())
 	{
@@ -31,28 +79,7 @@ void UDetailInfoWidget::NativeOnInitialized()
 		}
 	}
 
-	if (DiscardButton)
-	{
-		DiscardButton->OnClicked.AddDynamic(this, &UDetailInfoWidget::HandleDiscardClicked);
-	}
-
-	if (SplitQuantitySlider)
-	{
-		SplitQuantitySlider->OnValueChanged.AddDynamic(this, &UDetailInfoWidget::HandleSplitQuantityChanged);
-	}
-
 	HandleInventoryChanged();
-}
-
-void UDetailInfoWidget::NativeDestruct()
-{
-	if (UInventoryComponent* Inventory = BoundInventory.Get())
-	{
-		Inventory->OnInventoryChanged.RemoveDynamic(this, &UDetailInfoWidget::HandleInventoryChanged);
-		Inventory->OnSelectionChanged.RemoveDynamic(this, &UDetailInfoWidget::HandleInventoryChanged);
-	}
-
-	Super::NativeDestruct();
 }
 
 void UDetailInfoWidget::HandleInventoryChanged()
@@ -154,7 +181,7 @@ void UDetailInfoWidget::RebuildInfoRows(const FItemInstance& Selected)
 	{
 		for (const FEquipmentStatModifier& Modifier : EquipmentData->StatModifiers)
 		{
-			AddStatBarRow(Modifier.StatType, Modifier.Value);
+			AddStatTextRow(Modifier.StatType, Modifier.Value);
 		}
 	}
 	else if (const UConsumableItemData* ConsumableData = Cast<UConsumableItemData>(Selected.ItemData))
@@ -166,31 +193,19 @@ void UDetailInfoWidget::RebuildInfoRows(const FItemInstance& Selected)
 	}
 }
 
-void UDetailInfoWidget::AddStatBarRow(EEquipmentStatType StatType, float Value)
+void UDetailInfoWidget::AddStatTextRow(EEquipmentStatType StatType, float Value)
 {
 	if (!InfoRowsContainer)
 	{
 		return;
 	}
 
-	UHorizontalBox* Row = NewObject<UHorizontalBox>(this);
-
-	UTextBlock* Label = NewObject<UTextBlock>(this);
-	Label->SetText(StaticEnum<EEquipmentStatType>()->GetDisplayNameTextByValue(static_cast<int64>(StatType)));
-	Row->AddChildToHorizontalBox(Label);
-
-	if (StatBarWidgetClass)
-	{
-		if (UParameterBarWidget* Bar = CreateWidget<UParameterBarWidget>(this, StatBarWidgetClass))
-		{
-			Bar->UpdateParameterBar(Value, GetStatBarReferenceMax(StatType));
-
-			if (UHorizontalBoxSlot* BarSlot = Row->AddChildToHorizontalBox(Bar))
-			{
-				BarSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-			}
-		}
-	}
+	// UParameterBarWidget을 런타임에 새로 만들어 붙이는 방식은 이 프로젝트 환경에서 내부
+	// 구조가 제대로 안 그려지는 문제가 있어(원인 미확정) 포기하고, 소비 효과(AddEffectTextRow)와
+	// 동일한, 이미 검증된 텍스트 방식으로 통일했다.
+	UTextBlock* Row = WidgetTree->ConstructWidget<UTextBlock>();
+	const FText StatLabel = StaticEnum<EEquipmentStatType>()->GetDisplayNameTextByValue(static_cast<int64>(StatType));
+	Row->SetText(FText::Format(NSLOCTEXT("DetailInfoWidget", "StatRowFormat", "{0}: {1}"), StatLabel, FText::AsNumber(Value)));
 
 	InfoRowsContainer->AddChild(Row);
 }
@@ -202,7 +217,7 @@ void UDetailInfoWidget::AddEffectTextRow(const FItemEffect& Effect)
 		return;
 	}
 
-	UTextBlock* Row = NewObject<UTextBlock>(this);
+	UTextBlock* Row = WidgetTree->ConstructWidget<UTextBlock>();
 	const FText EffectLabel = StaticEnum<EItemEffectType>()->GetDisplayNameTextByValue(static_cast<int64>(Effect.EffectType));
 	Row->SetText(FText::Format(NSLOCTEXT("DetailInfoWidget", "EffectRowFormat", "{0} +{1}"), EffectLabel, FText::AsNumber(Effect.Magnitude)));
 
@@ -210,23 +225,6 @@ void UDetailInfoWidget::AddEffectTextRow(const FItemEffect& Effect)
 	//Row->SetColorAndOpacity(FSlateColor(GetEffectColor(Effect.EffectType)));
 
 	InfoRowsContainer->AddChild(Row);
-}
-
-float UDetailInfoWidget::GetStatBarReferenceMax(EEquipmentStatType StatType)
-{
-	// 실제 스탯의 진짜 상한이 아니라, 바가 얼마나 채워질지 가늠하기 위한 순전히 시각적인
-	// 기준값이다 — 밸런스가 잡히면 여기 값만 조정하면 되고 구조는 안 건드려도 된다.
-	switch (StatType)
-	{
-		case EEquipmentStatType::Defense:				return 50.f;
-		case EEquipmentStatType::MovementSpeedMult:	return 2.f;
-		case EEquipmentStatType::HarvestDamage:		return 100.f;
-		case EEquipmentStatType::WoodGatheringMult:	return 3.f;
-		case EEquipmentStatType::OreGatheringMult:		return 3.f;
-		case EEquipmentStatType::FleshGatheringMult:	return 3.f;
-		case EEquipmentStatType::DurabilityLossMult:	return 2.f;
-		default:										return 1.f;
-	}
 }
 
 FLinearColor UDetailInfoWidget::GetEffectColor(EItemEffectType EffectType)
@@ -242,26 +240,13 @@ FLinearColor UDetailInfoWidget::GetEffectColor(EItemEffectType EffectType)
 
 void UDetailInfoWidget::RebuildActionButtons(const FItemInstance& Selected)
 {
-	if (!ActionButtonsContainer)
+	// 버튼은 런타임에 만들지 않고 WBP에 미리 배치해둔 걸(UseButton 등) 카테고리에 따라
+	// 보이거나 숨기기만 한다 — 나중에 액션 버튼이 늘어나도 같은 방식으로 추가하면 된다.
+	if (UseButton)
 	{
-		return;
+		const bool bIsConsumable = Selected.ItemData && Selected.ItemData->Category == EItemCategory::Consumable;
+		UseButton->SetVisibility(bIsConsumable ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 	}
-
-	ActionButtonsContainer->ClearChildren();
-
-	if (Selected.ItemData->Category != EItemCategory::Consumable)
-	{
-		return;
-	}
-
-	UButton* UseButton = NewObject<UButton>(this);
-	UseButton->OnClicked.AddDynamic(this, &UDetailInfoWidget::HandleUseClicked);
-
-	UTextBlock* UseButtonLabel = NewObject<UTextBlock>(this);
-	UseButtonLabel->SetText(NSLOCTEXT("DetailInfoWidget", "UseButtonLabel", "사용"));
-	UseButton->AddChild(UseButtonLabel);
-
-	ActionButtonsContainer->AddChild(UseButton);
 }
 
 void UDetailInfoWidget::HandleDiscardClicked()
@@ -272,15 +257,18 @@ void UDetailInfoWidget::HandleDiscardClicked()
 		return;
 	}
 
-	Inventory->ThrowItem(Inventory->SelectedSlotRef);
+	Inventory->Server_ThrowItem(Inventory->SelectedSlotRef, 0);
 }
 
 void UDetailInfoWidget::HandleUseClicked()
 {
-	if (UInventoryComponent* Inventory = BoundInventory.Get())
+	UInventoryComponent* Inventory = BoundInventory.Get();
+	if (!Inventory || !Inventory->bHasSelection)
 	{
-		Inventory->UseSelectedItem();
+		return;
 	}
+
+	Inventory->Server_UseSelectedItem(Inventory->SelectedSlotRef);
 }
 
 void UDetailInfoWidget::HandleSplitQuantityChanged(float Value)
