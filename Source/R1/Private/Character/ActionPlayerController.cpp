@@ -38,6 +38,7 @@ void AActionPlayerController::OnPossess(APawn* InPawn)
 	Super::OnPossess(InPawn);
 	AActionCharacter* NewCharacter = Cast<AActionCharacter>(InPawn);
 
+	// Vehicle 등의 Pawn이면 Character 변경 이벤트를 발생시키지 않는다.
 	if (!NewCharacter) return;
 
 	UE_LOG(LogTemp, Warning,
@@ -121,6 +122,16 @@ void AActionPlayerController::OnRep_Pawn()
 		*GetNameSafe(GetPawn()),
 		IsLocalController() ? TEXT("TRUE") : TEXT("FALSE"));
 
+	AActionCharacter* NewCharacter = Cast<AActionCharacter>(GetPawn());
+
+	// 차량 등 Character가 아닌 Pawn으로 Possess된 경우
+	// Character 변경으로 취급하지 않는다.
+	if (!NewCharacter) return;
+
+	if (!IsLocalController()) return;
+
+	if (!GetPawn()) return;
+	
 	OnPossessedCharChange.Broadcast();
 }
 

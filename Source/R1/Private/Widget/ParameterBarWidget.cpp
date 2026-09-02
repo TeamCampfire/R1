@@ -12,6 +12,18 @@ void UParameterBarWidget::UpdateParameterBar(float inCurrent, float inMax)
 	float Div = FMath::Max(inMax, 0.001f);
 	TargetPercent = inCurrent / Div;
 	CurrentText->SetText(FText::AsNumber(FMath::FloorToInt(inCurrent)));
+	UE_LOG(LogTemp, Warning,
+		TEXT("[UI] UpdateParameterBar Widget=%s Current=%.2f"),
+		*GetNameSafe(this),
+		inCurrent);
+	//// 죽을 때 UI 잔상 처리
+	//if (FMath::IsNearlyZero(inCurrent))
+	//{
+	//	GetWorld()->GetTimerManager().ClearTimer(ParameterBarTimerHandle);
+	//	Bar->SetPercent(0.0f);
+	//	CurrentText->SetText(FText::AsNumber(0.0f));
+	//	return;
+	//}
 
 	if (GetWorld()->GetTimerManager().IsTimerActive(ParameterBarTimerHandle)) return;
 

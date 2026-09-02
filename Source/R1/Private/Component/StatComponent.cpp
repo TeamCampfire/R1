@@ -426,6 +426,11 @@ void UStatComponent::ApplyDehydrationDamage()
 
 void UStatComponent::OnRep_CurrentHealth()
 {
+	UE_LOG(LogTemp, Warning,
+		TEXT("[CLIENT] OnRep_CurrentHealth Owner=%s Health=%.2f"),
+		*GetNameSafe(GetOwner()),
+		CurrentHealth);
+
 	OnHealthChange.Broadcast(CurrentHealth, MaxHealth);
 }
 
