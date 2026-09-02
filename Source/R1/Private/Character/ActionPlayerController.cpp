@@ -114,7 +114,9 @@ AActor* AActionPlayerController::GetRespawnPoint()
 
 
 
+
 // Debug-----------------------------------------------------------------------------------------------------------------------
+
 void AActionPlayerController::TestDamage(int32 PlayerIndex)
 {
 	UE_LOG(LogTemp, Warning,

@@ -44,13 +44,15 @@ public:
 	AActor* GetRespawnPoint();
 
 protected:
+
+	// Debug---------------------------------------------------------------------------------------------------------------------
 	UFUNCTION(Server, Reliable)
 	void ServerTestInflictDamage();
-
 	UFUNCTION(Exec)
 	void TestDamage(int32 PlayerIndex);
 	UFUNCTION(Exec)
 	void TestHydrationDamage(int32 PlayerIndex);
+	// --------------------------------------------------------------------------------------------------------------------------
 protected:
 	// 기본 입력 맵핑 컨텍스트(캐릭터 조작) — 인벤토리가 열려있는 동안엔 제거된다.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)

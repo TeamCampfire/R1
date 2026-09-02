@@ -3,6 +3,7 @@
 
 #include "Framework/GameMode/TestGameMode.h"
 #include "GameFramework/Controller.h"
+#include "GameFramework/PlayerController.h"
 
 #include "Component/StatComponent.h"
 #include "Character/ActionCharacter.h"
@@ -155,4 +156,35 @@ bool ATestGameMode::FindRandomSpawnLocation(FVector& OutLocation) const
 	}
 
 	return false;
+}
+
+void ATestGameMode::Respawn(int32 ControllerIndex)
+{
+	UWorld* World = GetWorld();
+
+	if (!World) return;
+
+	int32 CurrentIndex = 0;
+
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator();
+		It; ++It)
+	{
+		APlayerController* PC = It->Get();
+
+		if (!IsValid(PC)) continue;
+		if (CurrentIndex == ControllerIndex)
+		{
+			RespawnPlayer(PC);
+
+			UE_LOG(LogTemp, Log, TEXT("Controller %d Respawn"), ControllerIndex);
+
+			return;
+		}
+
+		++CurrentIndex;
+	}
+
+	UE_LOG(LogTemp, Warning,
+		TEXT("Controller Index %d를 찾을 수 없습니다."),
+		ControllerIndex);
 }
