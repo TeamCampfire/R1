@@ -341,13 +341,17 @@ void UMultiplayerSessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 	for (int32 Index = 0; Index < SessionSearch->SearchResults.Num(); ++Index)
 	{
 		const FOnlineSessionSearchResult& Result = SessionSearch->SearchResults[Index];
+
+		// Items 배열의 마지막에 기본값으로 초기화된 요소 하나를 추가한 후, 추가된 요소의 참조를 Item 변수에 저장
 		FSessionListItem& Item = Items.AddDefaulted_GetRef();
+
+		// 새롭게 추가된 요소의 값을 SessionSearch로 읽어온 Result 값으로 설정
 		Item.SearchResultIndex = Index;
 		Item.MaxPlayers = Result.Session.SessionSettings.NumPublicConnections;
-		// 참가 인원 수 = 최대 인원 수 - 열린(남은) 슬롯 수
-		Item.CurrentPlayers = Item.MaxPlayers - Result.Session.NumOpenPublicConnections;
+		Item.CurrentPlayers = Item.MaxPlayers - Result.Session.NumOpenPublicConnections;	// 참가 인원 수 = 최대 인원 수 - 열린(남은) 슬롯 수
 		Item.Ping = Result.PingInMs;
 
+		// 방 이름 찾기에 실패한 세션은 "Unnamed Server"로 설정
 		if (!Result.Session.SessionSettings.Get(ServerNameSettingKey, Item.ServerName))
 		{
 			Item.ServerName = TEXT("Unnamed Server");
