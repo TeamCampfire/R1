@@ -82,6 +82,9 @@ void UMultiplayerSessionSubsystem::CreateSession(int32 NumPublicConnections, con
 		return;
 	}
 
+	// 비동기 생성 완료 후 ServerTravel URL에도 같은 정원을 전달할 수 있도록 보관
+	HostedMaxPlayers = NumPublicConnections;
+
 	// Online Subsystem은 같은 Local Session Name(NAME_GameSession) 중복 생성 불가
 	// 기존 세션이 있으면 입력값을 보관하고, Destroy 완료 후 다시 생성
 	if (SessionInterface->GetNamedSession(NAME_GameSession))
@@ -296,7 +299,7 @@ void UMultiplayerSessionSubsystem::OnCreateSessionComplete(FName SessionName, bo
 		return;
 	}
 
-	// 요청 후 월드 역할이 Client로 바뀐 경우에도 절대로 ServerTravel을 호출하지 않는다.
+	// 요청 후 월드 역할이 Client로 바뀐 경우에도 절대로 ServerTravel을 호출하지 않음
 	if (GetWorld() && GetWorld()->GetNetMode() == NM_Client)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("CreateSession completed on a client; ServerTravel was blocked"));
@@ -305,8 +308,15 @@ void UMultiplayerSessionSubsystem::OnCreateSessionComplete(FName SessionName, bo
 	}
 
 	UWorld* World = GetWorld();
+
+	// 서버 이동을 하며 MaxPlayers 옵션 전달: 클라이언트가 접속할 때 서버가 내부적으로 현재 인원 검사
+	// -> AGameSession::ApproveLogin()
+	const FString TravelURL = FString::Printf(
+		TEXT("/Game/Maps/Lv01_PlayerMoveTest?listen?MaxPlayers=%d"),
+		HostedMaxPlayers);
+
 	// Server Travel 요청 시작 여부 확인
-	if (!World || !World->ServerTravel(TEXT("/Game/Maps/Lv01_PlayerMoveTest?listen")))
+	if (!World || !World->ServerTravel(TravelURL))
 	{
 		UE_LOG(LogTemp, Error, TEXT("CreateSession succeeded, but ServerTravel failed"));
 		OnCreateSessionResult.Broadcast(false);
@@ -448,6 +458,10 @@ void UMultiplayerSessionSubsystem::OnDestroySessionComplete(FName SessionName, b
 
 void UMultiplayerSessionSubsystem::HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver, ENetworkFailure::Type FailureType, const FString& ErrorString)
 {
+	// 같은 프로세스의 다른 PIE 월드에서 발생한 실패는 무시
+	if (!World || World->GetGameInstance() != GetGameInstance())
+		return;
+
 	// 엔진 네트워크 실패 발생 시 실행
 	UE_LOG(LogTemp, Error, TEXT("Network failure %d: %s"), static_cast<int32>(FailureType), *ErrorString);
 
@@ -456,7 +470,9 @@ void UMultiplayerSessionSubsystem::HandleNetworkFailure(UWorld* World, UNetDrive
 
 	// UI에 원인을 먼저 알린 뒤 메뉴로 복귀 처리
 	OnConnectionFailure.Broadcast(ErrorString);
+
 	TravelToMainMenu();
+	// 네트워크 실패 시 연결이 끊긴 클라이언트는 엔진 기본 처리에 의해 GameDefaultMap으로 설정된 맵으로 이동
 }
 
 void UMultiplayerSessionSubsystem::TravelToMainMenu()

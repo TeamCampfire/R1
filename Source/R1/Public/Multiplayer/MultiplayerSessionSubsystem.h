@@ -169,4 +169,7 @@ private:
 	// 기존 세션을 제거한 뒤 다시 CreateSession할 때 사용할 임시 입력값
 	int32 PendingNumPublicConnections = 0;
 	FString PendingServerName;
+
+	// 온라인 세션의 광고 정원과 게임 서버의 로그인 정원에 동일한 값을 적용하기 위해 보관
+	int32 HostedMaxPlayers = 0;
 };

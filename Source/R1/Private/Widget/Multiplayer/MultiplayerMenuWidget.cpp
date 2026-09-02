@@ -71,12 +71,24 @@ void UMultiplayerMenuWidget::HandleRefreshClicked()
 
 void UMultiplayerMenuWidget::HandleJoinClicked()
 {
-	// 참가 가능한 상태이면 참가 시도
-	if (SessionSubsystem && !bBusy && SelectedSessionIndex != INDEX_NONE)
+	// 참가 가능한 상태인지 확인
+	if (!SessionSubsystem || bBusy || !FoundSessions.IsValidIndex(SelectedSessionIndex))
+		return;
+
+	// 현재 선택한 세션 정보 참조
+	const FSessionListItem& SelectedSession = FoundSessions[SelectedSessionIndex];
+
+	// 남은 자리 수 확인 -> 가득 찼으면 StatusText 문구 수정 후 종료 (참가 시도 안 함)
+	if (SelectedSession.CurrentPlayers >= SelectedSession.MaxPlayers)
 	{
-		SetBusy(true, FText::FromString(TEXT("Joining server...")));
-		SessionSubsystem->JoinSession(SelectedSessionIndex);
+		StatusText->SetText(FText::FromString(TEXT("This server is full.")));
+		return;
 	}
+
+	// 세션 참가 시도
+	SetBusy(true, FText::FromString(TEXT("Joining server...")));
+	SessionSubsystem->JoinSession(SelectedSessionIndex);
+
 }
 
 void UMultiplayerMenuWidget::HandleHostClicked()
@@ -145,13 +157,28 @@ void UMultiplayerMenuWidget::SelectSession(int32 SessionIndex)
 {
 	// 검색 결과의 실제 인덱스를 보존해 JoinSession 호출 시 같은 항목을 전달
 	SelectedSessionIndex = SessionIndex;
+
+	// 참: 유효한 세션 인덱스이고, 참가 자리가 남아있을 때
+	const bool bCanJoin = FoundSessions.IsValidIndex(SessionIndex)
+		&& FoundSessions[SessionIndex].CurrentPlayers < FoundSessions[SessionIndex].MaxPlayers;
+
 	if (JoinButton)
 	{
-		JoinButton->SetIsEnabled(!bBusy && SessionIndex != INDEX_NONE);
+		// 비동기 요청 실행 중이 아니고, 참가 가능한 세션일 때만 참가 버튼 활성화
+		JoinButton->SetIsEnabled(!bBusy && bCanJoin);
 	}
+
+	// StatusText 객체가 있고, 유효한 세션 인덱스일 때
 	if (StatusText && FoundSessions.IsValidIndex(SessionIndex))
 	{
-		StatusText->SetText(FText::FromString(FString::Printf(TEXT("Selected: %s"), *FoundSessions[SessionIndex].ServerName)));
+		// 세션 참가 자리 여부에 따라 StatusText 변경
+		StatusText->SetText(
+			bCanJoin
+			?
+			FText::FromString(FString::Printf(TEXT("Selected: %s"), *FoundSessions[SessionIndex].ServerName))
+			:
+			FText::FromString(TEXT("This server is full."))
+		);
 	}
 }
 
