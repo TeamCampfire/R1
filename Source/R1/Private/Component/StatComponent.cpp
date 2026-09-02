@@ -433,11 +433,11 @@ void UStatComponent::OnRep_CurrentCalories()
 
 void UStatComponent::OnRep_PlayerStatusEffects()
 {
-	UE_LOG(LogTemp, Warning,
-		TEXT("=== ONREP STATUS === Owner=%s Authority=%d Effects=%d"),
-		*GetNameSafe(GetOwner()),
-		GetOwner() ? GetOwner()->HasAuthority() : false,
-		static_cast<uint8>(PlayerStatusEffects));
+	//UE_LOG(LogTemp, Warning,
+	//	TEXT("=== ONREP STATUS === Owner=%s Authority=%d Effects=%d"),
+	//	*GetNameSafe(GetOwner()),
+	//	GetOwner() ? GetOwner()->HasAuthority() : false,
+	//	static_cast<uint8>(PlayerStatusEffects));
 
 	OnStatusEffectChange.Broadcast();
 }

@@ -19,7 +19,6 @@ enum class EStatusEffect : uint8
 	Starving	= 1 << 5,
 	Overheat	= 1 << 6,
 	Frostbite	= 1 << 7,
-	//Tetanus		= 1 << 8
 };
 ENUM_CLASS_FLAGS(EStatusEffect)
 

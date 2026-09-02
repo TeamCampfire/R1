@@ -4,6 +4,9 @@
 #include "Widget/StatusBarWidget.h"
 #include "Interface/StatusEffectInterface.h"
 #include "Components/TextBlock.h"
+#include "Components/Image.h"
+#include "Engine/Texture2D.h"
+#include "Materials/MaterialInterface.h"
 
 void UStatusBarWidget::InitializeStatusEffectWidget(const EStatusEffect inEStatusEffect)
 {
@@ -23,4 +26,14 @@ void UStatusBarWidget::InitializeStatusEffectWidget(const EStatusEffect inEStatu
 		break;
 	}
 
+	if (TSoftObjectPtr<UMaterialInterface>* FoundMaterial =
+		StatusIconMaterials.Find(inEStatusEffect))
+	{
+		UMaterialInterface* Material = FoundMaterial->LoadSynchronous();
+
+		if (Material && IconImage)
+		{
+			IconImage->SetBrushFromMaterial(Material);
+		}
+	}
 }

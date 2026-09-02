@@ -4,6 +4,8 @@
 #include "Widget/ParameterBarWidget.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
+#include "Components/Image.h"
+#include "Engine/Texture2D.h"
 
 void UParameterBarWidget::UpdateParameterBar(float inCurrent, float inMax)
 {
@@ -43,6 +45,10 @@ void UParameterBarWidget::NativePreConstruct()
 	if (Bar)
 	{
 		Bar->SetFillColorAndOpacity(FillColor);
+	}
+	if (IconImage && IconTexture)
+	{
+		IconImage->SetBrushFromTexture(IconTexture);
 	}
 }
 
