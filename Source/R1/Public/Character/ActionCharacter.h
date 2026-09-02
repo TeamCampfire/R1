@@ -244,9 +244,24 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
 	float AttackRange = 200.f;
 
-	/// Head 메시 (Body는 기본으로 있는거 BP에서 할당해서 사용)
+	/// Torso 메시 (Body는 기본으로 있는거 BP에서 할당해서 사용)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
-	TObjectPtr<USkeletalMeshComponent> HeadMesh;
+	TObjectPtr<USkeletalMeshComponent> TorsoMesh;
+
+	/// LegMesh
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
+	TObjectPtr<USkeletalMeshComponent> LegMesh;
+
+	/// HandMesh
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
+	TObjectPtr<USkeletalMeshComponent> HandMesh;
+
+	/// FeetMesh
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
+	TObjectPtr<USkeletalMeshComponent> FeetMesh;
+
+
+
 
 	/// 컴포넌트
 	// 인벤토리
@@ -256,9 +271,7 @@ protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Component")
 	TObjectPtr<UInteractionComponent> InteractionComponent;
 
-	/// Leg 메시
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
-	TObjectPtr<USkeletalMeshComponent> LegMesh;
+
 
 protected:
 	// 스프린트 모드

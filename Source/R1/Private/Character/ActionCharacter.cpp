@@ -34,15 +34,30 @@ AActionCharacter::AActionCharacter()
 	bReplicates = true;
 
 	// Head메시 생성
-	HeadMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("HeadMesh"));
-	HeadMesh->SetupAttachment(GetMesh());
-	HeadMesh->SetLeaderPoseComponent(GetMesh());
+	TorsoMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("HeadMesh"));
+	TorsoMesh->SetupAttachment(GetMesh());
+	TorsoMesh->SetLeaderPoseComponent(GetMesh());
 
 	// Leg메시 생성
 	LegMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("LegMesh"));
 	LegMesh->SetupAttachment(GetMesh());
 	LegMesh->SetLeaderPoseComponent(GetMesh());
-	
+
+	// HandMesh 생성
+	HandMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("HandMesh"));
+	HandMesh->SetupAttachment(GetMesh());
+	HandMesh->SetLeaderPoseComponent(GetMesh());
+
+	// FeetMesh 생성
+	FeetMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("FeetMesh"));
+	FeetMesh->SetupAttachment(GetMesh());
+	FeetMesh->SetLeaderPoseComponent(GetMesh());
+
+	// 각 파트를 메인 메시의 본에 따라서 움직이도록 부착
+	TorsoMesh->SetLeaderPoseComponent(GetMesh());
+	LegMesh->SetLeaderPoseComponent(GetMesh());
+	HandMesh->SetLeaderPoseComponent(GetMesh());
+	FeetMesh->SetLeaderPoseComponent(GetMesh());
 
 	/// 카메라 생성 및 세팅
 	FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
@@ -58,6 +73,10 @@ AActionCharacter::AActionCharacter()
 	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
 	GetCapsuleComponent()->InitCapsuleSize(34.f, 88.f);		// Standing: Radius, HalfHeight
 	GetCharacterMovement()->SetCrouchedHalfHeight(60.f);		// Crouch 시 목표 HalfHeight
+
+	// 메시 초기 위치 세팅
+	FRotator Rot(0, -90, 0);
+	GetMesh()->SetRelativeLocationAndRotation(FVector(0, 0, -88.f), Rot);
 
 	// 눈높이(카메라) 포지션
 	DefaultEyeHeight = BaseEyeHeight;
