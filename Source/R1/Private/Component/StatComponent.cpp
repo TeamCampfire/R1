@@ -460,14 +460,15 @@ void UStatComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	GetWorld()->GetTimerManager().SetTimer(
-		SurvivalStatTimerHandle,
-		this,
-		&UStatComponent::DrainSurvivalStats,
-		SurvivalStatUpdateInterval,
-		true,
-		SurvivalStatUpdateInterval
-	);
+	// For Debug.
+	//GetWorld()->GetTimerManager().SetTimer(
+	//	SurvivalStatTimerHandle,
+	//	this,
+	//	&UStatComponent::DrainSurvivalStats,
+	//	SurvivalStatUpdateInterval,
+	//	true,
+	//	SurvivalStatUpdateInterval
+	//);
 }
 
 void UStatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)

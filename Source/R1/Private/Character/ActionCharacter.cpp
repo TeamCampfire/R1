@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Character/ActionCharacter.h"
@@ -7,6 +7,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Component/HarvestableComponent.h"
+#include "Interface/Harvestable.h"
 #include "Component/HeldItemComponent.h"
 #include "Data/Item/EquipmentItemData.h"
 
@@ -244,41 +245,56 @@ void AActionCharacter::ProcessAttack()
 	if (DetectdObjectInAttackRange(DetectRes))
 	{
 		AActor* Target = DetectRes.GetActor();
+		if (!Target) return;
 
-		// 자원을 얻을 수 있는 대상인지 확인
-		if (UHarvestableComponent* HarvestComp = Target->FindComponentByClass<UHarvestableComponent>())
-		{
-			// 자원 획득 진행
-			FHarvestRes HarvRes =  IHarvestable::Execute_OnHitted(HarvestComp, this, DetectRes.ImpactPoint);
-			if (HarvRes.HarvesResult)
-			{
-				// 획득한 아이템 로그 출력
-				for (const FHarvestItemResult& ItemRes : HarvRes.HarvestedItems)
-				{
-					if (ItemRes.ItemData)
-					{
-						Server_GrantHarvestReward(ItemRes.ItemData, ItemRes.Count);
-
-						//TODO RemainCnt
-						//바닥에 소환하기
-						UE_LOG(LogTemp, Display, TEXT("자원 [%s]를 %d개 획득! (스위트스팟: %s, 고갈보너스: %s)"),
-							*(ItemRes.ItemData->DisplayName.ToString()),
-							ItemRes.Count,
-							HarvRes.bHitSweetSpot ? TEXT("O") : TEXT("X"),
-							HarvRes.bIsDepleted ? TEXT("O") : TEXT("X"));
-					}
-				}
-			}
-		}
-		//TOOD 자원이 얻는 대상이 아니라 공격을 받는 대상
-		else if (true)
-		{
-			UE_LOG(LogTemp, Display, TEXT("TODO 공격을 받는 인터페이스 구현"));
-		}
+		// 서버 권한으로 타격 및 자원 채집 처리 요청
+		Server_ProcessAttackTarget(Target, DetectRes.ImpactPoint);
 	}
 	else
 	{
 		UE_LOG(LogTemp, Display, TEXT("아무도 것도 맞지 않았습니다."));
+	}
+}
+
+bool AActionCharacter::Server_ProcessAttackTarget_Validate(AActor* TargetActor, const FVector& HitLocation)
+{
+	// Validate에서 false를 반환하면 언리얼 엔진이 클라이언트를 즉시 강제 종료(Kick)하므로,
+	// 대상 액터가 파괴/소멸 중이더라도 연결이 끊기지 않도록 true를 반환하고
+	// 실제 널 체크 및 유효성 검사는 Implementation 내부에서 안전하게 처리합니다.
+	return true;
+}
+
+void AActionCharacter::Server_ProcessAttackTarget_Implementation(AActor* TargetActor, const FVector& HitLocation)
+{
+	if (!TargetActor || !IsValid(TargetActor)) return;
+
+	// 1. 자원을 얻을 수 있는 대상인지 확인
+	if (UHarvestableComponent* HarvestComp = TargetActor->FindComponentByClass<UHarvestableComponent>())
+	{
+		// 서버에서 자원 획득 진행 (OnHitted_Implementation 실행)
+		FHarvestRes HarvRes = IHarvestable::Execute_OnHitted(HarvestComp, this, HitLocation);
+		if (HarvRes.HarvesResult)
+		{
+			for (const FHarvestItemResult& ItemRes : HarvRes.HarvestedItems)
+			{
+				if (ItemRes.ItemData && InventoryComponent)
+				{
+					int32 RemainCnt = 0;
+					InventoryComponent->AddItem(ItemRes.ItemData, ItemRes.Count, RemainCnt);
+
+					UE_LOG(LogTemp, Display, TEXT("[서버] 자원 [%s]를 %d개 획득! (스위트스팟: %s, 고갈보너스: %s)"),
+						*(ItemRes.ItemData->DisplayName.ToString()),
+						ItemRes.Count,
+						HarvRes.bHitSweetSpot ? TEXT("O") : TEXT("X"),
+						HarvRes.bIsDepleted ? TEXT("O") : TEXT("X"));
+				}
+			}
+		}
+	}
+	// 2. 자원이 아니라 공격을 받는 대상인 경우 (추후 구현)
+	else
+	{
+		UE_LOG(LogTemp, Display, TEXT("TODO 공격을 받는 인터페이스 구현"));
 	}
 }
 

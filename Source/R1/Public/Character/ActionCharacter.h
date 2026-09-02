@@ -1,4 +1,4 @@
-﻿/// 최초작성 : 2026.08.25
+/// 최초작성 : 2026.08.25
 /// 작 성 자 : 최 요 환
 
 // Fill out your copyright notice in the Description page of Project Settings.
@@ -72,6 +72,11 @@ public:
 	// 지급할지만 서버가 최종 승인한다 — AFishingRod::Server_FinishFishing과 동일한 패턴.
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_GrantHarvestReward(UItemDataBase* ItemData, int32 Count);
+
+	// 공격 대상(자원 등)에 대한 타격을 서버 권한으로 처리 요청
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_ProcessAttackTarget(AActor* TargetActor, const FVector& HitLocation);
+
 	// 사망
 	UFUNCTION(BlueprintCallable)
 	void Die();
