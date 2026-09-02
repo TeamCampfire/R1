@@ -22,6 +22,14 @@ void AActionPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// 게임 입력 모드로 설정
+	if (IsLocalPlayerController())
+	{
+		SetInputMode(FInputModeGameOnly());
+		SetShowMouseCursor(false);
+		FlushPressedKeys();
+	}
+
 	UEnhancedInputLocalPlayerSubsystem* SubSystem =
 		ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
 
