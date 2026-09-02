@@ -8,7 +8,8 @@
 
 class UProgressBar;
 class UTextBlock;
-
+class UImage;
+class UTexture2D;
 /**
  * 
  */
@@ -37,6 +38,12 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UTextBlock> CurrentText;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (BindWidget))
+	TObjectPtr<UImage> IconImage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TObjectPtr<UTexture2D> IconTexture;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FLinearColor FillColor = FLinearColor::White;

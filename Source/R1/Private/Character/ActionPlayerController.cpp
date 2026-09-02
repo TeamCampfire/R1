@@ -51,6 +51,7 @@ void AActionPlayerController::OnPossess(APawn* InPawn)
 	Super::OnPossess(InPawn);
 	AActionCharacter* NewCharacter = Cast<AActionCharacter>(InPawn);
 
+	// Vehicle 등의 Pawn이면 Character 변경 이벤트를 발생시키지 않는다.
 	if (!NewCharacter) return;
 
 	UE_LOG(LogTemp, Warning,
@@ -124,10 +125,35 @@ AActor* AActionPlayerController::GetRespawnPoint()
 	return RespawnPoint;
 }
 
+void AActionPlayerController::OnRep_Pawn()
+{
+	Super::OnRep_Pawn();
+
+	UE_LOG(LogTemp, Warning,
+		TEXT("=== ON REP PAWN === PC=%s Pawn=%s IsLocal=%s"),
+		*GetNameSafe(this),
+		*GetNameSafe(GetPawn()),
+		IsLocalController() ? TEXT("TRUE") : TEXT("FALSE"));
+
+	AActionCharacter* NewCharacter = Cast<AActionCharacter>(GetPawn());
+
+	// 차량 등 Character가 아닌 Pawn으로 Possess된 경우
+	// Character 변경으로 취급하지 않는다.
+	if (!NewCharacter) return;
+
+	if (!IsLocalController()) return;
+
+	if (!GetPawn()) return;
+	
+	OnPossessedCharChange.Broadcast();
+}
+
+
 
 
 
 // Debug-----------------------------------------------------------------------------------------------------------------------
+
 void AActionPlayerController::TestDamage(int32 PlayerIndex)
 {
 	UE_LOG(LogTemp, Warning,

@@ -7,6 +7,9 @@
 #include "StatusBarWidget.generated.h"
 
 class UTextBlock;
+class UImage;
+class UTexture2D;
+class UMaterialInterface;
 enum class EStatusEffect : uint8;
 
 /**
@@ -24,4 +27,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UTextBlock> StatusEffectText;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (BindWidget))
+	TObjectPtr<UImage> IconImage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TMap<EStatusEffect, TSoftObjectPtr<UMaterialInterface>> StatusIconMaterials;
 };
