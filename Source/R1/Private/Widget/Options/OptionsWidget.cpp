@@ -2,8 +2,18 @@
 
 
 #include "Widget/Options/OptionsWidget.h"
+#include "Widget/Options/OptionsControlsWidget.h"
+#include "Widget/Options/OptionsDisplayWidget.h"
 #include "Components/Button.h"
+#include "Components/Border.h"
 #include "Components/WidgetSwitcher.h"
+
+namespace
+{
+	// 왼쪽 카테고리 목록에서 현재 선택된 항목의 배경색 — 선택 안 된 항목은 완전 투명.
+	const FLinearColor GSelectedCategoryColor = FLinearColor(0.176f, 0.4f, 0.176f, 0.8f);
+	const FLinearColor GUnselectedCategoryColor = FLinearColor(0.f, 0.f, 0.f, 0.f);
+}
 
 void UOptionsWidget::NativeOnInitialized()
 {
@@ -38,5 +48,33 @@ void UOptionsWidget::SwitchToCategory(EOptionsCategory Category)
 	if (ContentSwitcher)
 	{
 		ContentSwitcher->SetActiveWidgetIndex(static_cast<int32>(Category));
+	}
+
+	if (CategoryHighlight_Controls)
+	{
+		CategoryHighlight_Controls->SetBrushColor(Category == EOptionsCategory::Controls ? GSelectedCategoryColor : GUnselectedCategoryColor);
+	}
+
+	if (CategoryHighlight_Display)
+	{
+		CategoryHighlight_Display->SetBrushColor(Category == EOptionsCategory::Display ? GSelectedCategoryColor : GUnselectedCategoryColor);
+	}
+}
+
+void UOptionsWidget::RefreshActiveCategory()
+{
+	if (!ContentSwitcher)
+	{
+		return;
+	}
+
+	if (UOptionsControlsWidget* Controls = Cast<UOptionsControlsWidget>(ContentSwitcher->GetWidgetAtIndex(static_cast<int32>(EOptionsCategory::Controls))))
+	{
+		Controls->RefreshRows();
+	}
+
+	if (UOptionsDisplayWidget* Display = Cast<UOptionsDisplayWidget>(ContentSwitcher->GetWidgetAtIndex(static_cast<int32>(EOptionsCategory::Display))))
+	{
+		Display->RefreshFromCurrentSettings();
 	}
 }

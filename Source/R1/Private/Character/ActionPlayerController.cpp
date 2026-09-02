@@ -44,14 +44,31 @@ void AActionPlayerController::BeginPlay()
 		// (DefaultEngine.ini의 bEnableUserSettings=True가 켜져 있어야 유효한 객체가 반환된다.)
 		if (UEnhancedInputUserSettings* UserSettings = SubSystem->GetUserSettings())
 		{
+			bool bDefaultRegistered = false;
+			bool bUIRegistered = false;
+
 			if (DefaultMappingContext)
 			{
-				UserSettings->RegisterInputMappingContext(DefaultMappingContext);
+				bDefaultRegistered = UserSettings->RegisterInputMappingContext(DefaultMappingContext);
 			}
 			if (UIMappingContext)
 			{
-				UserSettings->RegisterInputMappingContext(UIMappingContext);
+				bUIRegistered = UserSettings->RegisterInputMappingContext(UIMappingContext);
 			}
+
+			int32 MappingCount = 0;
+			if (const UEnhancedPlayerMappableKeyProfile* Profile = UserSettings->GetActiveKeyProfile())
+			{
+				for (const TPair<FName, FKeyMappingRow>& RowPair : Profile->GetPlayerMappingRows())
+				{
+					MappingCount += RowPair.Value.Mappings.Num();
+				}
+			}
+
+			UE_LOG(LogTemp, Warning, TEXT("[KeyRebind] IMC 등록 — Default=%s(%s) UI=%s(%s) 등록후 매핑 %d개"),
+				*GetNameSafe(DefaultMappingContext), bDefaultRegistered ? TEXT("성공") : TEXT("실패"),
+				*GetNameSafe(UIMappingContext), bUIRegistered ? TEXT("성공") : TEXT("실패"),
+				MappingCount);
 		}
 	}
 }

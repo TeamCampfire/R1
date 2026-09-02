@@ -106,6 +106,8 @@ protected:
 
 	void OnInteractPressed();			// 상호작용 시도
 	void OnInventoryTogglePressed();	// 인벤토리 패널 토글
+
+	UFUNCTION(BlueprintCallable)		// 블루프린트 테스트로 콜러블 설정
 	void OnOptionsTogglePressed();		// 옵션(환경설정) 패널 토글
 	void OnUseBeltSlotPressed(int32 BeltIndex);	// 벨트슬롯 단축키(1~6, 0-based 인덱스로 받음)
 

@@ -27,13 +27,16 @@ class R1_API UOptionsDisplayWidget : public UUserWidget
 {
 	GENERATED_BODY()
 
+public:
+	// 콤보박스를 현재 UGameUserSettings 값으로 채우고 현재 값을 선택 상태로 맞춘다.
+	// public인 이유: 옵션 패널을 열 때마다(OptionsWidget::RefreshActiveCategory) 다시 호출해서
+	// 다른 경로(예: 게임 중 해상도 변경)로 설정이 바뀌었어도 최신 값을 보여주기 위함.
+	void RefreshFromCurrentSettings();
+
 protected:
 	//~ Begin UUserWidget Interface
 	virtual void NativeOnInitialized() override;
 	//~ End UUserWidget Interface
-
-	// 콤보박스를 현재 UGameUserSettings 값으로 채우고 현재 값을 선택 상태로 맞춘다.
-	void RefreshFromCurrentSettings();
 
 	UFUNCTION()
 	void HandleApplyClicked();

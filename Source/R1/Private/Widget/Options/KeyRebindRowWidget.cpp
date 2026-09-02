@@ -2,13 +2,22 @@
 
 
 #include "Widget/Options/KeyRebindRowWidget.h"
+#include "Widget/Options/OptionsControlsWidget.h"
 #include "Components/TextBlock.h"
 #include "Components/Button.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
 
-void UKeyRebindRowWidget::Setup(FName InMappingName, EPlayerMappableKeySlot InSlot)
+namespace
 {
+	// 리스닝(다음 키 입력 대기) 중 KeyButton에 곱해줄 강조색 — "PRESS A KEY" 상태를 시각적으로 표시.
+	const FLinearColor GListeningColor = FLinearColor(0.376f, 0.702f, 0.294f, 1.f);
+	const FLinearColor GNormalColor = FLinearColor::White;
+}
+
+void UKeyRebindRowWidget::Setup(UOptionsControlsWidget* InOwner, FName InMappingName, EPlayerMappableKeySlot InSlot)
+{
+	OwnerControlsWidget = InOwner;
 	MappingName = InMappingName;
 	Slot = InSlot;
 
@@ -36,6 +45,13 @@ void UKeyRebindRowWidget::NativeOnInitialized()
 	{
 		KeyButton->OnClicked.AddDynamic(this, &UKeyRebindRowWidget::HandleKeyButtonClicked);
 	}
+
+	if (ResetRowButton)
+	{
+		ResetRowButton->OnClicked.AddDynamic(this, &UKeyRebindRowWidget::HandleResetRowClicked);
+		// 평소엔 숨겨뒀다가 마우스가 이 행 위에 있는 동안만(NativeOnMouseEnter/Leave) 보여준다.
+		ResetRowButton->SetVisibility(ESlateVisibility::Collapsed);
+	}
 }
 
 FReply UKeyRebindRowWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
@@ -48,6 +64,10 @@ FReply UKeyRebindRowWidget::NativeOnKeyDown(const FGeometry& InGeometry, const F
 		{
 			// 취소 — 새 키를 매핑하지 않고 리스닝만 종료한다.
 			bIsListening = false;
+			if (KeyButton)
+			{
+				KeyButton->SetBackgroundColor(GNormalColor);
+			}
 			RefreshKeyText();
 		}
 		else
@@ -72,9 +92,37 @@ FReply UKeyRebindRowWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry,
 	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
 }
 
+void UKeyRebindRowWidget::NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	Super::NativeOnMouseEnter(InGeometry, InMouseEvent);
+
+	if (ResetRowButton)
+	{
+		ResetRowButton->SetVisibility(ESlateVisibility::Visible);
+	}
+}
+
+void UKeyRebindRowWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
+{
+	Super::NativeOnMouseLeave(InMouseEvent);
+
+	if (ResetRowButton)
+	{
+		ResetRowButton->SetVisibility(ESlateVisibility::Collapsed);
+	}
+}
+
 void UKeyRebindRowWidget::HandleKeyButtonClicked()
 {
 	BeginListening();
+}
+
+void UKeyRebindRowWidget::HandleResetRowClicked()
+{
+	if (OwnerControlsWidget)
+	{
+		OwnerControlsWidget->RequestRowReset(MappingName);
+	}
 }
 
 void UKeyRebindRowWidget::BeginListening()
@@ -86,6 +134,11 @@ void UKeyRebindRowWidget::BeginListening()
 		KeyText->SetText(NSLOCTEXT("KeyRebindRowWidget", "Listening", "키를 누르세요..."));
 	}
 
+	if (KeyButton)
+	{
+		KeyButton->SetBackgroundColor(GListeningColor);
+	}
+
 	SetFocus();
 }
 
@@ -93,29 +146,17 @@ void UKeyRebindRowWidget::ApplyNewKey(const FKey& NewKey)
 {
 	bIsListening = false;
 
-	UEnhancedInputUserSettings* UserSettings = GetUserSettings();
-	if (!UserSettings)
+	if (KeyButton)
 	{
-		RefreshKeyText();
-		return;
+		KeyButton->SetBackgroundColor(GNormalColor);
 	}
 
-	FMapPlayerKeyArgs Args = FMapPlayerKeyArgs();
-	Args.MappingName = MappingName;
-	Args.Slot = Slot;
-	Args.NewKey = NewKey;
-	Args.bCreateMatchingSlotIfNeeded = true;
-
-	FGameplayTagContainer FailureReason;
-	UserSettings->MapPlayerKey(Args, FailureReason);
-
-	if (FailureReason.IsEmpty())
+	// 실제 매핑(+충돌 검사)은 다른 행들의 상태까지 알아야 해서 OptionsControlsWidget에게 넘긴다.
+	// 충돌이 없으면 그쪽에서 바로 적용 후 RefreshRows로 이 행 자체를 다시 만들고,
+	// 충돌이 있으면 다이얼로그를 띄운 채 대기하므로 여기서는 일단 원래 키로 되돌려 보여준다.
+	if (OwnerControlsWidget)
 	{
-		UserSettings->SaveSettings();
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[KeyRebind] MapPlayerKey 실패 (%s): %s"), *MappingName.ToString(), *FailureReason.ToString());
+		OwnerControlsWidget->RequestKeyRebind(MappingName, Slot, NewKey);
 	}
 
 	RefreshKeyText();

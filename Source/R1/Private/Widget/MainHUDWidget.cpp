@@ -64,6 +64,14 @@ bool UMainHUDWidget::ToggleOptionsPanel()
 	const bool bNewOpenState = !IsOptionsPanelOpen();
 	OptionsWidget->SetVisibility(bNewOpenState ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 
+	if (bNewOpenState)
+	{
+		// 열 때마다 다시 채운다 — 이 위젯은 게임 시작 시 한 번만 만들어지고 이후엔 Visibility만
+		// 토글되므로, 최초 생성 시점에 Enhanced Input 등록이 아직 안 끝나 있었어도 다음에 열 때는
+		// 최신 키 매핑으로 다시 채워진다.
+		OptionsWidget->RefreshActiveCategory();
+	}
+
 	return bNewOpenState;
 }
 
