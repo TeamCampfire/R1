@@ -93,6 +93,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Building|Placement", meta = (TitleProperty = "SocketName"))
 	TArray<FBuildingSnapPointDefinition> SnapPoints; // 이 파츠가 다른 파츠에 제공하는 스냅 위치들
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snapping")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|Snapping")
 	TArray<float> AllowedSnapYawOffsets = { 0.f }; // 소켓의 회전을 기준으로 선택할 수 있는 상대 Yaw 각도들
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|Snapping")
+	FName PlacementAnchorSocketName = NAME_None; // 이 파츠를 다른 파츠에 스냅할 때 대상 소켓에 맞출 자신의 소켓 (잠시 피벗이 된다고 이해하면 편함)
+	// None이면 기존처럼 메시 피벗을 대상 소켓에 맞춰요, 
 };

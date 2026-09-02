@@ -101,6 +101,11 @@ private:
 	// 건축 파츠의 회전값이 든 배열(AllowedSnapYawOffsets)[CurSnapYawOffsetIdx]
 	float GetCurSnapYawOffset();
 
+	// 새 파츠 액터의 PlacementAnchorSocketName가
+	// 붙어야 하는 스냅 소켓에 배치되기 위해.. 월드 Transform를 계산하는 함수
+	bool BuildSnappedPlacementTransform(const UBuildingPartDefinition* Definition, const FTransform& InSocketWorldTransform,
+		float SnapYawOffset, FTransform& OutPlacementTransform) const;
+
 	//  ===================================================================================
 private:
 	// 최대 건축 지점 거리

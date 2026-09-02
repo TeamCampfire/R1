@@ -1,6 +1,7 @@
 ﻿#include "BuildingSystem/Component/BuildingPlacementComponent.h"
 
 #include "Engine/OverlapResult.h"
+#include "Engine/StaticMeshSocket.h"
 #include "Components/StaticMeshComponent.h"
 #include "../R1.h"
 
@@ -280,11 +281,20 @@ void UBuildingPlacementComponent::ServerPlaceSnappedPart_Implementation(UBuildin
 	else if (_SnapYawOffsetIdx != 0)
 		return;
 
-	FQuat YawOffsetRotation = FRotator(0.f, SnapYawOffset, 0.f).Quaternion(); // 진짜 YawOffset만 든 값
-	FQuat FinalSnapRotation = SocketWorldTransform.GetRotation() * YawOffsetRotation; // 을 적용시켜요
-	FinalSnapRotation.Normalize();
+	//FQuat YawOffsetRotation = FRotator(0.f, SnapYawOffset, 0.f).Quaternion(); // 진짜 YawOffset만 든 값
+	//FQuat FinalSnapRotation = SocketWorldTransform.GetRotation() * YawOffsetRotation; // 을 적용시켜요
+	//FinalSnapRotation.Normalize();
 
-	FTransform SafeSnapTransform(FinalSnapRotation, SocketWorldTransform.GetLocation(), FVector::OneVector);
+	//FTransform SafeSnapTransform(FinalSnapRotation, SocketWorldTransform.GetLocation(), FVector::OneVector);
+
+	FTransform SafeSnapTransform;
+	if (false == BuildSnappedPlacementTransform(Definition, SocketWorldTransform, SnapYawOffset, SafeSnapTransform))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : ") TEXT("최종 스냅 Transform 계산에 실패했습니다."));
+		return;
+	}
+
+
 	if (SafeSnapTransform.ContainsNaN())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 소켓 Transform이 유효하지 않습니다."));
@@ -544,37 +554,29 @@ bool UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* 
 		return false;
 	}
 
+	// PlacementAnchorSocketName를 적용한 스냅 할 최종 Trasform을 계산해요
+	FTransform FinalSnapTransform;
+	if (false == BuildSnappedPlacementTransform(SelectedDefinition.Get(), BestSocketTransform, GetCurSnapYawOffset(), FinalSnapTransform))
+	{
+		HidePlacementPreview();
+		return false;
+	}
+
 	// 클라이언트에서도 최대 설치 수평거리 확인
-	float PlacementDistanceSquared = FVector::DistSquared2D( ViewLocation, BestSocketTransform.GetLocation());
+	float PlacementDistanceSquared = FVector::DistSquared2D(ViewLocation, FinalSnapTransform.GetLocation());
 	if (PlacementDistanceSquared > FMath::Square(MaxPlacementDistance))
 	{
 		HidePlacementPreview();
 		return false;
 	}
 
-	// 적용할 Yaw 회전값을 가져와 세팅된 값만이 담긴 회전 쿼터니언으로 만들었어요
-	FTransform RotatedSnapTransform = BestSocketTransform;
-	float SnapYawOffset = GetCurSnapYawOffset();
-	FQuat YawOffsetRotation = FRotator(0.f, SnapYawOffset, 0.f).Quaternion();
-
-	// BestSocketTransform의 회전에 적용시켜요
-	FQuat FinalRotation = BestSocketTransform.GetRotation() * YawOffsetRotation;
-
-	FinalRotation.Normalize();
-	RotatedSnapTransform.SetRotation(FinalRotation);
-
-	// 회전값까지 적용된 Transform을 프리뷰에 적용해 배치 !!
-	PreviewActor->SetActorTransform(RotatedSnapTransform);
+	// 모든 계산이 끝난 최종 Trasform을 Preview 위치로..
+	PreviewActor->SetActorTransform(FinalSnapTransform);
 
 	// 대상 Foundation 컴포넌트는 이미 의도적으로 겹친 상태니까 겹침 검사 대상에서 제외시켜요
 	const bool bHasOverlap = HasPlacementOverlap(HitResult.GetComponent(), HitBuilding);
 
 	bCanPlace = false == bHasOverlap;
-
-	//if (true == bHasDuplicateFoundation)
-	//{
-	//	UE_LOG(LogTemp, Warning, TEXT("[Foundation Preview] 이미 Foundation이 점유한 Transform입니다. Location=%s"), *BestSocketTransform.GetLocation().ToString());
-	//}
 
 	PreviewActor->SetPlacementValid(bCanPlace);
 	PreviewActor->SetActorHiddenInGame(false);
@@ -1037,4 +1039,36 @@ float UBuildingPlacementComponent::GetCurSnapYawOffset()
 	if (false == SelectedDefinition->AllowedSnapYawOffsets.IsValidIndex(CurSnapYawOffsetIdx)) return 0.f;
 
 	return SelectedDefinition->AllowedSnapYawOffsets[CurSnapYawOffsetIdx];
+}
+
+bool UBuildingPlacementComponent::BuildSnappedPlacementTransform(const UBuildingPartDefinition* Definition, const FTransform& InSocketWorldTransform, float SnapYawOffset, FTransform& OutPlacementTransform) const
+{
+	if (false == IsValid(Definition) || false == IsValid(Definition->PartMesh)) return false;
+
+	// 대상 소켓 회전에 허용된 Yaw Offset을 적용해 설치될 해당 파츠의 최종 회전을 계산해요
+	FQuat YawOffsetRotation = FRotator(0.f, SnapYawOffset, 0.f).Quaternion();
+
+	FQuat FinalRotation = InSocketWorldTransform.GetRotation() * YawOffsetRotation; // 부착이 되어질 소켓의 방향을 기준으로 한 Rot
+	FVector FinalLocation = InSocketWorldTransform.GetLocation(); // 부착될 소켓의 위치였으면 좋으련만 해당 메시의 피벗 위치
+	FinalRotation.Normalize();
+
+	// PlacementAnchorSocketName이 설정된 파츠는 메시 피벗이 아니라 부착 되어질 소켓의 위치에 맞춰요
+	if (false == Definition->PlacementAnchorSocketName.IsNone())
+	{
+		const UStaticMeshSocket* PlacementAnchorSocket = Definition->PartMesh->FindSocket(Definition->PlacementAnchorSocketName);
+		if (nullptr == PlacementAnchorSocket)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[BuildSnappedPlacementTransform] : ") TEXT("Placement Anchor이 세팅된 소켓을 찾을 수 없습니다. Socket=%s"),
+				*Definition->PlacementAnchorSocketName.ToString());
+			return false;
+		}
+
+		// 부착 소켓을 부착이 되어질 소켓의 회전만큼 틀어줘요
+		// 그래야 부착되어질 소켓이 회전하면 얘도 같이 회전할테니
+		const FVector RotatedAnchorOffset = FinalRotation.RotateVector(PlacementAnchorSocket->RelativeLocation); // 계단 회전까지 적용한 후의 벡터
+		FinalLocation -= RotatedAnchorOffset; // 빼줘야 진짜 부착될 소켓의 위치가 나옴!!
+	}
+
+	OutPlacementTransform = FTransform(FinalRotation, FinalLocation, FVector::OneVector);
+	return (false == OutPlacementTransform.ContainsNaN());
 }
