@@ -10,7 +10,6 @@
 #include "DetailInfoWidget.generated.h"
 
 class UInventoryComponent;
-class UParameterBarWidget;
 class UTextBlock;
 class UImage;
 class UButton;
@@ -33,8 +32,8 @@ enum class EItemEffectType : uint8;
  * - TitleText             : 아이템 이름.
  * - DescriptionText       : 아이템 설명.
  * - IconImage             : 아이템 아이콘. 아이콘이 없는 아이템은 자동으로 숨겨진다.
- * - InfoRowsContainer     : "정보" 섹션의 스탯 행이 채워질 패널(VerticalBox 권장) — 장비/도구는
- *                           라벨+StatBarWidgetClass 바, 소비는 색상 있는 텍스트 한 줄씩 채워진다.
+ * - InfoRowsContainer     : "정보" 섹션의 스탯 행이 채워질 패널(VerticalBox 권장) — 장비/도구
+ *                           스탯과 소비 효과 둘 다 텍스트 한 줄씩 채워진다.
  * - ActionButtonsContainer: 카테고리별 조건부 액션 버튼들을 담는 레이아웃용 컨테이너(선택 사항 —
  *                           버튼 자체는 런타임 생성이 아니라 아래처럼 WBP에 미리 배치해둔다).
  * - UseButton             : "사용" 버튼 — Consumable일 때만 보이고 그 외엔 Collapsed
@@ -78,20 +77,17 @@ private:
 	// Title/Description/Icon/Split 슬라이더 범위 등 전체 갱신. 선택 없음이면 RootPanel만 Collapsed.
 	void RefreshDisplay();
 
-	// "정보" 섹션 스탯 행 재생성. 장비/도구(UEquipmentItemData::StatModifiers)는 Bar 타입
-	// (StatBarWidgetClass 재사용), 소비(UConsumableItemData::Effects)는 색상 있는 텍스트 행.
+	// "정보" 섹션 스탯 행 재생성. 장비/도구(UEquipmentItemData::StatModifiers)와
+	// 소비(UConsumableItemData::Effects) 둘 다 텍스트 행으로 채운다 — 런타임에 새로 만든
+	// UParameterBarWidget(바)이 이 프로젝트 환경에서 내부 구조가 제대로 안 그려지는 문제가
+	// 있어서(원인 미확정) 이미 검증된 텍스트 방식으로 통일했다.
 	void RebuildInfoRows(const FItemInstance& Selected);
 
-	// 스탯 하나를 라벨 + StatBarWidgetClass 바 한 행으로 만들어 InfoRowsContainer에 추가.
-	void AddStatBarRow(EEquipmentStatType StatType, float Value);
+	// 스탯 하나를 "라벨: 값" 텍스트 한 줄로 만들어 InfoRowsContainer에 추가.
+	void AddStatTextRow(EEquipmentStatType StatType, float Value);
 
 	// 소비 효과 하나를 색상 있는 텍스트 한 줄로 만들어 InfoRowsContainer에 추가.
 	void AddEffectTextRow(const FItemEffect& Effect);
-
-	// 바 표시용 "기준 최대값" — 실제 스탯의 진짜 최대치가 아니라, 바를 얼마나 채울지 정하기
-	// 위한 순전히 시각적인 기준값이다. 스탯 종류별로 의미(가산 vs 배율)가 달라서 값도 다르게
-	// 잡아야 하므로 여기 한 곳에 모아두고 밸런스가 잡히면 이 값만 조정한다.
-	static float GetStatBarReferenceMax(EEquipmentStatType StatType);
 
 	// 소비 효과 종류별 텍스트 색상 — Heal은 붉은 계열, RestoreHunger/RestoreThirst는 서로
 	// 구분되게 각각 다른 색을 쓴다.
@@ -147,11 +143,6 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UImage> SplitDragIcon;
-
-	// "정보" 섹션의 Bar 타입 스탯 행에 쓸 위젯 클래스. UParameterBarWidget(라벨+바+값, 강진구
-	// 작성분)을 그대로 재사용 — WBP 디폴트에서 실제 WBP_ParameterBar로 지정.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "DetailInfo")
-	TSubclassOf<UParameterBarWidget> StatBarWidgetClass;
 
 private:
 	TWeakObjectPtr<UInventoryComponent> BoundInventory;

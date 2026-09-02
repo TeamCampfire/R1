@@ -49,9 +49,12 @@ AItemPickup::AItemPickup()
 	InteractionSphere = CreateDefaultSubobject<USphereComponent>(TEXT("InteractionSphere"));
 	InteractionSphere->SetupAttachment(RootComponent);
 	InteractionSphere->SetSphereRadius(120.f);
-	
+
 	// 프로젝트에 별도 상호작용 콜리전 채널이 있다면 그쪽 프로파일로 교체 권장.
 	InteractionSphere->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
+
+	// AutoOnOverlap 아이템의 근접 자동 획득용 — 실제 처리는 OnInteractionSphereBeginOverlap 참고.
+	InteractionSphere->OnComponentBeginOverlap.AddDynamic(this, &AItemPickup::OnInteractionSphereBeginOverlap);
 }
 
 void AItemPickup::InitializeFromItem(UItemDataBase* InItemData, int32 InCount)
@@ -91,6 +94,23 @@ void AItemPickup::BeginPlay()
 
 void AItemPickup::OnInteractionSphereBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
+	// 오버랩은 서버/클라이언트 양쪽에서 각자 독립적으로 발생한다 — 클라이언트에서도 처리해버리면
+	// 권한 없이 TryGrantToInventory(내부에서 Destroy() 호출)가 실행돼 리플리케이션이 꼬인다.
+	// 서버는 어차피 모든 폰을 권한 있게 시뮬레이션하니 이 가드만으로 충분하고, 별도 RPC가 필요 없다.
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (!ItemData || ItemData->DefaultPickupMode != EPickupMode::AutoOnOverlap)
+	{
+		return;
+	}
+
+	if (APawn* Interactor = Cast<APawn>(OtherActor))
+	{
+		TryGrantToInventory(Interactor);
+	}
 }
 
 void AItemPickup::RefreshVisual()

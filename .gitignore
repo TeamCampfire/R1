@@ -77,3 +77,5 @@ DerivedDataCache/*
 
 # 사용하지 않는 게임 에셋
 Content/_ExternalAssets/*
+/.mcp.json
+/아이템-인벤토리-설계-로드맵.md

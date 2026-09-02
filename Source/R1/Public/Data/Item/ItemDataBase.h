@@ -74,6 +74,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item|Visual")
 	TSoftObjectPtr<UStaticMesh> PickupMesh;
 
+	// 월드 픽업(AItemPickup)의 획득 방식. 무기/방어구/물약처럼 낱개로 다루는 아이템은
+	// LookAndPress(조준+단축키), 무더기로 흩어지는 광석·제작 재료 등은 AutoOnOverlap(근접 시 자동).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
+	EPickupMode DefaultPickupMode = EPickupMode::LookAndPress;
+
 private:
 	// Category가 Equipment/Weapon/Tool이면 MaxStackSize를 1로 강제한다 — 디자이너가
 	// 실수로 다른 값을 넣거나 에디터에서 Category만 바꿔도 즉시(에디터)/로드 시(런타임) 정정된다.

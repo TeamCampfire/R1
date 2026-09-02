@@ -2,7 +2,7 @@
 
 
 #include "Widget/Inventory/DetailInfoWidget.h"
-#include "Widget/ParameterBarWidget.h"
+#include "Blueprint/WidgetTree.h"
 #include "Widget/Inventory/InventoryDragDropOperation.h"
 #include "Components/Widget.h"
 #include "Components/TextBlock.h"
@@ -10,8 +10,6 @@
 #include "Components/Button.h"
 #include "Components/Slider.h"
 #include "Components/PanelWidget.h"
-#include "Components/HorizontalBox.h"
-#include "Components/HorizontalBoxSlot.h"
 #include "Data/Item/ItemDataBase.h"
 #include "Data/Item/EquipmentItemData.h"
 #include "Data/Item/ConsumableItemData.h"
@@ -183,7 +181,7 @@ void UDetailInfoWidget::RebuildInfoRows(const FItemInstance& Selected)
 	{
 		for (const FEquipmentStatModifier& Modifier : EquipmentData->StatModifiers)
 		{
-			AddStatBarRow(Modifier.StatType, Modifier.Value);
+			AddStatTextRow(Modifier.StatType, Modifier.Value);
 		}
 	}
 	else if (const UConsumableItemData* ConsumableData = Cast<UConsumableItemData>(Selected.ItemData))
@@ -195,31 +193,19 @@ void UDetailInfoWidget::RebuildInfoRows(const FItemInstance& Selected)
 	}
 }
 
-void UDetailInfoWidget::AddStatBarRow(EEquipmentStatType StatType, float Value)
+void UDetailInfoWidget::AddStatTextRow(EEquipmentStatType StatType, float Value)
 {
 	if (!InfoRowsContainer)
 	{
 		return;
 	}
 
-	UHorizontalBox* Row = NewObject<UHorizontalBox>(this);
-
-	UTextBlock* Label = NewObject<UTextBlock>(this);
-	Label->SetText(StaticEnum<EEquipmentStatType>()->GetDisplayNameTextByValue(static_cast<int64>(StatType)));
-	Row->AddChildToHorizontalBox(Label);
-
-	if (StatBarWidgetClass)
-	{
-		if (UParameterBarWidget* Bar = CreateWidget<UParameterBarWidget>(this, StatBarWidgetClass))
-		{
-			Bar->UpdateParameterBar(Value, GetStatBarReferenceMax(StatType));
-
-			if (UHorizontalBoxSlot* BarSlot = Row->AddChildToHorizontalBox(Bar))
-			{
-				BarSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-			}
-		}
-	}
+	// UParameterBarWidget을 런타임에 새로 만들어 붙이는 방식은 이 프로젝트 환경에서 내부
+	// 구조가 제대로 안 그려지는 문제가 있어(원인 미확정) 포기하고, 소비 효과(AddEffectTextRow)와
+	// 동일한, 이미 검증된 텍스트 방식으로 통일했다.
+	UTextBlock* Row = WidgetTree->ConstructWidget<UTextBlock>();
+	const FText StatLabel = StaticEnum<EEquipmentStatType>()->GetDisplayNameTextByValue(static_cast<int64>(StatType));
+	Row->SetText(FText::Format(NSLOCTEXT("DetailInfoWidget", "StatRowFormat", "{0}: {1}"), StatLabel, FText::AsNumber(Value)));
 
 	InfoRowsContainer->AddChild(Row);
 }
@@ -231,7 +217,7 @@ void UDetailInfoWidget::AddEffectTextRow(const FItemEffect& Effect)
 		return;
 	}
 
-	UTextBlock* Row = NewObject<UTextBlock>(this);
+	UTextBlock* Row = WidgetTree->ConstructWidget<UTextBlock>();
 	const FText EffectLabel = StaticEnum<EItemEffectType>()->GetDisplayNameTextByValue(static_cast<int64>(Effect.EffectType));
 	Row->SetText(FText::Format(NSLOCTEXT("DetailInfoWidget", "EffectRowFormat", "{0} +{1}"), EffectLabel, FText::AsNumber(Effect.Magnitude)));
 
@@ -239,23 +225,6 @@ void UDetailInfoWidget::AddEffectTextRow(const FItemEffect& Effect)
 	//Row->SetColorAndOpacity(FSlateColor(GetEffectColor(Effect.EffectType)));
 
 	InfoRowsContainer->AddChild(Row);
-}
-
-float UDetailInfoWidget::GetStatBarReferenceMax(EEquipmentStatType StatType)
-{
-	// 실제 스탯의 진짜 상한이 아니라, 바가 얼마나 채워질지 가늠하기 위한 순전히 시각적인
-	// 기준값이다 — 밸런스가 잡히면 여기 값만 조정하면 되고 구조는 안 건드려도 된다.
-	switch (StatType)
-	{
-		case EEquipmentStatType::Defense:				return 50.f;
-		case EEquipmentStatType::MovementSpeedMult:	return 2.f;
-		case EEquipmentStatType::HarvestDamage:		return 100.f;
-		case EEquipmentStatType::WoodGatheringMult:	return 3.f;
-		case EEquipmentStatType::OreGatheringMult:		return 3.f;
-		case EEquipmentStatType::FleshGatheringMult:	return 3.f;
-		case EEquipmentStatType::DurabilityLossMult:	return 2.f;
-		default:										return 1.f;
-	}
 }
 
 FLinearColor UDetailInfoWidget::GetEffectColor(EItemEffectType EffectType)
