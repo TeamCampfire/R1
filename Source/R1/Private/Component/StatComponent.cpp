@@ -137,6 +137,7 @@ void UStatComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(UStatComponent, CurrentHydration);
 	DOREPLIFETIME(UStatComponent, CurrentCalories);
 	DOREPLIFETIME(UStatComponent, PlayerStatusEffects);
+	DOREPLIFETIME(UStatComponent, bAlive);
 }
 
 void UStatComponent::IncreaseParameter(EParameterType InEParameterType, float InAmount)
@@ -257,6 +258,13 @@ void UStatComponent::DecreaseParameter(EParameterType InEParameterType, float In
 				UE_LOG(LogTemp, Log, TEXT("%s Died"), *this->GetOwner()->GetName());
 			}
 			bAlive = false;
+			UE_LOG(
+				LogTemp,
+				Warning,
+				TEXT("[SERVER] %s bAlive = %s"),
+				*GetOwner()->GetName(),
+				bAlive ? TEXT("TRUE") : TEXT("FALSE")
+			);
 		}
 		else
 		{

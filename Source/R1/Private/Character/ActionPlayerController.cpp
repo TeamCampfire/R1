@@ -111,6 +111,19 @@ AActor* AActionPlayerController::GetRespawnPoint()
 	return RespawnPoint;
 }
 
+void AActionPlayerController::OnRep_Pawn()
+{
+	Super::OnRep_Pawn();
+
+	UE_LOG(LogTemp, Warning,
+		TEXT("=== ON REP PAWN === PC=%s Pawn=%s IsLocal=%s"),
+		*GetNameSafe(this),
+		*GetNameSafe(GetPawn()),
+		IsLocalController() ? TEXT("TRUE") : TEXT("FALSE"));
+
+	OnPossessedCharChange.Broadcast();
+}
+
 
 
 

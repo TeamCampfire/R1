@@ -44,6 +44,8 @@ public:
 	AActor* GetRespawnPoint();
 
 protected:
+	// 폰 변경 감지 함수
+	virtual void OnRep_Pawn() override;
 
 	// Debug---------------------------------------------------------------------------------------------------------------------
 	UFUNCTION(Server, Reliable)

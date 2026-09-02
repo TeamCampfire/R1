@@ -66,6 +66,16 @@ void ATestGameMode::RespawnPlayer(AController* InController)
 		if (UStatComponent* StatComp = ExistingCharacter->GetStatComponent())
 		{
 			IHealthInterface* HealthInterface = Cast<IHealthInterface>(StatComp);
+			UE_LOG(LogTemp, Warning,
+				TEXT("[SERVER] Respawn %s bAlive = %s"),
+				*InController->GetName(),
+				ExistingCharacter &&
+				ExistingCharacter->GetStatComponent() &&
+				Cast<IHealthInterface>(
+					ExistingCharacter->GetStatComponent()
+				)->IsAlive()
+				? TEXT("TRUE")
+				: TEXT("FALSE"));
 
 			if (HealthInterface && HealthInterface->IsAlive())
 			{
@@ -78,7 +88,7 @@ void ATestGameMode::RespawnPlayer(AController* InController)
 			}
 		}
 	}
-
+	
 	// 살아있는 캐릭터가 없다면 새 캐릭터 생성
 	FTransform SpawnTransform(SpawnRotation, SpawnLocation);
 

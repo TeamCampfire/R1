@@ -166,8 +166,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float DebugDamage = 50.0f;
 
-private:
+	UPROPERTY(Replicated)
 	bool bAlive = false;
+private:
 
 public:
 	//UPROPERTY(BlueprintAssignable, Category = "Stat|Stamina")
