@@ -12,7 +12,7 @@
 
 class AActionCharacter;
 class UItemDataBase;
-class UEquipmentItemData;
+class UHeldItemData;
 class FLifetimeProperty;
 
 /**
@@ -33,7 +33,7 @@ public:
 	AHeldItemBase* EquipItem(UItemDataBase* ItemData);
 
 	UFUNCTION(BlueprintCallable, Category = "HeldItem")
-	AHeldItemBase* EquipHeldItemByData(UEquipmentItemData* EquipItemData);
+	AHeldItemBase* EquipHeldItemByData(UHeldItemData* EquipItemData);
 
 	// 클래스 직접 장착
 	UFUNCTION(BlueprintCallable, Category = "HeldItem")
@@ -71,7 +71,7 @@ public:
 
 	// 현재 장착된 아이템 데이터 반환
 	UFUNCTION(BlueprintPure, Category = "HeldItem")
-	FORCEINLINE UEquipmentItemData* GetCurrentEquippedItemData() const { return CurrentEquippedItemData; }
+	FORCEINLINE UHeldItemData* GetCurrentEquippedItemData() const { return CurrentEquippedItemData; }
 
 	// 특정 도구/무기 클래스로 안전하게 캐스팅하여 반환
 	template<typename T>
@@ -94,7 +94,7 @@ protected:
 protected:
 	// 게임 시작 시 컴포넌트에서 자동 장착할 기본 아이템 데이터 (에디터 디테일 패널에서 설정)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HeldItem|Default")
-	TObjectPtr<UEquipmentItemData> DefaultItemData;
+	TObjectPtr<UHeldItemData> DefaultItemData;
 
 	// 아이템 데이터 대신 액터 클래스로 직접 지정하고 싶을 때 사용
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HeldItem|Default")
@@ -106,7 +106,7 @@ protected:
 
 	// 현재 장착된 아이템의 데이터 에셋 정보 (Replicated)
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "HeldItem|Runtime")
-	TObjectPtr<UEquipmentItemData> CurrentEquippedItemData;
+	TObjectPtr<UHeldItemData> CurrentEquippedItemData;
 
 	UPROPERTY()
 	TObjectPtr<AActionCharacter> OwnerCharacter;
