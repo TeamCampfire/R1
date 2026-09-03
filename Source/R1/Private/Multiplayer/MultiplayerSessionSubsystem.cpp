@@ -2,6 +2,7 @@
 
 #include "Engine/Engine.h"	// 네트워크 실패 델리게이트 사용을 위해 포함
 #include "Engine/World.h"	// GetWorld()가 반환하는 UWorld의 ServerTravel과 GetNetMode를 호출하려면 UWorld의 완전한 클래스 정의 필요
+#include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "OnlineSessionSettings.h"
@@ -72,6 +73,57 @@ bool UMultiplayerSessionSubsystem::IsHostingSession() const
 {
 	const UWorld* World = GetWorld();
 	return IsInSession() && World && World->GetNetMode() == NM_ListenServer;
+}
+
+bool UMultiplayerSessionSubsystem::GetCurrentSessionInfo(FSessionListItem& OutSession) const
+{
+	if (!SessionInterface.IsValid())
+	{
+		return false;
+	}
+
+	const FNamedOnlineSession* CurrentSession = SessionInterface->GetNamedSession(NAME_GameSession);
+	if (!CurrentSession)
+	{
+		return false;
+	}
+
+	OutSession = FSessionListItem();
+	OutSession.MaxPlayers = CurrentSession->SessionSettings.NumPublicConnections;
+	OutSession.CurrentPlayers = OutSession.MaxPlayers - CurrentSession->NumOpenPublicConnections;
+	OutSession.SearchResultIndex = INDEX_NONE;
+	OutSession.bIsCurrentSession = true;
+
+	// 호스트의 로컬 세션 슬롯 등록이 늦더라도 실제 PlayerState 수보다 적게 표시하지 않음
+	if (const UWorld* World = GetWorld())
+	{
+		if (const AGameStateBase* GameState = World->GetGameState<AGameStateBase>())
+		{
+			OutSession.CurrentPlayers = FMath::Max(
+				OutSession.CurrentPlayers,
+				GameState->PlayerArray.Num());
+		}
+	}
+	OutSession.CurrentPlayers = FMath::Clamp(OutSession.CurrentPlayers, 0, OutSession.MaxPlayers);
+
+	if (!CurrentSession->SessionSettings.Get(ServerNameSettingKey, OutSession.ServerName))
+	{
+		OutSession.ServerName = TEXT("Unnamed Server");
+	}
+
+	return true;
+}
+
+bool UMultiplayerSessionSubsystem::ConsumeConnectionFailureMessage(FString& OutMessage)
+{
+	if (PendingConnectionFailureMessage.IsEmpty())
+	{
+		return false;
+	}
+
+	OutMessage = MoveTemp(PendingConnectionFailureMessage);
+	PendingConnectionFailureMessage.Reset();
+	return true;
 }
 
 void UMultiplayerSessionSubsystem::CreateSession(int32 NumPublicConnections, const FString& ServerName)
@@ -181,6 +233,22 @@ void UMultiplayerSessionSubsystem::JoinSession(int32 SessionIndex)
 		return;
 	}
 
+	// 클라이언트는 기존 로컬 세션을 제거한 뒤 선택한 다른 세션 참가를 자동으로 이어서 수행
+	if (IsInSession())
+	{
+		if (IsHostingSession())
+		{
+			UE_LOG(LogTemp, Warning, TEXT("JoinSession rejected: a host cannot switch sessions directly"));
+			OnJoinSessionResult.Broadcast(false);
+			return;
+		}
+
+		bJoinSessionAfterDestroy = true;
+		PendingJoinSessionIndex = SessionIndex;
+		LeaveSession();
+		return;
+	}
+
 	// Complete 델리게이트 등록 후, 나중에 이 바인딩만 해제할 때 사용하기 위해 핸들 저장
 	JoinSessionDelegateHandle = SessionInterface->AddOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegate);
 	bJoinInProgress = true;	// 현재 세션 참가 비동기 작업이 진행 중인지 기록 (중복 요청 방지)
@@ -212,6 +280,12 @@ void UMultiplayerSessionSubsystem::DestroySession()
 			bCreateSessionAfterDestroy = false;
 			OnCreateSessionResult.Broadcast(false);
 		}
+		else if (bJoinSessionAfterDestroy)
+		{
+			bJoinSessionAfterDestroy = false;
+			PendingJoinSessionIndex = INDEX_NONE;
+			OnJoinSessionResult.Broadcast(false);
+		}
 		else
 		{
 			OnDestroySessionResult.Broadcast(false, bWasHost);
@@ -229,6 +303,13 @@ void UMultiplayerSessionSubsystem::DestroySession()
 			const FString ServerName = PendingServerName;
 			bCreateSessionAfterDestroy = false;
 			CreateSession(NumPublicConnections, ServerName);
+		}
+		else if (bJoinSessionAfterDestroy)
+		{
+			const int32 SessionIndex = PendingJoinSessionIndex;
+			bJoinSessionAfterDestroy = false;
+			PendingJoinSessionIndex = INDEX_NONE;
+			JoinSession(SessionIndex);
 		}
 		else
 		{
@@ -253,6 +334,12 @@ void UMultiplayerSessionSubsystem::DestroySession()
 		{
 			bCreateSessionAfterDestroy = false;
 			OnCreateSessionResult.Broadcast(false);
+		}
+		else if (bJoinSessionAfterDestroy)
+		{
+			bJoinSessionAfterDestroy = false;
+			PendingJoinSessionIndex = INDEX_NONE;
+			OnJoinSessionResult.Broadcast(false);
 		}
 		else
 		{
@@ -360,6 +447,7 @@ void UMultiplayerSessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 
 	// 세션 찾기는 성공했지만 방이 없으면 찾기 성공 결과와 빈 배열을 UI에 전달함
 	Items.Reserve(SessionSearch->SearchResults.Num());	// 찾은 만큼 메모리 공간 확보
+	const FNamedOnlineSession* CurrentSession = SessionInterface->GetNamedSession(NAME_GameSession);
 	for (int32 Index = 0; Index < SessionSearch->SearchResults.Num(); ++Index)
 	{
 		const FOnlineSessionSearchResult& Result = SessionSearch->SearchResults[Index];
@@ -372,6 +460,9 @@ void UMultiplayerSessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 		Item.MaxPlayers = Result.Session.SessionSettings.NumPublicConnections;
 		Item.CurrentPlayers = Item.MaxPlayers - Result.Session.NumOpenPublicConnections;	// 참가 인원 수 = 최대 인원 수 - 열린(남은) 슬롯 수
 		Item.Ping = Result.PingInMs;
+		Item.bIsCurrentSession =
+			CurrentSession && CurrentSession->SessionInfo.IsValid() && Result.Session.SessionInfo.IsValid() &&
+			CurrentSession->SessionInfo->GetSessionId().ToString() == Result.Session.SessionInfo->GetSessionId().ToString();
 
 		// 방 이름 찾기에 실패한 세션은 "Unnamed Server"로 설정
 		if (!Result.Session.SessionSettings.Get(ServerNameSettingKey, Item.ServerName))
@@ -460,6 +551,25 @@ void UMultiplayerSessionSubsystem::OnDestroySessionComplete(FName SessionName, b
 		return;
 	}
 
+	// 다른 방 참가를 위한 Destroy라면 메인 메뉴로 이동하지 않고 예약한 참가 요청을 계속 수행
+	if (bJoinSessionAfterDestroy)
+	{
+		const int32 SessionIndex = PendingJoinSessionIndex;
+		bJoinSessionAfterDestroy = false;
+		PendingJoinSessionIndex = INDEX_NONE;
+
+		if (bWasSuccessful)
+		{
+			JoinSession(SessionIndex);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("Could not leave session %s before joining another"), *SessionName.ToString());
+			OnJoinSessionResult.Broadcast(false);
+		}
+		return;
+	}
+
 	OnDestroySessionResult.Broadcast(bWasSuccessful, bWasHost);
 	if (bWasSuccessful)
 	{
@@ -479,9 +589,15 @@ void UMultiplayerSessionSubsystem::HandleNetworkFailure(UWorld* World, UNetDrive
 
 	// 정상 흐름에서는 호스트가 Listen Server를 종료하면
 	// 원격 클라이언트에는 Destroy Complete가 오지 않고 ConnectionLost 같은 Network Failure가 전달됨
+	// 비정상 종료에서는 Destroy Complete가 오지 않으므로 남아 있는 로컬 Named Session을 직접 정리
+	if (SessionInterface.IsValid() && SessionInterface->GetNamedSession(NAME_GameSession))
+	{
+		SessionInterface->RemoveNamedSession(NAME_GameSession);
+	}
 
-	// UI에 원인을 먼저 알린 뒤 메뉴로 복귀 처리
-	OnConnectionFailure.Broadcast(ErrorString);
+	// 기존 위젯은 레벨 이동으로 제거되므로 새 메인 메뉴 위젯에서도 읽을 수 있도록 안내를 보관
+	PendingConnectionFailureMessage = TEXT("The host connection was lost. Returned to the main menu.");
+	OnConnectionFailure.Broadcast(PendingConnectionFailureMessage);
 
 	TravelToMainMenu();
 	// 네트워크 실패 시 연결이 끊긴 클라이언트는 엔진 기본 처리에 의해 GameDefaultMap으로 설정된 맵으로 이동

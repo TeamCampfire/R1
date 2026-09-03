@@ -17,11 +17,13 @@ void UMultiplayerSessionRowWidget::InitializeRow(UMultiplayerMenuWidget* InOwner
 	// 행: 표시 데이터만 보관
 	// 실제 참가 상태: 부모 메뉴가 관리
 	OwnerWidget = InOwnerWidget;
-	SessionIndex = InSession.SearchResultIndex;
+	SessionIndex = InSession.bIsCurrentSession ? INDEX_NONE : InSession.SearchResultIndex;
 	ServerNameText->SetText(FText::FromString(InSession.ServerName));
 	PlayersText->SetText(FText::FromString(FString::Printf(
 		TEXT("%d / %d"), InSession.CurrentPlayers, InSession.MaxPlayers)));
-	PingText->SetText(FText::FromString(FString::Printf(TEXT("%d ms"), InSession.Ping)));
+	PingText->SetText(InSession.bIsCurrentSession
+		? FText::FromString(TEXT("CURRENT"))
+		: FText::FromString(FString::Printf(TEXT("%d ms"), InSession.Ping)));
 }
 
 void UMultiplayerSessionRowWidget::HandleRowClicked()

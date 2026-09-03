@@ -206,6 +206,7 @@ void AActionPlayerController::OnGameMenuTogglePressed()
 	if (bOpen)
 	{
 		GameMenuWidget->RefreshMenuState();
+		GameMenuWidget->RefreshSessions();
 	}
 
 	GameMenuWidget->SetVisibility(

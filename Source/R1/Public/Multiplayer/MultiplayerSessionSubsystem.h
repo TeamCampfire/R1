@@ -33,6 +33,10 @@ struct FSessionListItem
 
 	UPROPERTY(BlueprintReadOnly)
 	int32 SearchResultIndex = INDEX_NONE;	// 세션 찾기 결과에 대한 일시적 방 인덱스
+
+	// 로컬 플레이어가 이미 참가했거나 직접 호스팅 중인 세션인지 표시
+	UPROPERTY(BlueprintReadOnly)
+	bool bIsCurrentSession = false;
 };
 
 /*
@@ -68,6 +72,12 @@ public:
 	// 호스트인지 확인
 	UFUNCTION(BlueprintCallable)
 	bool IsHostingSession() const;
+
+	// FindSessions를 사용하지 않고 로컬 Named Session에서 현재 방 정보를 읽음
+	bool GetCurrentSessionInfo(FSessionListItem& OutSession) const;
+
+	// 월드 이동 전에 발생한 연결 종료 안내를 새 메뉴 위젯에서 한 번 읽고 제거
+	bool ConsumeConnectionFailureMessage(FString& OutMessage);
 
 	// 세션 생성
 	UFUNCTION(BlueprintCallable)
@@ -174,6 +184,10 @@ private :
 	// 기존 세션이 존재하는 상태에서 새 세션을 만들 때 세션 교체를 위한 Destroy라고 표시하기 위한 변수
 	bool bCreateSessionAfterDestroy = false;
 
+	// 클라이언트가 현재 세션을 나간 뒤 선택한 다른 세션에 자동 참가하기 위한 예약 상태
+	bool bJoinSessionAfterDestroy = false;
+	int32 PendingJoinSessionIndex = INDEX_NONE;
+
 	// Destroy Complete 콜백에는 호스트 여부가 전달되지 않기 때문에
 	// DestroySession 호출 시점의 호스트 여부를 비동기 Destroy 완료 Callback까지 보관
 	bool bDestroyingHostedSession = false;
@@ -184,4 +198,7 @@ private :
 
 	// 온라인 세션의 광고 정원과 게임 서버의 로그인 정원에 동일한 값을 적용하기 위해 보관
 	int32 HostedMaxPlayers = 0;
+
+	// 네트워크 실패 직후 월드가 바뀌어 기존 위젯이 제거되므로 다음 메뉴 위젯까지 안내 문구를 보관
+	FString PendingConnectionFailureMessage;
 };

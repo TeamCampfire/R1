@@ -48,6 +48,9 @@ void UMultiplayerMenuWidget::NativeOnInitialized()
 		SessionSubsystem->OnDestroySessionResult.AddUniqueDynamic(this, &UMultiplayerMenuWidget::HandleDestroyResult);
 		SessionSubsystem->OnConnectionFailure.AddUniqueDynamic(this, &UMultiplayerMenuWidget::HandleConnectionFailure);
 	}
+
+	// 메인 메뉴 최초 생성 시 세션이 없다면 WBP의 기본 가시성과 관계없이 나가기 버튼을 숨김
+	UpdateLeaveSessionVisibility();
 }
 
 void UMultiplayerMenuWidget::NativeDestruct()
@@ -126,11 +129,34 @@ void UMultiplayerMenuWidget::HandleOptionClicked()
 
 void UMultiplayerMenuWidget::HandleRefreshClicked()
 {
-	if (SessionSubsystem && !bBusy)
+	if (!SessionSubsystem || bBusy)
 	{
-		SetBusy(true, FText::FromString(TEXT("Searching LAN servers...")));
-		SessionSubsystem->FindSessions(100);
+		return;
 	}
+
+	// OnlineSubsystemNull 호스트는 자기 LAN 광고를 검색하지 않고 로컬 세션을 목록에 표시
+	if (SessionSubsystem->IsHostingSession())
+	{
+		FoundSessions.Reset();
+		SelectedSessionIndex = INDEX_NONE;
+
+		FSessionListItem CurrentSession;
+		if (SessionSubsystem->GetCurrentSessionInfo(CurrentSession))
+		{
+			FoundSessions.Add(CurrentSession);
+			BuildSessionRows();
+			SetBusy(false, FText::FromString(TEXT("Showing the current hosted session.")));
+		}
+		else
+		{
+			BuildSessionRows();
+			SetBusy(false, FText::FromString(TEXT("Could not read the current hosted session.")));
+		}
+		return;
+	}
+
+	SetBusy(true, FText::FromString(TEXT("Searching LAN servers...")));
+	SessionSubsystem->FindSessions(100);
 }
 
 void UMultiplayerMenuWidget::HandleJoinClicked()
@@ -141,6 +167,14 @@ void UMultiplayerMenuWidget::HandleJoinClicked()
 
 	// 현재 선택한 세션 정보 참조
 	const FSessionListItem& SelectedSession = FoundSessions[SelectedSessionIndex];
+	if (SelectedSession.bIsCurrentSession)
+	{
+		if (StatusText)
+		{
+			StatusText->SetText(FText::FromString(TEXT("Already connected to this session.")));
+		}
+		return;
+	}
 
 	// 남은 자리 수 확인 -> 가득 찼으면 StatusText 문구 수정 후 종료 (참가 시도 안 함)
 	if (SelectedSession.CurrentPlayers >= SelectedSession.MaxPlayers)
@@ -154,7 +188,10 @@ void UMultiplayerMenuWidget::HandleJoinClicked()
 	}
 
 	// 세션 참가 시도
-	SetBusy(true, FText::FromString(TEXT("Joining server...")));
+	SetBusy(true, FText::FromString(
+		SessionSubsystem->IsInSession()
+		? TEXT("Leaving the current session and joining server...")
+		: TEXT("Joining server...")));
 	SessionSubsystem->JoinSession(SelectedSessionIndex);
 
 }
@@ -162,6 +199,8 @@ void UMultiplayerMenuWidget::HandleJoinClicked()
 bool UMultiplayerMenuWidget::CanJoinSelectedSession() const
 {
 	return FoundSessions.IsValidIndex(SelectedSessionIndex)
+		&& SessionSubsystem
+		&& !FoundSessions[SelectedSessionIndex].bIsCurrentSession
 		&& FoundSessions[SelectedSessionIndex].CurrentPlayers < FoundSessions[SelectedSessionIndex].MaxPlayers;
 }
 
@@ -229,6 +268,9 @@ void UMultiplayerMenuWidget::HandleDestroyResult(bool bSuccess, bool bWasHost)
 		SetBusy(false, FText::FromString(TEXT("Could not leave the sessions.")));
 		return;
 	}
+
+	// 정상 종료가 완료되어 로컬 세션이 제거된 즉시 나가기 버튼을 숨김
+	UpdateLeaveSessionVisibility();
 	SetBusy(false, FText::FromString(
 		bWasHost
 		? TEXT("Hosted session closed. Travelling...")
@@ -238,7 +280,8 @@ void UMultiplayerMenuWidget::HandleDestroyResult(bool bSuccess, bool bWasHost)
 
 void UMultiplayerMenuWidget::HandleConnectionFailure(const FString& ErrorMessage)
 {
-	SetBusy(false, FText::FromString(FString::Printf(TEXT("Connection lost: %s"), *ErrorMessage)));
+	SetBusy(false, FText::FromString(ErrorMessage));
+	UpdateLeaveSessionVisibility();
 }
 
 void UMultiplayerMenuWidget::SelectSession(int32 SessionIndex)
@@ -257,7 +300,9 @@ void UMultiplayerMenuWidget::SelectSession(int32 SessionIndex)
 	{
 		// 세션 참가 자리 여부에 따라 StatusText 변경
 		StatusText->SetText(
-			CanJoinSelectedSession()
+			FoundSessions[SessionIndex].bIsCurrentSession
+			? FText::FromString(TEXT("Already connected to this session."))
+			: CanJoinSelectedSession()
 			? FText::FromString(FString::Printf(TEXT("Selected: %s"), *FoundSessions[SessionIndex].ServerName))
 			: FText::FromString(TEXT("This server is full."))
 		);
@@ -271,6 +316,14 @@ void UMultiplayerMenuWidget::RefreshMenuState()
 
 void UMultiplayerMenuWidget::RefreshSessions()
 {
+	// 연결 종료로 메인 메뉴에 돌아온 직후에는 자동 검색 문구로 실패 안내를 덮어쓰지 않음
+	FString ConnectionFailureMessage;
+	if (SessionSubsystem && SessionSubsystem->ConsumeConnectionFailureMessage(ConnectionFailureMessage))
+	{
+		HandleConnectionFailure(ConnectionFailureMessage);
+		return;
+	}
+
 	HandleRefreshClicked();
 }
 
