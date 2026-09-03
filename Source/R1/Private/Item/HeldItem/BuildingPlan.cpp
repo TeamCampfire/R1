@@ -189,5 +189,7 @@ void ABuildingPlan::CloseRadialMenu()
 
 	PlayerController->SetIgnoreLookInput(false); // 카메라 회전 락 걸어둔 거 복구
 	//PlayerController->bShowMouseCursor = false;
+	
+	//TODO 플레이어 컨트롤러 패널 몇 개 열렸는지 확인 후 InputMode 세팅하는 걸로 변경
 	PlayerController->SetInputMode(FInputModeGameOnly()); // 게임 전용모드로 되돌리기
 }

@@ -34,6 +34,9 @@ protected:
 	// Radial 중간에 있는 정보에 현재 파츠의 데이터를 세팅해줘요
 	void UpdateCenterInfo(UBuildingPartDefinition* PartDefinition);
 
+	// 현재 파츠의 필요 자원과 현재 보유량을 표시
+	void UpdateResourceCostInfo(const UBuildingPartDefinition* PartDefinition);
+
 	// 현재 파츠 Radial영역을 강조하기 위한 머티리얼 작업을 여기서 해줘요
 	void UpdateSelectionSegment();
 
@@ -87,4 +90,13 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building Radial Menu|Input", meta = (ClampMin = "0.0"))
 	float SelectionDeadZone = 70.0f; // 마우스가 중심에서 이 거리 안에 있으면 기존 선택을 유지
+
+	// 자원 관련 
+	// 필요한 자원을 모두 보유했을 때 사용할 텍스트 색상
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building Radial Menu|Cost")
+	FLinearColor SufficientResourceColor = FLinearColor::White;
+
+	// 필요한 자원이 하나라도 부족할 때 사용할 비용 텍스트 색상
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building Radial Menu|Cost")
+	FLinearColor InsufficientResourceColor = FLinearColor(1.0f, 0.1f, 0.1f, 1.0f);
 };

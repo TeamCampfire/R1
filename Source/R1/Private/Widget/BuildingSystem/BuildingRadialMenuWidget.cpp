@@ -11,6 +11,8 @@
 #include "Data/Building/BuildingPartDefinition.h"
 #include "Widget/BuildingSystem/BuildingRadialEntryWidget.h"
 #include "GameFramework/PlayerController.h"
+#include "Character/ActionCharacter.h"
+#include "Component/InventoryComponent.h"
 
 void UBuildingRadialMenuWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
@@ -133,9 +135,71 @@ void UBuildingRadialMenuWidget::UpdateCenterInfo(UBuildingPartDefinition* PartDe
 			Image_SelectedPartIcon->SetBrushFromTexture(nullptr);
 	}
 
-	// 비용 데이터 구조가 아직 없으므로 숨김
-	if (true == IsValid(Text_SelectedPartCost))
+	// 현재 파츠의 필요 자원, 수량 UI 갱신 (이름, 설명, 아이콘)
+	UpdateResourceCostInfo(PartDefinition);
+}
+
+void UBuildingRadialMenuWidget::UpdateResourceCostInfo(const UBuildingPartDefinition* PartDefinition)
+{
+	if (false == IsValid(Text_SelectedPartCost)) return;
+
+	if (false == IsValid(PartDefinition))
+	{
 		Text_SelectedPartCost->SetVisibility(ESlateVisibility::Collapsed);
+		return;
+	}
+
+	// 비용이 설정되지 않은 파츠는 무료 설치이므로 "설치 비용 : 무료"료 표시
+	if (PartDefinition->ResourceCosts.Num() == 0)
+	{
+		Text_SelectedPartCost->SetText(FText::FromString(TEXT("설치 비용 : 무료")));
+		Text_SelectedPartCost->SetColorAndOpacity(FSlateColor(SufficientResourceColor));
+		Text_SelectedPartCost->SetVisibility(ESlateVisibility::Visible);
+		return;
+	}
+
+	// 현재 조종중인 캐릭터의 인벤토리를 가져옴
+	const AActionCharacter* OwnerCharacter = Cast<AActionCharacter>(GetOwningPlayerPawn());
+	const UInventoryComponent* Inventory = IsValid(OwnerCharacter) ? OwnerCharacter->GetInventoryComponent(): nullptr;
+
+	if (false == IsValid(OwnerCharacter) || false == IsValid(Inventory))
+		return; 
+
+	TArray<FString> CostLines;
+  	bool bHasValidCostData = true;
+
+	// 건축에 필요한 자원들을 순회하면서 UI에 띄울 정보를 CostLines 배열로 관리
+	for (const FBuildingResourceCost& ResourceCost : PartDefinition->ResourceCosts)
+	{
+		if (false == IsValid(ResourceCost.ItemData) || 0 >= ResourceCost.RequiredCount)
+		{
+			bHasValidCostData = false; // 잘못 세팅된 데이터들은 UI에 보여주지 않음
+			continue;
+		}
+
+		UItemDataBase* ResourceItem = ResourceCost.ItemData.Get();
+		// TODO 인벤토리 아이템 함수 구현되면 살릴
+		//const int32 OwnedCount = IsValid(Inventory) ? Inventory->GetItemCount(ResourceItem): 0;
+		const int32 OwnedCount = 0; //! 이건 임시 테스트용
+
+		if (OwnedCount < ResourceCost.RequiredCount) // 설치 요구 개수보다 보유한 숫자가 작으면 기각
+			bHasValidCostData = false;
+
+		// UI에 보여질 문구 : 필요한 개수 X 자원 이름 (현재 보유 개수)
+		CostLines.Add(FString::Printf(TEXT("%d X %s (%d)"), ResourceCost.RequiredCount, *ResourceItem->DisplayName.ToString(),OwnedCount));
+	}
+
+	if (0 == CostLines.Num())
+	{
+		CostLines.Add(TEXT("비용 정보 오류")); // 사실 없을 수 없거든요 (디버그 코드임)
+		bHasValidCostData = false;
+	}
+
+	Text_SelectedPartCost->SetText(FText::FromString(FString::Join(CostLines, TEXT("\n"))));
+
+	// 단일 TextBlock을 사용하므로 자원이 하나라도 부족하면 비용 텍스트 전체를 부족 색상으로 표시
+	Text_SelectedPartCost->SetColorAndOpacity(FSlateColor(bHasValidCostData ? SufficientResourceColor : InsufficientResourceColor));
+	Text_SelectedPartCost->SetVisibility(ESlateVisibility::Visible);
 }
 
 void UBuildingRadialMenuWidget::UpdateSelectionSegment()
