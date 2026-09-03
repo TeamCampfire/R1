@@ -95,6 +95,10 @@ private:
 	// Foundation의 지면·경사·장애물 조건을 검사 (기존)
 	bool IsServerFoundationPlacementValid(const UBuildingPartDefinition* Definition, const FTransform& InPlacementTransform);
 
+	// 건축 파츠의 모든 필요 자원을 실제로 캐릭터 인벤토리에서 소모하는 함수
+	// 서버에서 건축 설치가 최종 결정된 시점에 호출 / true : 자원 정상 소모
+	bool TryConsumeRequiredResources(const UBuildingPartDefinition* Definition);
+
 	// 현재 건축 파츠의 회전값이 든 배열(AllowedSnapYawOffsets)의 인덱스를 순환시키는 함수
 	void CycleSnapYawOffset();
 
@@ -105,6 +109,9 @@ private:
 	// 붙어야 하는 스냅 소켓에 배치되기 위해.. 월드 Transform를 계산하는 함수
 	bool BuildSnappedPlacementTransform(const UBuildingPartDefinition* Definition, const FTransform& InSocketWorldTransform,
 		float SnapYawOffset, FTransform& OutPlacementTransform) const;
+
+	// 설치할 건축 파츠가 요구하는 모든 자원을 플레이어(인벤토리)가 가지고 있는지 확인하는 함수 진짜 확인만 함
+	bool HasEnoughResources(const UBuildingPartDefinition* Definition) const;
 
 	//  ===================================================================================
 private:

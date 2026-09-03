@@ -189,10 +189,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Component")
 	FORCEINLINE class UHeldItemComponent* GetHeldItemComponent() const { return HeldItemComponent; }
 
+	UFUNCTION(BlueprintPure, Category = "Component")
+	class UInventoryComponent* GetInventoryComponent() const;
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
 	TObjectPtr<class UHeldItemComponent> HeldItemComponent;
-
 
 
 	/*--------------------------------

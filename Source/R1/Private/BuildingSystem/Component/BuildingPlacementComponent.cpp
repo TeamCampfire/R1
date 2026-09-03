@@ -8,6 +8,8 @@
 #include "Data/Building/BuildingPartDefinition.h"
 #include "BuildingSystem/BuildingPreviewActor.h"
 #include "BuildingSystem/BuildingActor.h"
+#include "Character/ActionCharacter.h"
+#include "Component/InventoryComponent.h"
 
 UBuildingPlacementComponent::UBuildingPlacementComponent()
 {
@@ -320,6 +322,13 @@ void UBuildingPlacementComponent::ServerPlaceSnappedPart_Implementation(UBuildin
 	if (RelativeTransform.ContainsNaN()) 
 		return;
 
+	// 건축에 필요한 자원이 인벤토리에 충분한지 검증
+	if (false == TryConsumeRequiredResources(Definition))
+	{
+		UE_LOG(LogTemp, Warning,TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 필요한 건축 자원이 부족합니다."));
+		return;
+	}
+
 	// 새 BuildingActor를 만들지 않고 기존 건물에 해당 스냅 파츠를 추가해요
 	UStaticMeshComponent* NewPart = TargetBuilding->AddPart(Definition, RelativeTransform);
 	if (false == IsValid(NewPart))
@@ -531,8 +540,8 @@ bool UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* 
 
 		// 소켓 존재 여부와 파츠 타입 호환성을 함께 검사
 		if (false == HitBuilding->TryGetSnapPointWorldTransform(
-				HitResult.GetComponent(), SelectedDefinition.Get(),
-				SnapPoint.SocketName, CandidateTransform))
+			HitResult.GetComponent(), SelectedDefinition.Get(),
+			SnapPoint.SocketName, CandidateTransform))
 			continue;
 
 		float DistanceSquared = FVector::DistSquared(HitResult.ImpactPoint, CandidateTransform.GetLocation());
@@ -576,7 +585,9 @@ bool UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* 
 	// 대상 Foundation 컴포넌트는 이미 의도적으로 겹친 상태니까 겹침 검사 대상에서 제외시켜요
 	const bool bHasOverlap = HasPlacementOverlap(HitResult.GetComponent(), HitBuilding);
 
-	bCanPlace = false == bHasOverlap;
+	// 스냅 위치가 유효해도 필요한 자원이 부족하면 설치할 수 없어요
+	const bool bHasEnoughResources = HasEnoughResources(SelectedDefinition.Get());
+	bCanPlace = false == bHasOverlap && bHasEnoughResources;
 
 	PreviewActor->SetPlacementValid(bCanPlace);
 	PreviewActor->SetActorHiddenInGame(false);
@@ -605,6 +616,36 @@ void UBuildingPlacementComponent::HidePlacementPreview()
 
 	PreviewActor->SetPlacementValid(false);
 	PreviewActor->SetActorHiddenInGame(true);
+}
+
+bool UBuildingPlacementComponent::HasEnoughResources(const UBuildingPartDefinition* Definition) const
+{
+	if (false == IsValid(Definition)) return false;
+
+	//TODO 나중에 살릴 코드
+	//if (0 == Definition->ResourceCosts.Num()) return true; // 프리패스 설치 
+
+	const APlayerController* PlayerController = Cast<APlayerController>(GetOwner());
+	const AActionCharacter* OwnerCharacter = IsValid(PlayerController) ? Cast<AActionCharacter>(PlayerController->GetPawn()) : nullptr;
+	const UInventoryComponent* Inventory = OwnerCharacter->GetInventoryComponent();
+	if (false == IsValid(Inventory)) return false;
+
+	//! 이건 테스트용 코드입니다
+		//! true / false 테스트
+	return false;
+
+	// TODO 구현되지 않은 아이템이 많아서 다 구현된다면 살려야 해요
+	//for (const FBuildingResourceCost& ResourceCost : Definition->ResourceCosts)
+	//{
+	//	// 유효하지 않은 재료와, 개수라면 설치 불가
+	//	//if (false == IsValid(ResourceCost.ItemData) || ResourceCost.RequiredCount <= 0) return false;
+
+	//	//TODO 아직 인벤토리에 들어있는 총 아이템 개수를 반환하는 함수가 구현되어있지 않음
+	//	//TODO 지금은 임의로 성공을 가정하지만, 인벤토리 기능 구현 후 코드 수정이 필요함!
+	//	//const int32 OwnedResourceCount = Inventory->GetItemCount(ResourceCost.ItemData);
+	//	//if (OwnedResourceCount < ResourceCost.RequiredCount) return false;
+	//}
+	//return true;
 }
 
 void UBuildingPlacementComponent::ServerPlaceNewBuilding_Implementation(UBuildingPartDefinition* Definition, const FTransform& InPlacementTransform)
@@ -647,7 +688,14 @@ void UBuildingPlacementComponent::ServerPlaceNewBuilding_Implementation(UBuildin
 	
 	if (true == HasServerPlacementOverlap(Definition, SafePlacementTransform))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("ServerPlaceNewBuilding: 장애물과 겹치는 설치 요청입니다."));
+		UE_LOG(LogTemp, Warning, TEXT("ServerPlaceNewBuilding : 장애물과 겹치는 설치 요청입니다."));
+		return;
+	}
+
+	// 건축에 필요한 자원이 인벤토리에 충분한지 검증
+	if (false == TryConsumeRequiredResources(Definition))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ServerPlaceNewBuilding : 필요한 건축 자원이 부족합니다."));
 		return;
 	}
 
@@ -748,7 +796,10 @@ void UBuildingPlacementComponent::ShowPreviewAtLocation(const FVector& InPreview
 	// 오브젝트 겹침 검사해서 결과를 얻어요
 	const bool bHasOverlap = HasPlacementOverlap(SupportingComponent);
 
-	bCanPlace = (bIsSurfaceValid) && (bIsSlopeValid) && (!bHasOverlap);
+	// 건축 파츠를 만들 때 필요한 아이템을 들고 있는 검사를 해서 결과를 얻어요
+	const bool bHasEnoughResources = HasEnoughResources(SelectedDefinition.Get());
+
+	bCanPlace = (bIsSurfaceValid) && (bIsSlopeValid) && (!bHasOverlap) && (bHasEnoughResources);
 	
 	PreviewActor->SetPlacementValid(bCanPlace); // 여기서 PreviewActor Valid/Invalid 머터리얼 세팅해요
 	PreviewActor->SetActorHiddenInGame(false);
@@ -1013,6 +1064,39 @@ bool UBuildingPlacementComponent::IsServerFoundationPlacementValid(const UBuildi
 		UE_LOG(LogTemp, Warning, TEXT("ServerPlaceNewBuilding: 허용되지 않는 지면 경사입니다."));
 		return false;
 	}
+
+	return true;
+}
+
+bool UBuildingPlacementComponent::TryConsumeRequiredResources(const UBuildingPartDefinition* Definition)
+{
+	if (false == IsValid(Definition)) return false;
+
+	if (0 == Definition->ResourceCosts.Num()) return true; // 공짜
+
+	APlayerController* PlayerController = Cast<APlayerController>(GetOwner());
+	AActionCharacter* PlayerCharacter = IsValid(PlayerController) ? Cast<AActionCharacter>(PlayerController->GetPawn()): nullptr;
+	if(false == IsValid(PlayerCharacter)) return false;
+
+	UInventoryComponent* Inventory = PlayerCharacter->GetInventoryComponent();
+	if (false == IsValid(Inventory)) return false;
+
+	// 진짜 아이템을 소모하기 전에 자원이 충분한지 검사
+	if (false == HasEnoughResources(Definition)) return false;
+
+	//TODO 인벤토리에서 아이템 소모 관련 함수가 구현되면 살릴 부분
+	//for (const FBuildingResourceCost& ResourceCost : Definition->ResourceCosts)
+	//{
+	//	if (false == IsValid(ResourceCost.ItemData) || 0 >= ResourceCost.RequiredCount) return false;
+
+	//	const bool bConsumed = Inventory->ConsumeItem(ItemData, ResourceCost.RequiredCount); // 자원 소모에 성공했는가?
+	//	if (false == bConsumed)
+	//	{
+	//		UE_LOG(LogTemp, Warning, TEXT("[TryConsumeRequiredResources] : 자원 소모에 실패했습니다. Item=%s, Count=%d"),
+	//			*GetNameSafe(ResourceCost.ItemData), ResourceCost.RequiredCount);
+	//		return false;
+	//	}
+	//}
 
 	return true;
 }

@@ -65,6 +65,19 @@ struct FGroundPlacementRule
     float MaxSlopeAngle = 35.f; // 설치 가능한 최대 지면 경사 (bEnabled 변수 값에 따라 해당 변수 활/비활 가능!!!)
 };
 
+// 건축 파츠 하나를 설치할 때 필요한 재료 한 종류의 정보
+USTRUCT(BlueprintType)
+struct FBuildingResourceCost
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<class UItemDataBase> ItemData = nullptr; // 건축할 때 소모할 재료 아이템의 데이터 애셋
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ClampMin = "1"))
+	int32 RequiredCount = 1; // 설치 시 필요 수량
+};
+
 /**
  건축 파츠 하나의 데이터 애셋
  */
@@ -99,6 +112,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|Snapping")
 	FName PlacementAnchorSocketName = NAME_None; // 이 파츠를 다른 파츠에 스냅할 때 대상 소켓에 맞출 자신의 소켓 (잠시 피벗이 된다고 이해하면 편함)
 	// None이면 기존처럼 메시 피벗을 대상 소켓에 맞춰요,
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|Cost", meta = (TitleProperty = "ItemData"))
+	TArray<FBuildingResourceCost> ResourceCosts; // 건축 파츠를 하나 설치할 때 필요한 모든 재료 목록
 
 	// ================= 건축 파츠 선택 Radial UI ===========================
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|UI")

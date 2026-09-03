@@ -545,6 +545,13 @@ bool AActionCharacter::DetectdObjectInAttackRange(FHitResult& OutHitRes)
 	return false;
 }
 
+UInventoryComponent* AActionCharacter::GetInventoryComponent() const
+{
+	if (false == IsValid(InventoryComponent)) return nullptr;
+
+	return InventoryComponent;
+}
+
 
 
 
