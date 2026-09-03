@@ -410,7 +410,7 @@ void UMultiplayerSessionSubsystem::OnCreateSessionComplete(FName SessionName, bo
 	// 서버 이동을 하며 MaxPlayers 옵션 전달: 클라이언트가 접속할 때 서버가 내부적으로 현재 인원 검사
 	// -> AGameSession::ApproveLogin()
 	const FString TravelURL = FString::Printf(
-		TEXT("/Game/Maps/Lv_SessionTest?listen?MaxPlayers=%d"),
+		TEXT("/Game/Maps/Lv_Test_BuildingSystem?listen?MaxPlayers=%d"),
 		HostedMaxPlayers
 	);
 
