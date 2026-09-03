@@ -176,6 +176,9 @@ void AActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		// 인벤토리 토글
 		EIC->BindAction(IA_InventoryToggle, ETriggerEvent::Started, this, &AActionCharacter::OnInventoryTogglePressed);
 
+		// 옵션(환경설정) 패널 토글
+		EIC->BindAction(IA_OptionsToggle, ETriggerEvent::Started, this, &AActionCharacter::OnOptionsTogglePressed);
+
 		// 벨트슬롯 단축키(1~6) — 인벤토리가 열려있는 동안엔 DefaultMappingContext 자체가 빠져있어서
 		// 이 액션들도 같이 안 눌린다(ActionPlayerController::SetInventoryInputState 참고).
 		EIC->BindAction(IA_Use_BeltSlot_1, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 0);
@@ -528,6 +531,25 @@ void AActionCharacter::OnInventoryTogglePressed()
 	const bool bIsOpen = MainHudWidget->ToggleInventoryPanel();
 	UE_LOG(LogTemp, Warning, TEXT("[InvToggle] ToggleInventoryPanel returned bIsOpen=%d"), bIsOpen);
 	PC->SetInventoryInputState(bIsOpen);
+}
+
+void AActionCharacter::OnOptionsTogglePressed()
+{
+	AActionPlayerController* PC = Cast<AActionPlayerController>(GetController());
+	if (!PC)
+	{
+		return;
+	}
+
+	AMainHUD* HUD = PC->GetHUD<AMainHUD>();
+	UMainHUDWidget* MainHudWidget = HUD ? HUD->GetMainHudWidget() : nullptr;
+	if (!MainHudWidget)
+	{
+		return;
+	}
+
+	const bool bIsOpen = MainHudWidget->ToggleOptionsPanel();
+	PC->SetOptionsInputState(bIsOpen);
 }
 
 void AActionCharacter::OnUseBeltSlotPressed(int32 BeltIndex)
