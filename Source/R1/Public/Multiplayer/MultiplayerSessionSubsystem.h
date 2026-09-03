@@ -61,6 +61,14 @@ public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 
+	// 세션에 참가 중인지 확인
+	UFUNCTION(BlueprintCallable)
+	bool IsInSession() const;
+
+	// 호스트인지 확인
+	UFUNCTION(BlueprintCallable)
+	bool IsHostingSession() const;
+
 	// 세션 생성
 	UFUNCTION(BlueprintCallable)
 	void CreateSession(int32 NumPublicConnections, const FString& ServerName);
@@ -84,21 +92,6 @@ public:
 	// 호스트가 방 운영 종료를 위한 작업 처리
 	UFUNCTION(BlueprintCallable)
 	void EndHostedSession();
-
-	UPROPERTY(BlueprintAssignable)
-	FOnCreateSessionResult OnCreateSessionResult;	// 세션 생성 결과 전달용 델리게이트
-
-	UPROPERTY(BlueprintAssignable)
-	FOnFindSessionsResult OnFindSessionsResult;		// 세션 찾기 결과 전달용 델리게이트
-
-	UPROPERTY(BlueprintAssignable)
-	FOnJoinSessionResult OnJoinSessionResult;		// 세션 참가 결과 전달용 델리게이트
-
-	UPROPERTY(BlueprintAssignable)
-	FOnDestroySessionResult OnDestroySessionResult;	// 세션 삭제 결과 전달용 델리게이트
-
-	UPROPERTY(BlueprintAssignable)
-	FOnConnectionFailure OnConnectionFailure;		// 네트워크 실패 전달용 델리게이트
 
 private:
 
@@ -126,6 +119,25 @@ private:
 	// CreateSession에서 값을 저장하고, FindSessions 결과에서 같은 Key로 읽음
 	// 실제 방 이름은 이 Key의 Value로 저장됨
 	static const FName ServerNameSettingKey;
+
+public:
+
+	UPROPERTY(BlueprintAssignable)
+	FOnCreateSessionResult OnCreateSessionResult;	// 세션 생성 결과 전달용 델리게이트
+
+	UPROPERTY(BlueprintAssignable)
+	FOnFindSessionsResult OnFindSessionsResult;		// 세션 찾기 결과 전달용 델리게이트
+
+	UPROPERTY(BlueprintAssignable)
+	FOnJoinSessionResult OnJoinSessionResult;		// 세션 참가 결과 전달용 델리게이트
+
+	UPROPERTY(BlueprintAssignable)
+	FOnDestroySessionResult OnDestroySessionResult;	// 세션 삭제 결과 전달용 델리게이트
+
+	UPROPERTY(BlueprintAssignable)
+	FOnConnectionFailure OnConnectionFailure;		// 네트워크 실패 전달용 델리게이트
+
+private :
 
 	/*
 	* 현재 활성 Online Subsystem이 제공하는 세션 API

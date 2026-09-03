@@ -63,6 +63,17 @@ void UMultiplayerSessionSubsystem::Deinitialize()
 	Super::Deinitialize();
 }
 
+bool UMultiplayerSessionSubsystem::IsInSession() const
+{
+	return SessionInterface.IsValid() && SessionInterface->GetNamedSession(NAME_GameSession) != nullptr;
+}
+
+bool UMultiplayerSessionSubsystem::IsHostingSession() const
+{
+	const UWorld* World = GetWorld();
+	return IsInSession() && World && World->GetNetMode() == NM_ListenServer;
+}
+
 void UMultiplayerSessionSubsystem::CreateSession(int32 NumPublicConnections, const FString& ServerName)
 {
 	// 이미 다른 서버에 접속한 클라이언트는 호스트 세션을 만들거나 ServerTravel을 시작할 수 없다.
@@ -312,8 +323,9 @@ void UMultiplayerSessionSubsystem::OnCreateSessionComplete(FName SessionName, bo
 	// 서버 이동을 하며 MaxPlayers 옵션 전달: 클라이언트가 접속할 때 서버가 내부적으로 현재 인원 검사
 	// -> AGameSession::ApproveLogin()
 	const FString TravelURL = FString::Printf(
-		TEXT("/Game/Maps/Lv_TestFishing?listen?MaxPlayers=%d"),
-		HostedMaxPlayers);
+		TEXT("/Game/Maps/Lv_SessionTest?listen?MaxPlayers=%d"),
+		HostedMaxPlayers
+	);
 
 	// Server Travel 요청 시작 여부 확인
 	if (!World || !World->ServerTravel(TravelURL))

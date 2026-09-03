@@ -9,6 +9,8 @@
 #include "InputMappingContext.h"
 #include "GameFramework/PlayerState.h"
 #include "EngineUtils.h"
+#include "Framework/MainHUD.h"
+#include "Widget/Multiplayer/MultiplayerMenuWidget.h"
 
 #include "BuildingSystem/Component/BuildingPlacementComponent.h"
 
@@ -48,6 +50,17 @@ void AActionPlayerController::BeginPlay()
 	}
 }
 
+void AActionPlayerController::SetupInputComponent()
+{
+	Super::SetupInputComponent();
+
+	if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(InputComponent))
+	{
+		// Esc: 게임 메뉴 토글
+		EIC->BindAction(IA_GameMenuToggle, ETriggerEvent::Started, this, &AActionPlayerController::OnGameMenuTogglePressed);
+	}
+}
+
 void AActionPlayerController::OnConfirmBuildingPlacement()
 {
 	if (true == IsValid(BuildingPlacementComponent))
@@ -84,37 +97,18 @@ void AActionPlayerController::PossessChar(AActionCharacter* InNewChar)
 	//OnPossessedCharChange.Broadcast();
 }
 
+// Temp
 void AActionPlayerController::SetInventoryInputState(bool bOpen)
 {
-	bShowMouseCursor = bOpen;
+	bInventoryOpen = bOpen;
+	ApplyUIInputState();
+}
 
-	if (UEnhancedInputLocalPlayerSubsystem* SubSystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
-	{
-		if (DefaultMappingContext)
-		{
-			if (bOpen)
-			{
-				// 인벤토리가 열려있는 동안엔 이동/시점/공격 등 게임플레이 입력을 완전히 끊는다.
-				SubSystem->RemoveMappingContext(DefaultMappingContext);
-			}
-			else
-			{
-				SubSystem->AddMappingContext(DefaultMappingContext, GameInputPriority);
-			}
-		}
-	}
-
-	if (bOpen)
-	{
-		FInputModeGameAndUI InputMode;
-		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-		InputMode.SetHideCursorDuringCapture(false);
-		SetInputMode(InputMode);
-	}
-	else
-	{
-		SetInputMode(FInputModeGameOnly());
-	}
+// Temp
+void AActionPlayerController::SetGameMenuInputState(bool bOpen)
+{
+	bGameMenuOpen = bOpen;
+	ApplyUIInputState();
 }
 
 void AActionPlayerController::SetRespawnPoint(AActor* InRespawnPoint)
@@ -198,6 +192,68 @@ void AActionPlayerController::TestHydrationDamage(int32 PlayerIndex)
 		StatComp->TestDecreaseHydration();
 		return;
 	}
+}
+
+void AActionPlayerController::OnGameMenuTogglePressed()
+{
+	AMainHUD* HUD = GetHUD<AMainHUD>();
+	UMultiplayerMenuWidget* GameMenuWidget = HUD ? HUD->GetGameMenuWidget() : nullptr;
+	if (!GameMenuWidget)
+		return;
+
+	const bool bOpen = GameMenuWidget->GetVisibility() == ESlateVisibility::Collapsed;
+
+	if (bOpen)
+	{
+		GameMenuWidget->RefreshMenuState();
+	}
+
+	GameMenuWidget->SetVisibility(
+		bOpen
+		? ESlateVisibility::Visible
+		: ESlateVisibility::Collapsed
+	);
+
+	SetGameMenuInputState(bOpen);	// Temp
+	// ApplyUIInpuState(bOpen);
+}
+
+// Temp
+void AActionPlayerController::ApplyUIInputState()
+{
+	const bool bAnyUIOpen = bInventoryOpen || bGameMenuOpen;
+
+	SetShowMouseCursor(bAnyUIOpen);
+
+	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
+	{
+		if (DefaultMappingContext)
+		{
+			// UI가 열려있는 동안엔 이동/시점/공격 등 게임플레이 입력을 완전히 끊는다.
+			// DefaultMappingContext가 중복추가되지 않도록 if문에서 뺌
+			Subsystem->RemoveMappingContext(DefaultMappingContext);
+
+			if (!bAnyUIOpen)
+			{
+				Subsystem->AddMappingContext(DefaultMappingContext, GameInputPriority);
+			}
+		}
+	}
+
+	if (bAnyUIOpen)
+	{
+		FInputModeGameAndUI InputMode;
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		InputMode.SetHideCursorDuringCapture(false);
+
+		SetInputMode(InputMode);
+	}
+	else
+	{
+		SetInputMode(FInputModeGameOnly());
+	}
+
+	FlushPressedKeys();	// 메뉴 여는 순간 눌려있던 키가 계속 적용되는 것 방지
 }
 
 void AActionPlayerController::ServerTestInflictDamage_Implementation()

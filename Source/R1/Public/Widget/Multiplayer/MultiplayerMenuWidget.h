@@ -29,26 +29,59 @@ public:
 	// 세션 행이 클릭되었을 때 참가 대상으로 사용할 검색 결과를 선택
 	void SelectSession(int32 SessionIndex);
 
+	UFUNCTION()
+	void RefreshMenuState();
+
+	UFUNCTION()
+	void RefreshSessions();
+
 protected:
 
+	// 위젯 인스턴스당 한 번만 호출
 	virtual void NativeOnInitialized() override;
 	virtual void NativeDestruct() override;
 
 private:
 
-	// 위젯에 배치된 버튼과 SessionSubsystem 델리게이트가 호출하는 기능 처리 함수들
+	// 위젯 UI 기능 처리 함수
+
+	// 세션 나가기
+	UFUNCTION()
+	void HandleLeaveSessionClicked();
+
+	// LeaveSession 버튼 보이기/숨기기 조정
+	UFUNCTION()
+	void UpdateLeaveSessionVisibility();
+
+	// 게임 종료
+	UFUNCTION()
+	void HandleExitGameClicked();
+
+	// 설정 UI
+	UFUNCTION()
+	void HandleOptionClicked();
+
+	// 세션 목록 새로고침
 	UFUNCTION()
 	void HandleRefreshClicked();
 
+	// 선택 세션 참가
 	UFUNCTION()
 	void HandleJoinClicked();
 
+	// 선택 세션 참가 가능 여부 판단
+	UFUNCTION()
+	bool CanJoinSelectedSession() const;
+
+	// 세션 호스트
 	UFUNCTION()
 	void HandleHostClicked();
 
+	// 세션 인원 수용량 감소
 	UFUNCTION()
 	void HandleDecreaseMaxPlayersClicked();
 
+	// 세션 인원 수용량 증가
 	UFUNCTION()
 	void HandleIncreaseMaxPlayersClicked();
 
@@ -62,17 +95,32 @@ private:
 	void HandleJoinResult(bool bSuccess);
 
 	UFUNCTION()
+	void HandleDestroyResult(bool bSuccess, bool bWasHost);
+
+	UFUNCTION()
 	void HandleConnectionFailure(const FString& ErrorMessage);
 
 	void BuildSessionRows();
 	void SetBusy(bool bInBusy, const FText& Message);	// 비동기 세션 요청 중 중복 요청과 인원 변경 차단
 	void UpdateMaxPlayersDisplay();
 
+private :
+
 	// SessionSubsystem을 캐시해 모든 네트워크 작업을 위임
 	UPROPERTY()
 	TObjectPtr<UMultiplayerSessionSubsystem> SessionSubsystem;
 
-	// 아래 이름은 WBP_MultiplayerMenu 디자이너의 Is Variable 위젯 이름과 정확히 일치해야 함
+	// 위젯 UI 변수 연결
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget, AllowPrivateAccess = "true"))
+	TObjectPtr<UButton> LeaveSessionButton;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget, AllowPrivateAccess = "true"))
+	TObjectPtr<UButton> ExitGameButton;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget, AllowPrivateAccess = "true"))
+	TObjectPtr<UButton> OptionButton;
+
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget, AllowPrivateAccess = "true"))
 	TObjectPtr<UScrollBox> SessionList;
 

@@ -24,9 +24,13 @@ void AMultiplayerMenuPlayerController::BeginPlay()
 	// 위젯 만들어졌으면 화면에 띄우기
 	MultiplayerMenuWidget->AddToViewport();
 
+	// 세션 목록 자동 새로고침
+	MultiplayerMenuWidget->RefreshSessions();
+
 	// UI 입력 모드로 전환
 	FInputModeUIOnly InputMode;
 	InputMode.SetWidgetToFocus(MultiplayerMenuWidget->TakeWidget());
 	SetInputMode(InputMode);	// 입력 모드 적용
 	SetShowMouseCursor(true);	// 마우스 커서 보이게 유지
+
 }
