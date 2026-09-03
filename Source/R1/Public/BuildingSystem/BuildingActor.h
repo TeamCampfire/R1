@@ -1,4 +1,4 @@
-// 작업 시작일 : 8/28
+﻿// 작업 시작일 : 8/28
 // 작업자 : 우진
 #pragma once
 
@@ -52,6 +52,8 @@ public:
 	// (인자로 들어오는 게 라인트레이스로 맞춘 파츠의 메시 컴포넌트)
 	const FPlacedBuildingPart* FindPlacedPartByComponent(const UPrimitiveComponent* InComponent) const;
 
+	FPlacedBuildingPart* FindPlacedPartByComponent(UPrimitiveComponent* InComponent);
+
 	// 해당 건축 파츠가 제공하는 소켓의 월드 Transform을 가져오는 함수 -> 가져옴 : true 반환
 	// 두번째 인자 : 이번에 새로 설치될 건축 파츠 데이터
 	bool TryGetSnapPointWorldTransform(const UPrimitiveComponent* TargetComponent,
@@ -61,6 +63,8 @@ public:
 	// (서버용) PartID를 이용해 설치된 파츠를 확인
 	FPlacedBuildingPart* FindPlacedPartByID(const FGuid& InPartID);
 
+	// 새 Foundation과 이미 설치된 Foundation 사이에서 서로 맞닿은 모든 연결면을 찾아 양쪽 소켓을 점유 처리하는 함수
+	void ResolveAdjacentFoundationConnections(FGuid NewPartID, float AnchorTolerance);
 	//  ===================================================================================
 
 protected:

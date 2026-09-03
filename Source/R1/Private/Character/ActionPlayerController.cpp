@@ -12,6 +12,7 @@
 #include "UserSettings/EnhancedInputUserSettings.h"
 
 #include "BuildingSystem/Component/BuildingPlacementComponent.h"
+#include "Data/Building/BuildingPartDefinition.h"
 
 AActionPlayerController::AActionPlayerController()
 {
@@ -108,6 +109,24 @@ void AActionPlayerController::PossessChar(AActionCharacter* InNewChar)
 
 	Possess(InNewChar);
 	//OnPossessedCharChange.Broadcast();
+}
+
+void AActionPlayerController::OnRotateBuildingPart()
+{
+	if (true == IsValid(BuildingPlacementComponent))
+		BuildingPlacementComponent->RotateBuildingPart();
+}
+
+void AActionPlayerController::OnStartPlacement(UBuildingPartDefinition* Definition)
+{
+	if(true == IsValid(BuildingPlacementComponent))
+		BuildingPlacementComponent->StartPlacement(Definition);
+}
+
+void AActionPlayerController::OnStopPlacement()
+{
+	if (true == IsValid(BuildingPlacementComponent))
+		BuildingPlacementComponent->StopPlacement();
 }
 
 void AActionPlayerController::SetInventoryInputState(bool bOpen)

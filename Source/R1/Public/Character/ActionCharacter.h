@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.25
+﻿/// 최초작성 : 2026.08.25
 /// 작 성 자 : 최 요 환
 
 // Fill out your copyright notice in the Description page of Project Settings.
@@ -108,6 +108,7 @@ protected:
 	void OnSecondaryActionReleased();	// 보조 액션 종료 (우클릭 뗌)
 
 	void OnBuildingPlacementPressed();
+	void OnRotateBuildingPartPressed();
 
 	void OnInteractPressed();			// 상호작용 시도
 	void OnInventoryTogglePressed();	// 인벤토리 패널 토글
@@ -161,6 +162,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UInputAction> IA_BuildingPlacement;
 
+	// 건축 파츠 회전 휠클릭
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UInputAction> IA_RotateBuildingPart;
+
 	// 상호작용
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UInputAction> IA_Interact;
@@ -213,10 +218,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Component")
 	FORCEINLINE class UHeldItemComponent* GetHeldItemComponent() const { return HeldItemComponent; }
 
+	UFUNCTION(BlueprintPure, Category = "Component")
+	class UInventoryComponent* GetInventoryComponent() const;
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
 	TObjectPtr<class UHeldItemComponent> HeldItemComponent;
-
 
 
 	/*--------------------------------

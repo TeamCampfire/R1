@@ -1,4 +1,4 @@
-// 작업 시작일 : 8/28
+﻿// 작업 시작일 : 8/28
 // 작업자 : 우진
 #pragma once
 
@@ -6,6 +6,20 @@
 #include "Components/ActorComponent.h"
 #include "BuildingPlacementComponent.generated.h"
 
+
+
+ // 현재 건축 파츠를 설치할 수 없는 이유.
+ // 설치 불가 상태에서 좌클릭하면 이 값에 맞는 UI 메시지를 표시해요
+UENUM(BlueprintType)
+enum class EBuildingPlacementInvalidReason : uint8
+{
+	None, // 현재 모든 설치 조건을 만족하는 상태
+	InsufficientResources, // 필요한 건축 자원을 충분히 가지고 있지 않은 상태
+	InvalidLocation, // 라인 트레이스 실패, 거리 초과, 스냅 지점 없음 등 세부 원인으로 분류하지 않는 일반적인 위치 오류
+	InvalidSlope, // 선택한 건축 파츠가 허용하는 경사보다 지면이 가파른 상태
+	InvalidSurface, // 건축이 허용되지 않은 지면 또는 오브젝트를 바라보는 상태
+	Overlap // 프리뷰가 다른 오브젝트나 건축 파츠와 겹친 상태
+};
 
 // 건축 파츠를 선택한 순간부터 실제로 설치하기 전까지의 과정을 담당하는 컴포넌트
 // Player의 Controller에 붙을 예정
@@ -34,6 +48,9 @@ public:
 	// 현재 프리뷰 위치에 건축물 설치를 요청
 	void ConfirmPlacement();
 
+	// 키를 누를 때 마다 프리뷰 상태에서 데이터에 의해 파츠 회전을 진행하는 함수 
+	void RotateBuildingPart();
+
 protected:
 	// 클라이언트가 서버에 새로운 건축물 생성을 요청
 	UFUNCTION(Server, Reliable)
@@ -42,13 +59,13 @@ protected:
 	// 클라이언트가 서버에 스냅 건물 파츠 생성을 요청
 	UFUNCTION(Server, Reliable)
 	void ServerPlaceSnappedPart(UBuildingPartDefinition* Definition, 
-		class ABuildingActor* TargetBuilding, FGuid TargetPartID, FName SocketName);
+		class ABuildingActor* TargetBuilding, FGuid TargetPartID, FName SocketName, int32 SnapYawwOffsetIdx);
 
 	// Foundation Type의 지면 배치 프리뷰를 갱신
 	void UpdateFoundationPreview(APlayerController* PlayerController);
 
 	// Structure_Snap Type의 지면 배치 프리뷰를 갱신
-	void UpdateStructureSnapPreview(APlayerController* PlayerController);
+	bool UpdateStructureSnapPreview(APlayerController* PlayerController);
 
 	// Structure_Snap 대상 초기화 함수
 	void ClearCurrentSnapTarget();
@@ -91,7 +108,28 @@ private:
 
 	// Foundation의 지면·경사·장애물 조건을 검사 (기존)
 	bool IsServerFoundationPlacementValid(const UBuildingPartDefinition* Definition, const FTransform& InPlacementTransform);
-	
+
+	// 건축 파츠의 모든 필요 자원을 실제로 캐릭터 인벤토리에서 소모하는 함수
+	// 서버에서 건축 설치가 최종 결정된 시점에 호출 / true : 자원 정상 소모
+	bool TryConsumeRequiredResources(const UBuildingPartDefinition* Definition);
+
+	// 현재 건축 파츠의 회전값이 든 배열(AllowedSnapYawOffsets)의 인덱스를 순환시키는 함수
+	void CycleSnapYawOffset();
+
+	// 건축 파츠의 회전값이 든 배열(AllowedSnapYawOffsets)[CurSnapYawOffsetIdx]
+	float GetCurSnapYawOffset();
+
+	// 새 파츠 액터의 PlacementAnchorSocketName가
+	// 붙어야 하는 스냅 소켓에 배치되기 위해.. 월드 Transform를 계산하는 함수
+	bool BuildSnappedPlacementTransform(const UBuildingPartDefinition* Definition, const FTransform& InSocketWorldTransform,
+		float SnapYawOffset, FTransform& OutPlacementTransform) const;
+
+	// 설치할 건축 파츠가 요구하는 모든 자원을 플레이어(인벤토리)가 가지고 있는지 확인하는 함수 진짜 확인만 함
+	bool HasEnoughResources(const UBuildingPartDefinition* Definition) const;
+
+	// CurrentInvalidReason을 현재 플레이어의 메인 HUD에 표시하는 함수
+	void ShowCurrentInvalidReasonMessage() const;
+
 	//  ===================================================================================
 private:
 	// 최대 건축 지점 거리
@@ -119,6 +157,10 @@ protected:
 	UPROPERTY(Transient)
 	bool bCanPlace = false; // 현재 프리뷰 위치에 실제 파츠를 설치할 수 있는지요?
 
+	// 현재 프리뷰가 설치 불가라면 그 이유를 저장하는 변수
+	UPROPERTY(Transient)
+	EBuildingPlacementInvalidReason CurrentInvalidReason = EBuildingPlacementInvalidReason::InvalidLocation;
+
 	UPROPERTY(Transient)
 	TObjectPtr<UStaticMeshComponent> ServerValidationMeshComponent; // 서버에서 실제 메시 콜리전 검사에 사용하는 숨겨진 컴포넌트
 
@@ -135,6 +177,16 @@ protected:
 
 	FName CurrentSnapSocketName = NAME_None; // 현재 선택된 소켓 이름
 
+	UPROPERTY(EditDefaultsOnly, Category = "Building|Server")
+	float ServerPlacementDistanceTolerance = 50.f; // 서버 허용 오차 (네트워크 지연이나 부동소수점 계산 차이)
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|Snapping")
+	float FoundationSnapPointSearchRadius = 280.f; // 기존 Foundation 가장자리에서 인접 Foundation 중심 소켓을 찾는 반경 (Foundation끼리의 스냅을 위한)
+
+	UPROPERTY(EditDefaultsOnly, Category = "Building|Snapping", meta = (ClampMin = "0.0"))
+	float FoundationConnectionAnchorTolerance = 15.f; // Foundation 고리가 닫힐 때 발생할 수 있는 연결 앵커 사이의 작은 배치 오차를 허용해요
 private:
 	bool bIsPlacing = false; // 현재 건축물 배치중인가요?
+
+	int CurSnapYawOffsetIdx = 0; // 현재 선택된 UBuildingPartDefinition->AllowedSnapYawOffsets 배열의 인덱스
 };

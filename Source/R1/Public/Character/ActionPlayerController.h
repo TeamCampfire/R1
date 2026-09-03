@@ -33,6 +33,13 @@ public:
 	// 플레이어가 건축 좌키 눌렀을 때 컨트롤러로 넘어온 함수
 	void OnConfirmBuildingPlacement();
 
+	// 플레이어가 건축 파츠 회전을 위해 휠키 눌렀을 때 컨트롤러로 넘어온 함수
+	void OnRotateBuildingPart();
+
+	// BuildingPlacementComponent의 Start/Stop Placement 래핑 함수
+	void OnStartPlacement(class UBuildingPartDefinition* Definition);
+	void OnStopPlacement();
+
 	//  ===================================================================================
 public:
 	virtual void OnPossess(APawn* InPawn) override;
