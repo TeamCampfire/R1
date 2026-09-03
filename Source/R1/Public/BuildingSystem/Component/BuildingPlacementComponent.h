@@ -7,6 +7,20 @@
 #include "BuildingPlacementComponent.generated.h"
 
 
+
+ // 현재 건축 파츠를 설치할 수 없는 이유.
+ // 설치 불가 상태에서 좌클릭하면 이 값에 맞는 UI 메시지를 표시해요
+UENUM(BlueprintType)
+enum class EBuildingPlacementInvalidReason : uint8
+{
+	None, // 현재 모든 설치 조건을 만족하는 상태
+	InsufficientResources, // 필요한 건축 자원을 충분히 가지고 있지 않은 상태
+	InvalidLocation, // 라인 트레이스 실패, 거리 초과, 스냅 지점 없음 등 세부 원인으로 분류하지 않는 일반적인 위치 오류
+	InvalidSlope, // 선택한 건축 파츠가 허용하는 경사보다 지면이 가파른 상태
+	InvalidSurface, // 건축이 허용되지 않은 지면 또는 오브젝트를 바라보는 상태
+	Overlap // 프리뷰가 다른 오브젝트나 건축 파츠와 겹친 상태
+};
+
 // 건축 파츠를 선택한 순간부터 실제로 설치하기 전까지의 과정을 담당하는 컴포넌트
 // Player의 Controller에 붙을 예정
 UCLASS( ClassGroup=(Building), meta=(BlueprintSpawnableComponent) )
@@ -113,6 +127,9 @@ private:
 	// 설치할 건축 파츠가 요구하는 모든 자원을 플레이어(인벤토리)가 가지고 있는지 확인하는 함수 진짜 확인만 함
 	bool HasEnoughResources(const UBuildingPartDefinition* Definition) const;
 
+	// CurrentInvalidReason을 현재 플레이어의 메인 HUD에 표시하는 함수
+	void ShowCurrentInvalidReasonMessage() const;
+
 	//  ===================================================================================
 private:
 	// 최대 건축 지점 거리
@@ -139,6 +156,10 @@ protected:
 
 	UPROPERTY(Transient)
 	bool bCanPlace = false; // 현재 프리뷰 위치에 실제 파츠를 설치할 수 있는지요?
+
+	// 현재 프리뷰가 설치 불가라면 그 이유를 저장하는 변수
+	UPROPERTY(Transient)
+	EBuildingPlacementInvalidReason CurrentInvalidReason = EBuildingPlacementInvalidReason::InvalidLocation;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UStaticMeshComponent> ServerValidationMeshComponent; // 서버에서 실제 메시 콜리전 검사에 사용하는 숨겨진 컴포넌트

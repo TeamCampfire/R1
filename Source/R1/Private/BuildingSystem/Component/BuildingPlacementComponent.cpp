@@ -4,12 +4,15 @@
 #include "Engine/StaticMeshSocket.h"
 #include "Components/StaticMeshComponent.h"
 #include "../R1.h"
+#include "Framework/MainHUD.h"
+#include "Widget/MainHUDWidget.h"
 
 #include "Data/Building/BuildingPartDefinition.h"
 #include "BuildingSystem/BuildingPreviewActor.h"
 #include "BuildingSystem/BuildingActor.h"
 #include "Character/ActionCharacter.h"
 #include "Component/InventoryComponent.h"
+
 
 UBuildingPlacementComponent::UBuildingPlacementComponent()
 {
@@ -86,6 +89,9 @@ void UBuildingPlacementComponent::StartPlacement(UBuildingPartDefinition* Defini
 	}
 
 	SelectedDefinition = Definition;
+	bCanPlace = false;
+	CurrentInvalidReason = EBuildingPlacementInvalidReason::InvalidLocation;
+
 	CurFoundationLegLength = 0.f;
 	CurSnapYawOffsetIdx = 0;
 
@@ -122,6 +128,8 @@ void UBuildingPlacementComponent::StartPlacement(UBuildingPartDefinition* Defini
 void UBuildingPlacementComponent::StopPlacement()
 {
 	// 배치 끝냈으니, 값들 리셋
+	bCanPlace = false;
+	CurrentInvalidReason = EBuildingPlacementInvalidReason::InvalidLocation;
 	ClearCurrentSnapTarget();
 	bIsPlacing = false;
 	SelectedDefinition = nullptr;
@@ -152,6 +160,7 @@ void UBuildingPlacementComponent::ConfirmPlacement()
 	if (false == bCanPlace)
 	{
 		UE_LOG(LogTemp, Log, TEXT("[UBuildingPlacementComponent::ConfirmPlacement()] : 현재 위치에는 설치할 수 없습니다."));
+		ShowCurrentInvalidReasonMessage(); // 설치 실패 원인을 HUD에 표시
 		return;
 	}
 
@@ -587,7 +596,19 @@ bool UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* 
 
 	// 스냅 위치가 유효해도 필요한 자원이 부족하면 설치할 수 없어요
 	const bool bHasEnoughResources = HasEnoughResources(SelectedDefinition.Get());
-	bCanPlace = false == bHasOverlap && bHasEnoughResources;
+
+	// 스냅 배치는 이미 유효한 소켓과 Transform을 찾은 상태이기 때문에 마지막에는 겹침과 자원 조건만 구분하면 돼요
+	if (true == bHasOverlap)
+		CurrentInvalidReason = EBuildingPlacementInvalidReason::Overlap;
+
+	else if (false == bHasEnoughResources)
+		CurrentInvalidReason = EBuildingPlacementInvalidReason::InsufficientResources;
+
+	else
+		CurrentInvalidReason = EBuildingPlacementInvalidReason::None;
+
+	bCanPlace = (CurrentInvalidReason == EBuildingPlacementInvalidReason::None);
+	//bCanPlace = false == bHasOverlap && bHasEnoughResources;
 
 	PreviewActor->SetPlacementValid(bCanPlace);
 	PreviewActor->SetActorHiddenInGame(false);
@@ -610,6 +631,7 @@ void UBuildingPlacementComponent::ClearCurrentSnapTarget()
 void UBuildingPlacementComponent::HidePlacementPreview()
 {
 	bCanPlace = false;
+	CurrentInvalidReason = EBuildingPlacementInvalidReason::InvalidLocation;
 	ClearCurrentSnapTarget();
 
 	if (false == IsValid(PreviewActor)) return;
@@ -622,30 +644,70 @@ bool UBuildingPlacementComponent::HasEnoughResources(const UBuildingPartDefiniti
 {
 	if (false == IsValid(Definition)) return false;
 
-	//TODO 나중에 살릴 코드
-	//if (0 == Definition->ResourceCosts.Num()) return true; // 프리패스 설치 
+	if (0 == Definition->ResourceCosts.Num()) return true; // 프리패스 설치 
 
 	const APlayerController* PlayerController = Cast<APlayerController>(GetOwner());
 	const AActionCharacter* OwnerCharacter = IsValid(PlayerController) ? Cast<AActionCharacter>(PlayerController->GetPawn()) : nullptr;
+	if (false == IsValid(OwnerCharacter)) return false;
 	const UInventoryComponent* Inventory = OwnerCharacter->GetInventoryComponent();
-	if (false == IsValid(Inventory)) return false;
-
-	//! 이건 테스트용 코드입니다
-		//! true / false 테스트
-	return false;
+	if (false == IsValid(Inventory)) return false;	
 
 	// TODO 구현되지 않은 아이템이 많아서 다 구현된다면 살려야 해요
-	//for (const FBuildingResourceCost& ResourceCost : Definition->ResourceCosts)
-	//{
-	//	// 유효하지 않은 재료와, 개수라면 설치 불가
-	//	//if (false == IsValid(ResourceCost.ItemData) || ResourceCost.RequiredCount <= 0) return false;
+	for (const FBuildingResourceCost& ResourceCost : Definition->ResourceCosts)
+	{
+		// 유효하지 않은 재료와, 개수라면 설치 불가
+		if (false == IsValid(ResourceCost.ItemData) || ResourceCost.RequiredCount <= 0) return false;
 
-	//	//TODO 아직 인벤토리에 들어있는 총 아이템 개수를 반환하는 함수가 구현되어있지 않음
-	//	//TODO 지금은 임의로 성공을 가정하지만, 인벤토리 기능 구현 후 코드 수정이 필요함!
-	//	//const int32 OwnedResourceCount = Inventory->GetItemCount(ResourceCost.ItemData);
-	//	//if (OwnedResourceCount < ResourceCost.RequiredCount) return false;
-	//}
-	//return true;
+		//TODO 아직 인벤토리에 들어있는 총 아이템 개수를 반환하는 함수가 구현되어있지 않음
+		//TODO 지금은 임의로 실패를 가정하지만, 인벤토리 기능 구현 후 코드 수정이 필요함!
+		//TODO (성공이 들어온다면 그건 필요 자원이 적어서 프리패스인 경우임)
+		const int32 OwnedResourceCount = 0;// Inventory->GetItemCount(ResourceCost.ItemData);
+		if (OwnedResourceCount < ResourceCost.RequiredCount) return false;
+	}
+	return true;
+}
+
+void UBuildingPlacementComponent::ShowCurrentInvalidReasonMessage() const
+{
+	APlayerController* PlayerController = Cast<APlayerController>(GetOwner());
+
+	if (false == IsValid(PlayerController)) return;
+
+	AMainHUD* MainHUD = PlayerController->GetHUD<AMainHUD>();
+	UMainHUDWidget* MainHUDWidget = IsValid(MainHUD) ? MainHUD->GetMainHudWidget() : nullptr;
+
+	if (false == IsValid(MainHUDWidget)) return;
+
+	// 내부에서 사용하는 실패 원인을 실제 사용자에게 보여줄 문장으로 변환
+	FText Message;
+	switch (CurrentInvalidReason)
+	{
+	case EBuildingPlacementInvalidReason::InsufficientResources:
+		Message = NSLOCTEXT("BuildingPlacement", "InsufficientResources", "필요한 자원이 부족합니다.");
+		break;
+
+	case EBuildingPlacementInvalidReason::InvalidSlope:
+		Message = NSLOCTEXT("BuildingPlacement", "InvalidSlope", "경사가 너무 가파릅니다.");
+		break;
+
+	case EBuildingPlacementInvalidReason::InvalidSurface:
+		Message = NSLOCTEXT("BuildingPlacement", "InvalidSurface", "건축할 수 없는 지면입니다.");
+		break;
+
+	case EBuildingPlacementInvalidReason::Overlap:
+		Message = NSLOCTEXT("BuildingPlacement", "Overlap", "다른 오브젝트와 겹칩니다.");
+		break;
+
+	case EBuildingPlacementInvalidReason::InvalidLocation:
+		Message = NSLOCTEXT("BuildingPlacement", "InvalidLocation", "이 위치에는 설치할 수 없습니다.");
+		break;
+
+	case EBuildingPlacementInvalidReason::None:
+	default:
+		return;
+	}
+
+	MainHUDWidget->ShowBuildingPlacementMessage(Message);
 }
 
 void UBuildingPlacementComponent::ServerPlaceNewBuilding_Implementation(UBuildingPartDefinition* Definition, const FTransform& InPlacementTransform)
@@ -799,7 +861,25 @@ void UBuildingPlacementComponent::ShowPreviewAtLocation(const FVector& InPreview
 	// 건축 파츠를 만들 때 필요한 아이템을 들고 있는 검사를 해서 결과를 얻어요
 	const bool bHasEnoughResources = HasEnoughResources(SelectedDefinition.Get());
 
-	bCanPlace = (bIsSurfaceValid) && (bIsSlopeValid) && (!bHasOverlap) && (bHasEnoughResources);
+	// 사용자에게 가장 구체적으로 알려줄 원인을 우선순위대로 세팅해요
+	if (false == bIsSurfaceValid)
+		CurrentInvalidReason = EBuildingPlacementInvalidReason::InvalidSurface;
+
+	else if (false == bIsSlopeValid)
+		CurrentInvalidReason = EBuildingPlacementInvalidReason::InvalidSlope;
+
+	else if (true == bHasOverlap)
+		CurrentInvalidReason = EBuildingPlacementInvalidReason::Overlap;
+
+	else if (false == bHasEnoughResources)
+		CurrentInvalidReason = EBuildingPlacementInvalidReason::InsufficientResources;
+
+	else // 위치와 자원 조건을 모두 만족했습니다.
+		CurrentInvalidReason = EBuildingPlacementInvalidReason::None;
+
+	// 실패 원인이 없으면 실제 설치 가능한 상태
+	bCanPlace = (CurrentInvalidReason == EBuildingPlacementInvalidReason::None);
+	//bCanPlace = (bIsSurfaceValid) && (bIsSlopeValid) && (!bHasOverlap) && (bHasEnoughResources);
 	
 	PreviewActor->SetPlacementValid(bCanPlace); // 여기서 PreviewActor Valid/Invalid 머터리얼 세팅해요
 	PreviewActor->SetActorHiddenInGame(false);
