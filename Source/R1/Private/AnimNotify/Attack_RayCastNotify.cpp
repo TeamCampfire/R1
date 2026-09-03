@@ -11,7 +11,6 @@ void UAttack_RayCastNotify::Notify(USkeletalMeshComponent* MeshComp, UAnimSequen
 	// 해당 노티파이가 들어오면 공격 실행
 	if(AActionCharacter* AC = Cast<AActionCharacter>(MeshComp->GetOwner()))
 	{
-		if (!AC->IsLocallyControlled()) return;
 		AC->ProcessAttack();
 	}
 }

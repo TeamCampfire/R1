@@ -243,6 +243,13 @@ void AActionCharacter::SetCrouchInputMode(ECrouchInputMode NewMode)
 
 void AActionCharacter::ProcessAttack()
 {
+	// 여기 들어왔다는건 일단 휘둘렀다는 뜻.
+	// TODO 하드코딩 수정
+	// TODO DrainSurvivalStats 열어줄 수 있는지 물어볼 것
+	ICaloriesInterface::Execute_DecreaseCalories(StatComponent, 10.016f);
+	IHydrationInterface::Execute_DecreaseHydration(StatComponent, 10.0032f);
+
+	if (!IsLocallyControlled()) return;
 	//TODO 무기 타입에 따라서 세분화
 	FHitResult DetectRes;
 	if (DetectdObjectInAttackRange(DetectRes))
@@ -257,6 +264,8 @@ void AActionCharacter::ProcessAttack()
 	{
 		UE_LOG(LogTemp, Display, TEXT("아무도 것도 맞지 않았습니다."));
 	}
+
+
 }
 
 bool AActionCharacter::Server_ProcessAttackTarget_Validate(AActor* TargetActor, const FVector& HitLocation)
