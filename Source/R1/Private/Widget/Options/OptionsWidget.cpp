@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Widget/Options/OptionsWidget.h"
@@ -45,11 +45,13 @@ void UOptionsWidget::HandleCategoryDisplayClicked()
 
 void UOptionsWidget::SwitchToCategory(EOptionsCategory Category)
 {
+	// 컨텐츠에 표시할 번호 할당 
 	if (ContentSwitcher)
 	{
 		ContentSwitcher->SetActiveWidgetIndex(static_cast<int32>(Category));
 	}
 
+	/// 각 버튼별 현재 선택된 카테고리 번호인지 확인 해서 배경색 표시
 	if (CategoryHighlight_Controls)
 	{
 		CategoryHighlight_Controls->SetBrushColor(Category == EOptionsCategory::Controls ? GSelectedCategoryColor : GUnselectedCategoryColor);

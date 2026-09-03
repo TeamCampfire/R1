@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Widget/Options/OptionsDisplayWidget.h"
@@ -34,6 +34,7 @@ void UOptionsDisplayWidget::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
 
+	// 적용 버튼 클릭 시 현재 콤보박스 선택값을 UGameUserSettings에 적용 + 저장
 	if (ApplyButton)
 	{
 		ApplyButton->OnClicked.AddDynamic(this, &UOptionsDisplayWidget::HandleApplyClicked);
@@ -90,6 +91,8 @@ void UOptionsDisplayWidget::RefreshFromCurrentSettings()
 
 void UOptionsDisplayWidget::HandleApplyClicked()
 {
+	/// 해상도/화면모드는 언리얼 전역 객체인 UGameUserSettings가 관리
+	// 엔진 설정 객체 가져오기
 	UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr;
 	if (!Settings)
 	{
