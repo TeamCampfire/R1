@@ -32,6 +32,10 @@ public:
 	// 플레이어가 건축 파츠 회전을 위해 휠키 눌렀을 때 컨트롤러로 넘어온 함수
 	void OnRotateBuildingPart();
 
+	// BuildingPlacementComponent의 Start/Stop Placement 래핑 함수
+	void OnStartPlacement(class UBuildingPartDefinition* Definition);
+	void OnStopPlacement();
+
 	//  ===================================================================================
 public:
 	// 인벤토리 패널이 열리면 마우스 커서를 보여주고 UI 입력을 받도록, 닫히면 다시 게임 전용 입력으로 되돌린다.

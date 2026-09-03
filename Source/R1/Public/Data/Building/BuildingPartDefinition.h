@@ -98,5 +98,16 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|Snapping")
 	FName PlacementAnchorSocketName = NAME_None; // 이 파츠를 다른 파츠에 스냅할 때 대상 소켓에 맞출 자신의 소켓 (잠시 피벗이 된다고 이해하면 편함)
-	// None이면 기존처럼 메시 피벗을 대상 소켓에 맞춰요, 
+	// None이면 기존처럼 메시 피벗을 대상 소켓에 맞춰요,
+
+	// ================= 건축 파츠 선택 Radial UI ===========================
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|UI")
+	FText DisplayName; // 다이얼 UI에 표시할 파츠 이름
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|UI", meta = (MultiLine = true))
+	FText Description; // 다이얼 중앙에 표시할 설명
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|UI")
+	TSoftObjectPtr<UTexture2D> Icon; // 다이얼에 표시할 파츠 아이콘
+
 };
