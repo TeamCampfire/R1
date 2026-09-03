@@ -65,14 +65,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Options")
 	void SetOptionsInputState(bool bOpen);
 
-	// Temp
+	// Temp: 없애도 될 거 같은데 !!!!!!!!!
 	// GameMenu 패널이 열리면 마우스 커서를 보여주고 UI 입력을 받도록, 닫히면 다시 게임 전용 입력으로 되돌린다.
 	UFUNCTION(BlueprintCallable, Category = "GameMenu")
 	void SetGameMenuInputState(bool bOpen);
-
-	// 동시에 열어도 마지막 하나가 닫힐 때까지 게임 입력이 잘못 복구되지 않는다.
-	UFUNCTION(BlueprintCallable, Category = "Options")
-	void SetOptionsInputState(bool bOpen);
 
 	// 리스폰 지점(액터) 설정 함수
 	UFUNCTION(BlueprintCallable, Category = "Respawn")

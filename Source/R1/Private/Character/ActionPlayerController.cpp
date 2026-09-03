@@ -162,13 +162,13 @@ void AActionPlayerController::SetOptionsInputState(bool bOpen)
 
 void AActionPlayerController::SetGameMenuInputState(bool bOpen)
 {
-	ApplyUIInputState();
-
-	FlushPressedKeys();	// 메뉴 여는 순간 눌려있던 키가 계속 적용되는 것 방지
+	ApplyUIInputState(bOpen);
 }
 
 void AActionPlayerController::ApplyUIInputState(bool bOpen)
 {
+	FlushPressedKeys();	// UI 토글 순간 눌려있던 키가 계속 적용되는 것 방지
+
 	// 열려있는 UI 패널이 하나도 없다가 하나 생길 때(0→1)만 게임 입력을 끄고,
 	// 마지막 하나가 닫힐 때(1→0)만 게임 입력을 복구한다 — 인벤토리를 연 채로 옵션을
 	// 열었다가 옵션만 닫아도 인벤토리가 열려있는 한 게임 입력이 되살아나지 않는다.
