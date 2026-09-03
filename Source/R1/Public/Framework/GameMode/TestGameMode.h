@@ -31,6 +31,10 @@ protected:
 	// 스폰 가능한 지점 찾는 함수
 	bool FindRandomSpawnLocation(FVector& OutLocation) const;
 
+	// Debug--------------------------------------------------------------
+	UFUNCTION(Exec)
+	void Respawn(int32 ControllerIndex);
+	// -------------------------------------------------------------------
 protected:
 	// 랜덤 스폰 범위
 	UPROPERTY(EditDefaultsOnly, Category = "Respawn")

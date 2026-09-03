@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.30
+﻿/// 최초작성 : 2026.08.30
 /// 작 성 자 : 주 형 진
 
 // Fill out your copyright notice in the Description page of Project Settings.
@@ -13,6 +13,7 @@
 class AActionCharacter;
 class UItemDataBase;
 class UEquipmentItemData;
+class FLifetimeProperty;
 
 /**
  * 손에 쥐는 도구, 근접 무기, 특수 장비의 장착/해제 및 액션 입력 중계를 전담하는 컴포넌트
@@ -80,6 +81,17 @@ public:
 	}
 
 protected:
+	// 네트워크 복제 변수 등록 (CurrentHeldItem, CurrentEquippedItemData)
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	// [OnRep] 서버에서 장착 도구가 변경/스폰/해제되었을 때 클라이언트에서 소켓 부착 및 입력 바인딩 처리
+	UFUNCTION()
+	void OnRep_CurrentHeldItem(AHeldItemBase* PreviousHeldItem);
+
+	// 캐릭터의 손 소켓(r_handSocket / RightHandSocket)에 도구 액터를 부착하는 헬퍼 함수
+	void AttachHeldItemToCharacter(AHeldItemBase* ItemToAttach);
+
+protected:
 	// 게임 시작 시 컴포넌트에서 자동 장착할 기본 아이템 데이터 (에디터 디테일 패널에서 설정)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HeldItem|Default")
 	TObjectPtr<UEquipmentItemData> DefaultItemData;
@@ -88,10 +100,12 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HeldItem|Default")
 	TSubclassOf<AHeldItemBase> DefaultHeldItemClass;
 
-	UPROPERTY(BlueprintReadOnly, Category = "HeldItem|Runtime")
+	// 현재 손에 든 도구 액터 (서버 권한 스폰 -> 클라이언트 자동 복제 및 OnRep 실행)
+	UPROPERTY(ReplicatedUsing = OnRep_CurrentHeldItem, BlueprintReadOnly, Category = "HeldItem|Runtime")
 	TObjectPtr<AHeldItemBase> CurrentHeldItem;
 
-	UPROPERTY(BlueprintReadOnly, Category = "HeldItem|Runtime")
+	// 현재 장착된 아이템의 데이터 에셋 정보 (Replicated)
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "HeldItem|Runtime")
 	TObjectPtr<UEquipmentItemData> CurrentEquippedItemData;
 
 	UPROPERTY()

@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -16,6 +16,7 @@
 class UNiagaraSystem;
 class USoundBase;
 class AItemPickup;
+class FLifetimeProperty;
 
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class R1_API UHarvestableComponent : public UActorComponent, public IHarvestable
@@ -33,13 +34,22 @@ public:
 	virtual void		SpawnImpactDecal_Implementation(const FVector SpawnPoint, const FRotator SpawnRotator) override;
 
 protected:
-	// Called when the game starts
+	// 컴포넌트 시작 시 호출 (부모 액터의 bReplicates를 보장)
 	virtual void		BeginPlay() override;
-	// Called every frame
-	virtual void		TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
-	// 맞추면 자원을 더 획득하는 구건을 생성(나무는 빨간 X자 스프레이)
-	void				GenerateSweetSpot();
+	// 네트워크 복제 변수 등록 (SweetSpotTransform)
+	virtual void		GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	// [서버 전용] 라인트레이스를 통해 스위트스팟의 새 Transform을 계산하고 Replicated 변수에 저장
+	void				GenerateSweetSpot_Server();
+
+	// [멀티캐스트] 모든 플레이어 화면에 타격 사운드, 나이아가라 파편 FX, 임팩트 데칼 재생 브로드캐스트
+	UFUNCTION(NetMulticast, Unreliable)
+	void				Multicast_PlayHitEffects(const FVector& HitLocation, bool bIsSweetSpot, const FRotator& DecalRot);
+
+	// [OnRep] 서버에서 SweetSpotTransform이 갱신되었을 때 각 클라이언트 화면에 데칼을 스폰/이동
+	UFUNCTION()
+	void				OnRep_SweetSpotTransform();
 
 protected:
 	// 채집 시 획득할 아이템 목록 (다중 아이템 및 확률 지원)
@@ -165,4 +175,7 @@ private:
 	// 실제 생성된 SweetSpotDecal
 	UPROPERTY()
 	TObjectPtr<UDecalComponent> CurrentSweetSpotDecal;
+
+	UPROPERTY(ReplicatedUsing = OnRep_SweetSpotTransform)
+	FTransform SweetSpotTransform;
 };

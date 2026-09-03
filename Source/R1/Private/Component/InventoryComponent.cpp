@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Component/InventoryComponent.h"
@@ -368,6 +368,10 @@ void UInventoryComponent::UseBeltSlot(int32 BeltIndex)
 		if (HeldBeltIndex != INDEX_NONE)
 		{
 			HeldBeltIndex = INDEX_NONE;
+			if (UHeldItemComponent* HeldItemComp = GetOwner() ? GetOwner()->FindComponentByClass<UHeldItemComponent>() : nullptr)
+			{
+				HeldItemComp->UnequipHeldItem();
+			}
 			OnInventoryChanged.Broadcast();
 		}
 		return;

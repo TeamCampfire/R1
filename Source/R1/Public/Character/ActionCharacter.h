@@ -72,6 +72,11 @@ public:
 	// 지급할지만 서버가 최종 승인한다 — AFishingRod::Server_FinishFishing과 동일한 패턴.
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_GrantHarvestReward(UItemDataBase* ItemData, int32 Count);
+
+	// 공격 대상(자원 등)에 대한 타격을 서버 권한으로 처리 요청
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_ProcessAttackTarget(AActor* TargetActor, const FVector& HitLocation);
+
 	// 사망
 	UFUNCTION(BlueprintCallable)
 	void Die();
@@ -103,9 +108,13 @@ protected:
 	void OnSecondaryActionReleased();	// 보조 액션 종료 (우클릭 뗌)
 
 	void OnBuildingPlacementPressed();
+	void OnRotateBuildingPartPressed();
 
 	void OnInteractPressed();			// 상호작용 시도
 	void OnInventoryTogglePressed();	// 인벤토리 패널 토글
+
+	UFUNCTION(BlueprintCallable)		// 블루프린트 테스트로 콜러블 설정
+	void OnOptionsTogglePressed();		// 옵션(환경설정) 패널 토글
 	void OnUseBeltSlotPressed(int32 BeltIndex);	// 벨트슬롯 단축키(1~6, 0-based 인덱스로 받음)
 
 	// 공격 몽타주 재생 RPC (리슨 서버 및 멀티플레이어 동기화)
@@ -153,6 +162,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UInputAction> IA_BuildingPlacement;
 
+	// 건축 파츠 회전 휠클릭
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UInputAction> IA_RotateBuildingPart;
+
 	// 상호작용
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UInputAction> IA_Interact;
@@ -160,6 +173,10 @@ protected:
 	// 인벤토리 토글
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UInputAction> IA_InventoryToggle;
+
+	// 옵션(환경설정) 패널 토글 (ESC)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UInputAction> IA_OptionsToggle;
 
 	/// 벨트슬롯 단축키
 	// 1
@@ -201,10 +218,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Component")
 	FORCEINLINE class UHeldItemComponent* GetHeldItemComponent() const { return HeldItemComponent; }
 
+	UFUNCTION(BlueprintPure, Category = "Component")
+	class UInventoryComponent* GetInventoryComponent() const;
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
 	TObjectPtr<class UHeldItemComponent> HeldItemComponent;
-
 
 
 	/*--------------------------------

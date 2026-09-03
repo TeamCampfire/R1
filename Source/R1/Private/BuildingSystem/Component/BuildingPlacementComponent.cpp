@@ -1,12 +1,18 @@
-#include "BuildingSystem/Component/BuildingPlacementComponent.h"
+﻿#include "BuildingSystem/Component/BuildingPlacementComponent.h"
 
 #include "Engine/OverlapResult.h"
+#include "Engine/StaticMeshSocket.h"
 #include "Components/StaticMeshComponent.h"
 #include "../R1.h"
+#include "Framework/MainHUD.h"
+#include "Widget/MainHUDWidget.h"
 
 #include "Data/Building/BuildingPartDefinition.h"
 #include "BuildingSystem/BuildingPreviewActor.h"
 #include "BuildingSystem/BuildingActor.h"
+#include "Character/ActionCharacter.h"
+#include "Component/InventoryComponent.h"
+
 
 UBuildingPlacementComponent::UBuildingPlacementComponent()
 {
@@ -45,7 +51,11 @@ void UBuildingPlacementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 	switch (SelectedDefinition->PlacementType)
 	{
 	case EBuildingPlacementType::FOUNDATION:
-		UpdateFoundationPreview(PlayerController);
+	{
+		// 기존 Foundation에서 스냅 될 수 있는 소켓을 찾았다면 스냅 프리뷰를 사용하고.  찾지 못했을 때만 기존의 지면 자유 배치를 실행합니다
+		if(false == UpdateStructureSnapPreview(PlayerController))
+			UpdateFoundationPreview(PlayerController);
+	}
 		break;
 
 	case EBuildingPlacementType::STRUCTURE_SNAP:
@@ -79,7 +89,12 @@ void UBuildingPlacementComponent::StartPlacement(UBuildingPartDefinition* Defini
 	}
 
 	SelectedDefinition = Definition;
+	bCanPlace = false;
+	CurrentInvalidReason = EBuildingPlacementInvalidReason::InvalidLocation;
+
 	CurFoundationLegLength = 0.f;
+	CurSnapYawOffsetIdx = 0;
+
 	if (SelectedDefinition->PlacementType == EBuildingPlacementType::FOUNDATION)
 	{
 		// Foundation 전용 : 메시 피벗 아래쪽으로 내려간 다리기둥 길이 계산
@@ -113,6 +128,8 @@ void UBuildingPlacementComponent::StartPlacement(UBuildingPartDefinition* Defini
 void UBuildingPlacementComponent::StopPlacement()
 {
 	// 배치 끝냈으니, 값들 리셋
+	bCanPlace = false;
+	CurrentInvalidReason = EBuildingPlacementInvalidReason::InvalidLocation;
 	ClearCurrentSnapTarget();
 	bIsPlacing = false;
 	SelectedDefinition = nullptr;
@@ -143,6 +160,7 @@ void UBuildingPlacementComponent::ConfirmPlacement()
 	if (false == bCanPlace)
 	{
 		UE_LOG(LogTemp, Log, TEXT("[UBuildingPlacementComponent::ConfirmPlacement()] : 현재 위치에는 설치할 수 없습니다."));
+		ShowCurrentInvalidReasonMessage(); // 설치 실패 원인을 HUD에 표시
 		return;
 	}
 
@@ -151,6 +169,17 @@ void UBuildingPlacementComponent::ConfirmPlacement()
 	{
 	case EBuildingPlacementType::FOUNDATION:
 	{
+		const bool bHasFoundationSnapTarget = CurrentSnapBuilding.IsValid() && CurrentSnapTargetPartID.IsValid() && false == CurrentSnapSocketName.IsNone();
+		if (true == bHasFoundationSnapTarget)
+		{
+			// 기존 Foundation에 스냅하는 경우
+			ServerPlaceSnappedPart(SelectedDefinition.Get(), CurrentSnapBuilding.Get(),
+				CurrentSnapTargetPartID, CurrentSnapSocketName, CurSnapYawOffsetIdx);
+
+			break;
+		}
+
+		// 근처에 스냅될 수 있는 소켓이 없다면 기존처럼 지면에 새로운 BuildingActor를 생성
 		if (nullptr == BuildingActorClass)
 		{
 			UE_LOG(LogTemp, Log, TEXT("[UBuildingPlacementComponent::ConfirmPlacement()] : BuildingActorClass가 설정되지 않았습니다."));
@@ -171,7 +200,7 @@ void UBuildingPlacementComponent::ConfirmPlacement()
 		}
 
 		// 실제 건축 파츠 스냅은 서버에 요청해요
-		ServerPlaceSnappedPart(SelectedDefinition.Get(), CurrentSnapBuilding.Get(), CurrentSnapTargetPartID, CurrentSnapSocketName);
+		ServerPlaceSnappedPart(SelectedDefinition.Get(), CurrentSnapBuilding.Get(), CurrentSnapTargetPartID, CurrentSnapSocketName, CurSnapYawOffsetIdx);
 
 		break;
 	}
@@ -185,7 +214,13 @@ void UBuildingPlacementComponent::ConfirmPlacement()
 	}
 }
 
-void UBuildingPlacementComponent::ServerPlaceSnappedPart_Implementation(UBuildingPartDefinition* Definition, ABuildingActor* TargetBuilding, FGuid TargetPartID, FName SocketName)
+void UBuildingPlacementComponent::RotateBuildingPart()
+{
+	CycleSnapYawOffset();
+	UE_LOG(LogTemp, Log, TEXT("현재 스냅 Yaw Offset: %.1f"), GetCurSnapYawOffset());
+}
+
+void UBuildingPlacementComponent::ServerPlaceSnappedPart_Implementation(UBuildingPartDefinition* Definition, ABuildingActor* TargetBuilding, FGuid TargetPartID, FName SocketName, int32 _SnapYawOffsetIdx)
 {
 	if (false == IsValid(Definition) || false == IsValid(Definition->PartMesh) ||
 		false == IsValid(TargetBuilding) || false == TargetPartID.IsValid() || true == SocketName.IsNone())
@@ -194,10 +229,14 @@ void UBuildingPlacementComponent::ServerPlaceSnappedPart_Implementation(UBuildin
 		return;
 	}
 
-	// Structure 파츠만...
-	if (Definition->PlacementType != EBuildingPlacementType::STRUCTURE_SNAP)
+	bool bSupportsSnapPlacement =
+		Definition->PlacementType == EBuildingPlacementType::STRUCTURE_SNAP ||
+		Definition->PlacementType == EBuildingPlacementType::FOUNDATION;
+
+	if (false == bSupportsSnapPlacement)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : StructureSnap 파츠가 아닙니다."));
+		UE_LOG(LogTemp, Warning,
+			TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 스냅을 지원하지 않는 파츠입니다."));
 		return;
 	}
 
@@ -209,11 +248,24 @@ void UBuildingPlacementComponent::ServerPlaceSnappedPart_Implementation(UBuildin
 		return;
 	}
 
-	// 이미 사용된 소켓인지 검사
+	// 이미 점유된 소켓인지 검사
 	if (TargetPart->OccupiedSnapPoints.Contains(SocketName))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 이미 점유된 소켓입니다. Socket=%s"), *SocketName.ToString());
+		UE_LOG(
+			LogTemp, Warning, TEXT("[Snap Occupancy] 이미 점유된 소켓 차단 | PartID=%s | Socket=%s"),
+			*TargetPart->PartID.ToString(), *SocketName.ToString());
 		return;
+	}
+
+	// AddPart() 이후에는 PlacedParts 배열이 재할당될 수 있으므로.. 지금 사용한 대상 소켓의 연결 정보를 미리 값으로 복사해둬요
+	FName ConnectedPartSocketName = NAME_None;
+	for (const FBuildingSnapPointDefinition& SnapPoint : TargetPart->Definition->SnapPoints)
+	{
+		if (SnapPoint.SocketName != SocketName)
+			continue;
+
+		ConnectedPartSocketName = SnapPoint.ConnectedPartSocketName;
+		break;
 	}
 
 	//서버가 Definition과 실제 메시 소켓을 이용해 직!접! 최종 월드 Transform을 계산해요
@@ -225,7 +277,35 @@ void UBuildingPlacementComponent::ServerPlaceSnappedPart_Implementation(UBuildin
 		return;
 	}
 
-	const FTransform SafeSnapTransform(SocketWorldTransform.GetRotation(), SocketWorldTransform.GetLocation(), FVector::OneVector);
+	//스냅 Yaw 회전값을 Definition에서 직접 받아와 Trasform에 적용해요
+	float SnapYawOffset = 0.f;
+	if (Definition->AllowedSnapYawOffsets.Num() > 0)
+	{
+		if (false == Definition->AllowedSnapYawOffsets.IsValidIndex(_SnapYawOffsetIdx))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 허용되지 않은 회전 인덱스입니다. Index=%d"), _SnapYawOffsetIdx);
+			return;
+		}
+
+		SnapYawOffset = Definition->AllowedSnapYawOffsets[_SnapYawOffsetIdx];
+	}
+	else if (_SnapYawOffsetIdx != 0)
+		return;
+
+	//FQuat YawOffsetRotation = FRotator(0.f, SnapYawOffset, 0.f).Quaternion(); // 진짜 YawOffset만 든 값
+	//FQuat FinalSnapRotation = SocketWorldTransform.GetRotation() * YawOffsetRotation; // 을 적용시켜요
+	//FinalSnapRotation.Normalize();
+
+	//FTransform SafeSnapTransform(FinalSnapRotation, SocketWorldTransform.GetLocation(), FVector::OneVector);
+
+	FTransform SafeSnapTransform;
+	if (false == BuildSnappedPlacementTransform(Definition, SocketWorldTransform, SnapYawOffset, SafeSnapTransform))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : ") TEXT("최종 스냅 Transform 계산에 실패했습니다."));
+		return;
+	}
+
+
 	if (SafeSnapTransform.ContainsNaN())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 소켓 Transform이 유효하지 않습니다."));
@@ -251,6 +331,13 @@ void UBuildingPlacementComponent::ServerPlaceSnappedPart_Implementation(UBuildin
 	if (RelativeTransform.ContainsNaN()) 
 		return;
 
+	// 건축에 필요한 자원이 인벤토리에 충분한지 검증
+	if (false == TryConsumeRequiredResources(Definition))
+	{
+		UE_LOG(LogTemp, Warning,TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 필요한 건축 자원이 부족합니다."));
+		return;
+	}
+
 	// 새 BuildingActor를 만들지 않고 기존 건물에 해당 스냅 파츠를 추가해요
 	UStaticMeshComponent* NewPart = TargetBuilding->AddPart(Definition, RelativeTransform);
 	if (false == IsValid(NewPart))
@@ -259,22 +346,31 @@ void UBuildingPlacementComponent::ServerPlaceSnappedPart_Implementation(UBuildin
 		return;
 	}
 
-	// AddPart()가 PlacedParts 배열에 새 요소를 추가하면서 배열 메모리가 재할당될 수 있으므로,
-	// 기존 TargetPart 포인터를 사용하지 않고 PartID로 다시 찾아요
+	// AddPart()가 PlacedParts 배열에 새 요소를 추가하면서 배열 메모리가
+    // 재할당될 수 있으므로 기존 TargetPart 포인터는 다시 사용하지 않아요
 	FPlacedBuildingPart* UpdatedTargetPart = TargetBuilding->FindPlacedPartByID(TargetPartID);
-	if (nullptr == UpdatedTargetPart)
+	FPlacedBuildingPart* NewPlacedPart = TargetBuilding->FindPlacedPartByComponent(NewPart);
+
+	if (nullptr == UpdatedTargetPart || nullptr == NewPlacedPart)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 설치 후 대상 파츠 재검색에 실패했습니다."));
+		UE_LOG(LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 설치 후 파츠 재검색에 실패했습니다."));
 		return;
 	}
 
-	// 설치에 사용한 소켓을 사용된 상태로 기록
+	// 기존 대상 파츠에서 설치에 사용된 소켓 점유
 	UpdatedTargetPart->OccupiedSnapPoints.AddUnique(SocketName);
 
-	// PlacedParts 변경을 클라이언트에 빠르게 전달
+	// 새로 설치된 파츠에서도 맞닿은 소켓 점유
+	if (false == ConnectedPartSocketName.IsNone())
+		NewPlacedPart->OccupiedSnapPoints.AddUnique(ConnectedPartSocketName);
+
+	// 새 Foundation이 고리를 닫으면서 다른 Foundation과도 맞닿았다면 직접 선택하지 않은 나머지 연결면까지 자동으로 점유해요
+	if (Definition->PlacementType == EBuildingPlacementType::FOUNDATION)
+		TargetBuilding->ResolveAdjacentFoundationConnections(NewPlacedPart->PartID, FoundationConnectionAnchorTolerance);
+
 	TargetBuilding->ForceNetUpdate();
 
-	UE_LOG(LogTemp, Log, TEXT(" [UBuildingPlacementComponent::ServerPlaceSnappedPart] : 스냅 파츠 설치 완료. Socket=%s"), *SocketName.ToString());
+	UE_LOG(LogTemp, Log, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 스냅 파츠 설치 완료. Socket=%s"),*SocketName.ToString());
 }
 
 void UBuildingPlacementComponent::UpdateFoundationPreview(APlayerController* PlayerController)
@@ -369,19 +465,20 @@ void UBuildingPlacementComponent::UpdateFoundationPreview(APlayerController* Pla
 	float FinalHeight = FMath::Clamp(DesiredHeight, 0.f, CurFoundationLegLength);
 
 	FVector PreviewLocation(MaxDistancePoint.X, MaxDistancePoint.Y, GroundZ + FinalHeight);
+
 	ShowPreviewAtLocation(PreviewLocation, GroundHitResult.ImpactNormal, GroundHitResult.GetComponent());
 
 	PreviewActor->SetActorHiddenInGame(false);
 }
 
-void UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* PlayerController)
+bool UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* PlayerController)
 {
 	ClearCurrentSnapTarget();
 
 	if (false == IsValid(PlayerController) || false == IsValid(SelectedDefinition) || false == IsValid(PreviewActor))
 	{
 		HidePlacementPreview();
-		return;
+		return false;
 	}
 
 	// 컨트롤러에서 플레이어 카메라가 보고 있는 현재 위치와 회전을 가져와요
@@ -412,7 +509,7 @@ void UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* 
 	if (false == bHit)
 	{
 		HidePlacementPreview();
-		return;
+		return false;
 	}
 
 	// 트레이스 맞힌 액터가 BuildingActor인지 확인합니다
@@ -420,7 +517,7 @@ void UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* 
 	if (false == IsValid(HitBuilding) || false == IsValid(HitResult.GetComponent()))
 	{
 		HidePlacementPreview();
-		return;
+		return false;
 	}
 
 	// 트레이스 맞힌 메시 컴포넌트의 건축 파츠가 있는지 확인
@@ -428,12 +525,17 @@ void UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* 
 	if (nullptr == TargetPart || false == IsValid(TargetPart->Definition) || false == IsValid(TargetPart->MeshComponent))
 	{
 		HidePlacementPreview();
-		return;
+		return false;
 	}
 
 	// 조준 지점에서 가장 가까운 호환(AllowedPartTypes) 소켓을 찾아요
 	bool bFoundSnapPoint = false;
-	float BestDistanceSquared = FMath::Square(SnapPointSearchRadius);
+
+	const float CurrentSnapPointSearchRadius =
+		SelectedDefinition->PlacementType == EBuildingPlacementType::FOUNDATION ?
+		FoundationSnapPointSearchRadius: SnapPointSearchRadius;
+
+	float BestDistanceSquared = FMath::Square(CurrentSnapPointSearchRadius);
 	FName BestSocketName = NAME_None;
 	FTransform BestSocketTransform = FTransform::Identity;
 
@@ -447,8 +549,8 @@ void UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* 
 
 		// 소켓 존재 여부와 파츠 타입 호환성을 함께 검사
 		if (false == HitBuilding->TryGetSnapPointWorldTransform(
-				HitResult.GetComponent(), SelectedDefinition.Get(),
-				SnapPoint.SocketName, CandidateTransform))
+			HitResult.GetComponent(), SelectedDefinition.Get(),
+			SnapPoint.SocketName, CandidateTransform))
 			continue;
 
 		float DistanceSquared = FVector::DistSquared(HitResult.ImpactPoint, CandidateTransform.GetLocation());
@@ -467,24 +569,46 @@ void UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* 
 	if (false == bFoundSnapPoint) // 사실 못 찾았습니다
 	{
 		HidePlacementPreview();
-		return;
+		return false;
+	}
+
+	// PlacementAnchorSocketName를 적용한 스냅 할 최종 Trasform을 계산해요
+	FTransform FinalSnapTransform;
+	if (false == BuildSnappedPlacementTransform(SelectedDefinition.Get(), BestSocketTransform, GetCurSnapYawOffset(), FinalSnapTransform))
+	{
+		HidePlacementPreview();
+		return false;
 	}
 
 	// 클라이언트에서도 최대 설치 수평거리 확인
-	float PlacementDistanceSquared = FVector::DistSquared2D( ViewLocation, BestSocketTransform.GetLocation());
+	float PlacementDistanceSquared = FVector::DistSquared2D(ViewLocation, FinalSnapTransform.GetLocation());
 	if (PlacementDistanceSquared > FMath::Square(MaxPlacementDistance))
 	{
 		HidePlacementPreview();
-		return;
+		return false;
 	}
 
-	// 프리뷰를 선택된 소켓에 배치!!!
-	PreviewActor->SetActorTransform(BestSocketTransform);
+	// 모든 계산이 끝난 최종 Trasform을 Preview 위치로..
+	PreviewActor->SetActorTransform(FinalSnapTransform);
 
 	// 대상 Foundation 컴포넌트는 이미 의도적으로 겹친 상태니까 겹침 검사 대상에서 제외시켜요
 	const bool bHasOverlap = HasPlacementOverlap(HitResult.GetComponent(), HitBuilding);
 
-	bCanPlace = false == bHasOverlap;
+	// 스냅 위치가 유효해도 필요한 자원이 부족하면 설치할 수 없어요
+	const bool bHasEnoughResources = HasEnoughResources(SelectedDefinition.Get());
+
+	// 스냅 배치는 이미 유효한 소켓과 Transform을 찾은 상태이기 때문에 마지막에는 겹침과 자원 조건만 구분하면 돼요
+	if (true == bHasOverlap)
+		CurrentInvalidReason = EBuildingPlacementInvalidReason::Overlap;
+
+	else if (false == bHasEnoughResources)
+		CurrentInvalidReason = EBuildingPlacementInvalidReason::InsufficientResources;
+
+	else
+		CurrentInvalidReason = EBuildingPlacementInvalidReason::None;
+
+	bCanPlace = (CurrentInvalidReason == EBuildingPlacementInvalidReason::None);
+	//bCanPlace = false == bHasOverlap && bHasEnoughResources;
 
 	PreviewActor->SetPlacementValid(bCanPlace);
 	PreviewActor->SetActorHiddenInGame(false);
@@ -493,6 +617,8 @@ void UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* 
 	CurrentSnapBuilding = HitBuilding;
 	CurrentSnapTargetPartID = TargetPart->PartID;
 	CurrentSnapSocketName = BestSocketName;
+
+	return true;
 }
 
 void UBuildingPlacementComponent::ClearCurrentSnapTarget()
@@ -505,12 +631,83 @@ void UBuildingPlacementComponent::ClearCurrentSnapTarget()
 void UBuildingPlacementComponent::HidePlacementPreview()
 {
 	bCanPlace = false;
+	CurrentInvalidReason = EBuildingPlacementInvalidReason::InvalidLocation;
 	ClearCurrentSnapTarget();
 
 	if (false == IsValid(PreviewActor)) return;
 
 	PreviewActor->SetPlacementValid(false);
 	PreviewActor->SetActorHiddenInGame(true);
+}
+
+bool UBuildingPlacementComponent::HasEnoughResources(const UBuildingPartDefinition* Definition) const
+{
+	if (false == IsValid(Definition)) return false;
+
+	if (0 == Definition->ResourceCosts.Num()) return true; // 프리패스 설치 
+
+	const APlayerController* PlayerController = Cast<APlayerController>(GetOwner());
+	const AActionCharacter* OwnerCharacter = IsValid(PlayerController) ? Cast<AActionCharacter>(PlayerController->GetPawn()) : nullptr;
+	if (false == IsValid(OwnerCharacter)) return false;
+	const UInventoryComponent* Inventory = OwnerCharacter->GetInventoryComponent();
+	if (false == IsValid(Inventory)) return false;	
+
+	// TODO 구현되지 않은 아이템이 많아서 다 구현된다면 살려야 해요
+	for (const FBuildingResourceCost& ResourceCost : Definition->ResourceCosts)
+	{
+		// 유효하지 않은 재료와, 개수라면 설치 불가
+		if (false == IsValid(ResourceCost.ItemData) || ResourceCost.RequiredCount <= 0) return false;
+
+		//TODO 아직 인벤토리에 들어있는 총 아이템 개수를 반환하는 함수가 구현되어있지 않음
+		//TODO 지금은 임의로 실패를 가정하지만, 인벤토리 기능 구현 후 코드 수정이 필요함!
+		//TODO (성공이 들어온다면 그건 필요 자원이 적어서 프리패스인 경우임)
+		const int32 OwnedResourceCount = 0;// Inventory->GetItemCount(ResourceCost.ItemData);
+		if (OwnedResourceCount < ResourceCost.RequiredCount) return false;
+	}
+	return true;
+}
+
+void UBuildingPlacementComponent::ShowCurrentInvalidReasonMessage() const
+{
+	APlayerController* PlayerController = Cast<APlayerController>(GetOwner());
+
+	if (false == IsValid(PlayerController)) return;
+
+	AMainHUD* MainHUD = PlayerController->GetHUD<AMainHUD>();
+	UMainHUDWidget* MainHUDWidget = IsValid(MainHUD) ? MainHUD->GetMainHudWidget() : nullptr;
+
+	if (false == IsValid(MainHUDWidget)) return;
+
+	// 내부에서 사용하는 실패 원인을 실제 사용자에게 보여줄 문장으로 변환
+	FText Message;
+	switch (CurrentInvalidReason)
+	{
+	case EBuildingPlacementInvalidReason::InsufficientResources:
+		Message = NSLOCTEXT("BuildingPlacement", "InsufficientResources", "필요한 자원이 부족합니다.");
+		break;
+
+	case EBuildingPlacementInvalidReason::InvalidSlope:
+		Message = NSLOCTEXT("BuildingPlacement", "InvalidSlope", "경사가 너무 가파릅니다.");
+		break;
+
+	case EBuildingPlacementInvalidReason::InvalidSurface:
+		Message = NSLOCTEXT("BuildingPlacement", "InvalidSurface", "건축할 수 없는 지면입니다.");
+		break;
+
+	case EBuildingPlacementInvalidReason::Overlap:
+		Message = NSLOCTEXT("BuildingPlacement", "Overlap", "다른 오브젝트와 겹칩니다.");
+		break;
+
+	case EBuildingPlacementInvalidReason::InvalidLocation:
+		Message = NSLOCTEXT("BuildingPlacement", "InvalidLocation", "이 위치에는 설치할 수 없습니다.");
+		break;
+
+	case EBuildingPlacementInvalidReason::None:
+	default:
+		return;
+	}
+
+	MainHUDWidget->ShowBuildingPlacementMessage(Message);
 }
 
 void UBuildingPlacementComponent::ServerPlaceNewBuilding_Implementation(UBuildingPartDefinition* Definition, const FTransform& InPlacementTransform)
@@ -553,7 +750,14 @@ void UBuildingPlacementComponent::ServerPlaceNewBuilding_Implementation(UBuildin
 	
 	if (true == HasServerPlacementOverlap(Definition, SafePlacementTransform))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("ServerPlaceNewBuilding: 장애물과 겹치는 설치 요청입니다."));
+		UE_LOG(LogTemp, Warning, TEXT("ServerPlaceNewBuilding : 장애물과 겹치는 설치 요청입니다."));
+		return;
+	}
+
+	// 건축에 필요한 자원이 인벤토리에 충분한지 검증
+	if (false == TryConsumeRequiredResources(Definition))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ServerPlaceNewBuilding : 필요한 건축 자원이 부족합니다."));
 		return;
 	}
 
@@ -653,9 +857,30 @@ void UBuildingPlacementComponent::ShowPreviewAtLocation(const FVector& InPreview
 
 	// 오브젝트 겹침 검사해서 결과를 얻어요
 	const bool bHasOverlap = HasPlacementOverlap(SupportingComponent);
-	
-	bCanPlace = (bIsSurfaceValid) && (bIsSlopeValid) && (!bHasOverlap);
 
+	// 건축 파츠를 만들 때 필요한 아이템을 들고 있는 검사를 해서 결과를 얻어요
+	const bool bHasEnoughResources = HasEnoughResources(SelectedDefinition.Get());
+
+	// 사용자에게 가장 구체적으로 알려줄 원인을 우선순위대로 세팅해요
+	if (false == bIsSurfaceValid)
+		CurrentInvalidReason = EBuildingPlacementInvalidReason::InvalidSurface;
+
+	else if (false == bIsSlopeValid)
+		CurrentInvalidReason = EBuildingPlacementInvalidReason::InvalidSlope;
+
+	else if (true == bHasOverlap)
+		CurrentInvalidReason = EBuildingPlacementInvalidReason::Overlap;
+
+	else if (false == bHasEnoughResources)
+		CurrentInvalidReason = EBuildingPlacementInvalidReason::InsufficientResources;
+
+	else // 위치와 자원 조건을 모두 만족했습니다.
+		CurrentInvalidReason = EBuildingPlacementInvalidReason::None;
+
+	// 실패 원인이 없으면 실제 설치 가능한 상태
+	bCanPlace = (CurrentInvalidReason == EBuildingPlacementInvalidReason::None);
+	//bCanPlace = (bIsSurfaceValid) && (bIsSlopeValid) && (!bHasOverlap) && (bHasEnoughResources);
+	
 	PreviewActor->SetPlacementValid(bCanPlace); // 여기서 PreviewActor Valid/Invalid 머터리얼 세팅해요
 	PreviewActor->SetActorHiddenInGame(false);
 }
@@ -723,8 +948,11 @@ bool UBuildingPlacementComponent::IsWithinServerPlacementDistance(const FVector&
 	if (false == IsValid(OwnerPawn)) return false;
 
 	const FVector ViewLocation = OwnerPawn->GetPawnViewLocation(); // 서버가 알고 있는 Pawn의 시점 위치
+
+	const float AllowedDistance = MaxPlacementDistance + ServerPlacementDistanceTolerance;
+
 	// 서버가 알고 있는 Pawn의 시점 위치를 기준으로 요청받은 건축 위치가 최대 설치 거리(수평 기준) 안인지 검사해요
-	return FVector::DistSquared2D(ViewLocation, InPlacementLocation) <= FMath::Square(MaxPlacementDistance);
+	return FVector::DistSquared2D(ViewLocation, InPlacementLocation) <= FMath::Square(AllowedDistance);
 }
 
 bool UBuildingPlacementComponent::FindSupportingGround(const UBuildingPartDefinition* Definition, const FVector& InPlacementLocation, FHitResult& OutGroundHit) const
@@ -918,4 +1146,93 @@ bool UBuildingPlacementComponent::IsServerFoundationPlacementValid(const UBuildi
 	}
 
 	return true;
+}
+
+bool UBuildingPlacementComponent::TryConsumeRequiredResources(const UBuildingPartDefinition* Definition)
+{
+	if (false == IsValid(Definition)) return false;
+
+	if (0 == Definition->ResourceCosts.Num()) return true; // 공짜
+
+	APlayerController* PlayerController = Cast<APlayerController>(GetOwner());
+	AActionCharacter* PlayerCharacter = IsValid(PlayerController) ? Cast<AActionCharacter>(PlayerController->GetPawn()): nullptr;
+	if(false == IsValid(PlayerCharacter)) return false;
+
+	UInventoryComponent* Inventory = PlayerCharacter->GetInventoryComponent();
+	if (false == IsValid(Inventory)) return false;
+
+	// 진짜 아이템을 소모하기 전에 자원이 충분한지 검사
+	if (false == HasEnoughResources(Definition)) return false;
+
+	//TODO 인벤토리에서 아이템 소모 관련 함수가 구현되면 살릴 부분
+	//for (const FBuildingResourceCost& ResourceCost : Definition->ResourceCosts)
+	//{
+	//	if (false == IsValid(ResourceCost.ItemData) || 0 >= ResourceCost.RequiredCount) return false;
+
+	//	const bool bConsumed = Inventory->ConsumeItem(ItemData, ResourceCost.RequiredCount); // 자원 소모에 성공했는가?
+	//	if (false == bConsumed)
+	//	{
+	//		UE_LOG(LogTemp, Warning, TEXT("[TryConsumeRequiredResources] : 자원 소모에 실패했습니다. Item=%s, Count=%d"),
+	//			*GetNameSafe(ResourceCost.ItemData), ResourceCost.RequiredCount);
+	//		return false;
+	//	}
+	//}
+
+	return true;
+}
+
+void UBuildingPlacementComponent::CycleSnapYawOffset()
+{
+	if (false == IsValid(SelectedDefinition)) return;
+
+	const int32 OffsetCnt = SelectedDefinition->AllowedSnapYawOffsets.Num();
+
+	if (OffsetCnt <= 0)
+	{
+		CurSnapYawOffsetIdx = 0;
+		return;
+	}
+
+	// 배열의 마지막 인덱스에서 다시 배열의 0번째 인덱스로 돌아가요
+	CurSnapYawOffsetIdx = (CurSnapYawOffsetIdx + 1) % OffsetCnt;
+}
+
+float UBuildingPlacementComponent::GetCurSnapYawOffset()
+{
+	if (false == IsValid(SelectedDefinition)) return 0.f;
+	if (false == SelectedDefinition->AllowedSnapYawOffsets.IsValidIndex(CurSnapYawOffsetIdx)) return 0.f;
+
+	return SelectedDefinition->AllowedSnapYawOffsets[CurSnapYawOffsetIdx];
+}
+
+bool UBuildingPlacementComponent::BuildSnappedPlacementTransform(const UBuildingPartDefinition* Definition, const FTransform& InSocketWorldTransform, float SnapYawOffset, FTransform& OutPlacementTransform) const
+{
+	if (false == IsValid(Definition) || false == IsValid(Definition->PartMesh)) return false;
+
+	// 대상 소켓 회전에 허용된 Yaw Offset을 적용해 설치될 해당 파츠의 최종 회전을 계산해요
+	FQuat YawOffsetRotation = FRotator(0.f, SnapYawOffset, 0.f).Quaternion();
+
+	FQuat FinalRotation = InSocketWorldTransform.GetRotation() * YawOffsetRotation; // 부착이 되어질 소켓의 방향을 기준으로 한 Rot
+	FVector FinalLocation = InSocketWorldTransform.GetLocation(); // 부착될 소켓의 위치였으면 좋으련만 해당 메시의 피벗 위치
+	FinalRotation.Normalize();
+
+	// PlacementAnchorSocketName이 설정된 파츠는 메시 피벗이 아니라 부착 되어질 소켓의 위치에 맞춰요
+	if (false == Definition->PlacementAnchorSocketName.IsNone())
+	{
+		const UStaticMeshSocket* PlacementAnchorSocket = Definition->PartMesh->FindSocket(Definition->PlacementAnchorSocketName);
+		if (nullptr == PlacementAnchorSocket)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[BuildSnappedPlacementTransform] : ") TEXT("Placement Anchor이 세팅된 소켓을 찾을 수 없습니다. Socket=%s"),
+				*Definition->PlacementAnchorSocketName.ToString());
+			return false;
+		}
+
+		// 부착 소켓을 부착이 되어질 소켓의 회전만큼 틀어줘요
+		// 그래야 부착되어질 소켓이 회전하면 얘도 같이 회전할테니
+		const FVector RotatedAnchorOffset = FinalRotation.RotateVector(PlacementAnchorSocket->RelativeLocation); // 계단 회전까지 적용한 후의 벡터
+		FinalLocation -= RotatedAnchorOffset; // 빼줘야 진짜 부착될 소켓의 위치가 나옴!!
+	}
+
+	OutPlacementTransform = FTransform(FinalRotation, FinalLocation, FVector::OneVector);
+	return (false == OutPlacementTransform.ContainsNaN());
 }

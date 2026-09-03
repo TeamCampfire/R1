@@ -22,16 +22,13 @@ public class R1 : ModuleRules
 			"CableComponent",
 			"Niagara",
 			"OnlineSubsystem",		// 세션 관리
-			"OnlineSubsystemUtils"	// 세션 관리
+			"OnlineSubsystemUtils",	// 세션 관리
+			"NavigationSystem",
+			"AIModule"
 		});
 
 
-		PrivateDependencyModuleNames.AddRange(new string[] {  });
-
-		if (Target.bBuildEditor)
-		{
-			PrivateDependencyModuleNames.AddRange(new string[] { "UnrealEd", "UMGEditor" });
-		}
+		PrivateDependencyModuleNames.AddRange(new string[] { "GameplayTags" });
 		
 		// Uncomment if you are using online features
 		// PrivateDependencyModuleNames.Add("OnlineSubsystem");

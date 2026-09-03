@@ -3,6 +3,9 @@
 
 #include "Framework/GameMode/TestGameMode.h"
 #include "GameFramework/Controller.h"
+#include "GameFramework/PlayerController.h"
+
+#include "Component/StatComponent.h"
 #include "Character/ActionCharacter.h"
 #include "Character/ActionPlayerController.h"
 
@@ -27,17 +30,24 @@ void ATestGameMode::RespawnPlayer(AController* InController)
 {
 	if (!IsValid(InController)) return;
 
+	AActionPlayerController* PC =
+		Cast<AActionPlayerController>(InController);
+
+	if (!PC) return;
+
 	FVector SpawnLocation;
 	FRotator SpawnRotation = FRotator::ZeroRotator;
-	FTransform SpawnTransform(SpawnRotation, SpawnLocation);
 
-	if (IsValid(Cast<AActionPlayerController>(InController)->GetRespawnPoint()))
+	// Respawn 위치 결정
+	if (IsValid(PC->GetRespawnPoint()))
 	{
-		SpawnTransform =
+		const FTransform RespawnTransform =
 			IRespawnPointInterface::Execute_GetRespawnTransform(
-				Cast<AActionPlayerController>(InController)->GetRespawnPoint()
+				PC->GetRespawnPoint()
 			);
-		SpawnLocation = SpawnTransform.GetLocation();
+
+		SpawnLocation = RespawnTransform.GetLocation();
+		SpawnRotation = RespawnTransform.Rotator();
 	}
 	else if (!FindRandomSpawnLocation(SpawnLocation))
 	{
@@ -47,13 +57,45 @@ void ATestGameMode::RespawnPlayer(AController* InController)
 		return;
 	}
 
+	// 현재 Controller에 연결된 캐릭터 확인
+	AActionCharacter* ExistingCharacter =
+		Cast<AActionCharacter>(InController->GetPawn());
 
-	SpawnTransform = FTransform(SpawnRotation, SpawnLocation);
+	if (IsValid(ExistingCharacter))
+	{
+		if (UStatComponent* StatComp = ExistingCharacter->GetStatComponent())
+		{
+			IHealthInterface* HealthInterface = Cast<IHealthInterface>(StatComp);
+			UE_LOG(LogTemp, Warning,
+				TEXT("[SERVER] Respawn %s bAlive = %s"),
+				*InController->GetName(),
+				ExistingCharacter &&
+				ExistingCharacter->GetStatComponent() &&
+				Cast<IHealthInterface>(
+					ExistingCharacter->GetStatComponent()
+				)->IsAlive()
+				? TEXT("TRUE")
+				: TEXT("FALSE"));
+
+			if (HealthInterface && HealthInterface->IsAlive())
+			{
+				ExistingCharacter->SetActorLocationAndRotation(
+					SpawnLocation,
+					SpawnRotation
+				);
+
+				return;
+			}
+		}
+	}
+	
+	// 살아있는 캐릭터가 없다면 새 캐릭터 생성
+	FTransform SpawnTransform(SpawnRotation, SpawnLocation);
 
 	TSubclassOf<APawn> PlayerClass =
 		GetDefaultPawnClassForController(InController);
 
-	if (!PlayerClass)	return;
+	if (!PlayerClass) return;
 
 	AActionCharacter* NewCharacter =
 		GetWorld()->SpawnActor<AActionCharacter>(
@@ -63,10 +105,7 @@ void ATestGameMode::RespawnPlayer(AController* InController)
 
 	if (NewCharacter)
 	{
-		AActionPlayerController* PC =
-			Cast<AActionPlayerController>(InController);
-
-		if (PC)	PC->PossessChar(NewCharacter);
+		PC->PossessChar(NewCharacter);
 	}
 }
 
@@ -127,4 +166,35 @@ bool ATestGameMode::FindRandomSpawnLocation(FVector& OutLocation) const
 	}
 
 	return false;
+}
+
+void ATestGameMode::Respawn(int32 ControllerIndex)
+{
+	UWorld* World = GetWorld();
+
+	if (!World) return;
+
+	int32 CurrentIndex = 0;
+
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator();
+		It; ++It)
+	{
+		APlayerController* PC = It->Get();
+
+		if (!IsValid(PC)) continue;
+		if (CurrentIndex == ControllerIndex)
+		{
+			RespawnPlayer(PC);
+
+			UE_LOG(LogTemp, Log, TEXT("Controller %d Respawn"), ControllerIndex);
+
+			return;
+		}
+
+		++CurrentIndex;
+	}
+
+	UE_LOG(LogTemp, Warning,
+		TEXT("Controller Index %d를 찾을 수 없습니다."),
+		ControllerIndex);
 }

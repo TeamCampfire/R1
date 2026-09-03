@@ -1,4 +1,4 @@
-// 작업 시작일 : 8/28
+﻿// 작업 시작일 : 8/28
 // 작업자 : 우진
 
 #pragma once
@@ -23,12 +23,14 @@ enum class EBuildingPartType : uint8
 {
 	NONE,
 	FOUNDATION,
+	FOUNDATION_TRIANGLE,
 	WALL,
 	WALL_DOORFRAME,
 	FLOOR,
 	STAIR,
 	DOOR,
-	DEPLOYABLE // 모닥불, 제작대처럼 구조물이 아닌 설치물
+	DEPLOYABLE, // 모닥불, 제작대처럼 구조물이 아닌 설치물
+	ROOF
 };
 
 // 스냅되어 붙을 수 있는 것들의 정보가 담긴 구조체
@@ -42,6 +44,13 @@ struct FBuildingSnapPointDefinition
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TArray<EBuildingPartType> AllowedPartTypes; // 이 위치에 설치할 수 있는 파츠의 종류
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	FName ConnectedPartSocketName = NAME_None; // 이 소켓에 새 파츠가 연결될 때 새로 설치된 파츠에서 함께 점유할 연결 소켓 이름
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snapping")
+	FName ConnectionAnchorSocketName = NAME_None; // 이 스냅 포인트가 담당하는 실제 연결면의 중심 소켓
+	// (새 파츠 설치 후 다른 Foundation의 연결면과 맞닿았는지 검사할 때 사용)
 };
 
 // 곧 사라질 수도 있음
@@ -54,6 +63,19 @@ struct FGroundPlacementRule
     UPROPERTY(EditAnywhere, BlueprintReadOnly, 
 		meta = (EditCondition = "bEnabled", EditConditionHides, ClampMin = "0.0", ClampMax = "90.0"))
     float MaxSlopeAngle = 35.f; // 설치 가능한 최대 지면 경사 (bEnabled 변수 값에 따라 해당 변수 활/비활 가능!!!)
+};
+
+// 건축 파츠 하나를 설치할 때 필요한 재료 한 종류의 정보
+USTRUCT(BlueprintType)
+struct FBuildingResourceCost
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<class UItemDataBase> ItemData = nullptr; // 건축할 때 소모할 재료 아이템의 데이터 애셋
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ClampMin = "1"))
+	int32 RequiredCount = 1; // 설치 시 필요 수량
 };
 
 /**
@@ -83,4 +105,25 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Building|Placement", meta = (TitleProperty = "SocketName"))
 	TArray<FBuildingSnapPointDefinition> SnapPoints; // 이 파츠가 다른 파츠에 제공하는 스냅 위치들
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|Snapping")
+	TArray<float> AllowedSnapYawOffsets = { 0.f }; // 소켓의 회전을 기준으로 선택할 수 있는 상대 Yaw 각도들
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|Snapping")
+	FName PlacementAnchorSocketName = NAME_None; // 이 파츠를 다른 파츠에 스냅할 때 대상 소켓에 맞출 자신의 소켓 (잠시 피벗이 된다고 이해하면 편함)
+	// None이면 기존처럼 메시 피벗을 대상 소켓에 맞춰요,
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|Cost", meta = (TitleProperty = "ItemData"))
+	TArray<FBuildingResourceCost> ResourceCosts; // 건축 파츠를 하나 설치할 때 필요한 모든 재료 목록
+
+	// ================= 건축 파츠 선택 Radial UI ===========================
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|UI")
+	FText DisplayName; // 다이얼 UI에 표시할 파츠 이름
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|UI", meta = (MultiLine = true))
+	FText Description; // 다이얼 중앙에 표시할 설명
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|UI")
+	TSoftObjectPtr<UTexture2D> Icon; // 다이얼에 표시할 파츠 아이콘
+
 };

@@ -137,6 +137,7 @@ void UStatComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(UStatComponent, CurrentHydration);
 	DOREPLIFETIME(UStatComponent, CurrentCalories);
 	DOREPLIFETIME(UStatComponent, PlayerStatusEffects);
+	DOREPLIFETIME(UStatComponent, bAlive);
 }
 
 void UStatComponent::IncreaseParameter(EParameterType InEParameterType, float InAmount)
@@ -257,6 +258,13 @@ void UStatComponent::DecreaseParameter(EParameterType InEParameterType, float In
 				UE_LOG(LogTemp, Log, TEXT("%s Died"), *this->GetOwner()->GetName());
 			}
 			bAlive = false;
+			UE_LOG(
+				LogTemp,
+				Warning,
+				TEXT("[SERVER] %s bAlive = %s"),
+				*GetOwner()->GetName(),
+				bAlive ? TEXT("TRUE") : TEXT("FALSE")
+			);
 		}
 		else
 		{
@@ -418,6 +426,11 @@ void UStatComponent::ApplyDehydrationDamage()
 
 void UStatComponent::OnRep_CurrentHealth()
 {
+	UE_LOG(LogTemp, Warning,
+		TEXT("[CLIENT] OnRep_CurrentHealth Owner=%s Health=%.2f"),
+		*GetNameSafe(GetOwner()),
+		CurrentHealth);
+
 	OnHealthChange.Broadcast(CurrentHealth, MaxHealth);
 }
 
@@ -433,11 +446,11 @@ void UStatComponent::OnRep_CurrentCalories()
 
 void UStatComponent::OnRep_PlayerStatusEffects()
 {
-	UE_LOG(LogTemp, Warning,
-		TEXT("=== ONREP STATUS === Owner=%s Authority=%d Effects=%d"),
-		*GetNameSafe(GetOwner()),
-		GetOwner() ? GetOwner()->HasAuthority() : false,
-		static_cast<uint8>(PlayerStatusEffects));
+	//UE_LOG(LogTemp, Warning,
+	//	TEXT("=== ONREP STATUS === Owner=%s Authority=%d Effects=%d"),
+	//	*GetNameSafe(GetOwner()),
+	//	GetOwner() ? GetOwner()->HasAuthority() : false,
+	//	static_cast<uint8>(PlayerStatusEffects));
 
 	OnStatusEffectChange.Broadcast();
 }
@@ -447,14 +460,15 @@ void UStatComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	GetWorld()->GetTimerManager().SetTimer(
-		SurvivalStatTimerHandle,
-		this,
-		&UStatComponent::DrainSurvivalStats,
-		SurvivalStatUpdateInterval,
-		true,
-		SurvivalStatUpdateInterval
-	);
+	// For Debug.
+	//GetWorld()->GetTimerManager().SetTimer(
+	//	SurvivalStatTimerHandle,
+	//	this,
+	//	&UStatComponent::DrainSurvivalStats,
+	//	SurvivalStatUpdateInterval,
+	//	true,
+	//	SurvivalStatUpdateInterval
+	//);
 }
 
 void UStatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)

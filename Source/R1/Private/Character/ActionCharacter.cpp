@@ -7,6 +7,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Component/HarvestableComponent.h"
+#include "Interface/Harvestable.h"
 #include "Component/HeldItemComponent.h"
 #include "Data/Item/EquipmentItemData.h"
 
@@ -175,6 +176,9 @@ void AActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		// 인벤토리 토글
 		EIC->BindAction(IA_InventoryToggle, ETriggerEvent::Started, this, &AActionCharacter::OnInventoryTogglePressed);
 
+		// 옵션(환경설정) 패널 토글
+		EIC->BindAction(IA_OptionsToggle, ETriggerEvent::Started, this, &AActionCharacter::OnOptionsTogglePressed);
+
 		// 벨트슬롯 단축키(1~6) — 인벤토리가 열려있는 동안엔 DefaultMappingContext 자체가 빠져있어서
 		// 이 액션들도 같이 안 눌린다(ActionPlayerController::SetInventoryInputState 참고).
 		EIC->BindAction(IA_Use_BeltSlot_1, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 0);
@@ -203,7 +207,11 @@ void AActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 			HeldItemComponent->GetCurrentHeldItem()->SetupInputComponent(EIC);
 		}
 
-		//EIC->BindAction(IA_BuildingPlacement, ETriggerEvent::Started, this, &AActionCharacter::OnBuildingPlacementPressed);
+		if(IA_BuildingPlacement)
+			EIC->BindAction(IA_BuildingPlacement, ETriggerEvent::Started, this, &AActionCharacter::OnBuildingPlacementPressed);
+
+		if (IA_RotateBuildingPart)
+			EIC->BindAction(IA_RotateBuildingPart, ETriggerEvent::Started, this, &AActionCharacter::OnRotateBuildingPartPressed);
 	}
 }
 
@@ -239,47 +247,82 @@ void AActionCharacter::SetCrouchInputMode(ECrouchInputMode NewMode)
 
 void AActionCharacter::ProcessAttack()
 {
+	// 여기 들어왔다는건 일단 휘둘렀다는 뜻.
+	// TODO 하드코딩 수정
+	// TODO DrainSurvivalStats 열어줄 수 있는지 물어볼 것
+	ICaloriesInterface::Execute_DecreaseCalories(StatComponent, 10.016f);
+	IHydrationInterface::Execute_DecreaseHydration(StatComponent, 10.0032f);
+
+	if (!IsLocallyControlled()) return;
 	//TODO 무기 타입에 따라서 세분화
 	FHitResult DetectRes;
 	if (DetectdObjectInAttackRange(DetectRes))
 	{
 		AActor* Target = DetectRes.GetActor();
+		if (!Target) return;
 
-		// 자원을 얻을 수 있는 대상인지 확인
-		if (UHarvestableComponent* HarvestComp = Target->FindComponentByClass<UHarvestableComponent>())
-		{
-			// 자원 획득 진행
-			FHarvestRes HarvRes =  IHarvestable::Execute_OnHitted(HarvestComp, this, DetectRes.ImpactPoint);
-			if (HarvRes.HarvesResult)
-			{
-				// 획득한 아이템 로그 출력
-				for (const FHarvestItemResult& ItemRes : HarvRes.HarvestedItems)
-				{
-					if (ItemRes.ItemData)
-					{
-						Server_GrantHarvestReward(ItemRes.ItemData, ItemRes.Count);
-
-						//TODO RemainCnt
-						//바닥에 소환하기
-						UE_LOG(LogTemp, Display, TEXT("자원 [%s]를 %d개 획득! (스위트스팟: %s, 고갈보너스: %s)"),
-							*(ItemRes.ItemData->DisplayName.ToString()),
-							ItemRes.Count,
-							HarvRes.bHitSweetSpot ? TEXT("O") : TEXT("X"),
-							HarvRes.bIsDepleted ? TEXT("O") : TEXT("X"));
-					}
-				}
-			}
-		}
-		//TOOD 자원이 얻는 대상이 아니라 공격을 받는 대상
-		else if (true)
-		{
-			UE_LOG(LogTemp, Display, TEXT("TODO 공격을 받는 인터페이스 구현"));
-		}
+		// 서버 권한으로 타격 및 자원 채집 처리 요청
+		Server_ProcessAttackTarget(Target, DetectRes.ImpactPoint);
 	}
 	else
 	{
 		UE_LOG(LogTemp, Display, TEXT("아무도 것도 맞지 않았습니다."));
 	}
+
+
+}
+
+bool AActionCharacter::Server_ProcessAttackTarget_Validate(AActor* TargetActor, const FVector& HitLocation)
+{
+	// Validate에서 false를 반환하면 언리얼 엔진이 클라이언트를 즉시 강제 종료(Kick)하므로,
+	// 대상 액터가 파괴/소멸 중이더라도 연결이 끊기지 않도록 true를 반환하고
+	// 실제 널 체크 및 유효성 검사는 Implementation 내부에서 안전하게 처리합니다.
+	return true;
+}
+
+void AActionCharacter::Server_ProcessAttackTarget_Implementation(AActor* TargetActor, const FVector& HitLocation)
+{
+	if (!TargetActor || !IsValid(TargetActor)) return;
+
+	// 1. 자원이 아니라 공격을 받는 대상인 경우 
+	if (IHealthInterface* IHealth = Cast<IHealthInterface>(TargetActor))
+	{
+		// 공격 실행
+		if (IHealth->IsAlive())
+		{
+			//TODO 하드코딩 수정
+			IHealthInterface::Execute_InflictDamage(TargetActor, 50.f);
+			return;
+		}
+
+	}
+
+	// 2. 자원을 얻을 수 있는 대상인지 확인
+	if (UHarvestableComponent* HarvestComp = TargetActor->FindComponentByClass<UHarvestableComponent>())
+	{
+		// 서버에서 자원 획득 진행 (OnHitted_Implementation 실행)
+		FHarvestRes HarvRes = IHarvestable::Execute_OnHitted(HarvestComp, this, HitLocation);
+		if (HarvRes.HarvesResult)
+		{
+			// 서버에서 만들어준 자원을 인벤토리에 넣는다.
+			for (const FHarvestItemResult& ItemRes : HarvRes.HarvestedItems)
+			{
+				if (ItemRes.ItemData && InventoryComponent)
+				{
+					int32 RemainCnt = 0;
+					InventoryComponent->AddItem(ItemRes.ItemData, ItemRes.Count, RemainCnt);
+
+					//// For Debug
+					//UE_LOG(LogTemp, Display, TEXT("[서버] 자원 [%s]를 %d개 획득! (스위트스팟: %s, 고갈보너스: %s)"),
+					//	*(ItemRes.ItemData->DisplayName.ToString()),
+					//	ItemRes.Count,
+					//	HarvRes.bHitSweetSpot ? TEXT("O") : TEXT("X"),
+					//	HarvRes.bIsDepleted ? TEXT("O") : TEXT("X"));
+				}
+			}
+		}
+	}
+
 }
 
 bool AActionCharacter::Server_GrantHarvestReward_Validate(UItemDataBase* ItemData, int32 Count)
@@ -479,10 +522,16 @@ void AActionCharacter::OnJumpPressed()
 
 void AActionCharacter::OnBuildingPlacementPressed()
 {
-	UE_LOG(LogTemp, Display, TEXT("OnBuildingPlacementPressed"));
+
 	// 플레이어 컨트롤러에게 건축 배치를 맡김
 	if (AActionPlayerController* PlayerController = Cast<AActionPlayerController>(GetController()))
 		PlayerController->OnConfirmBuildingPlacement();
+}
+
+void AActionCharacter::OnRotateBuildingPartPressed()
+{
+	if (AActionPlayerController* PlayerController = Cast<AActionPlayerController>(GetController()))
+		PlayerController->OnRotateBuildingPart();
 }
 
 void AActionCharacter::OnInteractPressed()
@@ -512,6 +561,25 @@ void AActionCharacter::OnInventoryTogglePressed()
 	const bool bIsOpen = MainHudWidget->ToggleInventoryPanel();
 	UE_LOG(LogTemp, Warning, TEXT("[InvToggle] ToggleInventoryPanel returned bIsOpen=%d"), bIsOpen);
 	PC->SetInventoryInputState(bIsOpen);
+}
+
+void AActionCharacter::OnOptionsTogglePressed()
+{
+	AActionPlayerController* PC = Cast<AActionPlayerController>(GetController());
+	if (!PC)
+	{
+		return;
+	}
+
+	AMainHUD* HUD = PC->GetHUD<AMainHUD>();
+	UMainHUDWidget* MainHudWidget = HUD ? HUD->GetMainHudWidget() : nullptr;
+	if (!MainHudWidget)
+	{
+		return;
+	}
+
+	const bool bIsOpen = MainHudWidget->ToggleOptionsPanel();
+	PC->SetOptionsInputState(bIsOpen);
 }
 
 void AActionCharacter::OnUseBeltSlotPressed(int32 BeltIndex)
@@ -615,6 +683,13 @@ bool AActionCharacter::DetectdObjectInAttackRange(FHitResult& OutHitRes)
 		}
 	}
 	return false;
+}
+
+UInventoryComponent* AActionCharacter::GetInventoryComponent() const
+{
+	if (false == IsValid(InventoryComponent)) return nullptr;
+
+	return InventoryComponent;
 }
 
 
