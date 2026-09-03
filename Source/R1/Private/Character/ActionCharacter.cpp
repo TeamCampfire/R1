@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Character/ActionCharacter.h"
@@ -271,13 +271,27 @@ void AActionCharacter::Server_ProcessAttackTarget_Implementation(AActor* TargetA
 {
 	if (!TargetActor || !IsValid(TargetActor)) return;
 
-	// 1. 자원을 얻을 수 있는 대상인지 확인
+	// 1. 자원이 아니라 공격을 받는 대상인 경우 
+	if (IHealthInterface* IHealth = Cast<IHealthInterface>(TargetActor))
+	{
+		// 공격 실행
+		if (IHealth->IsAlive())
+		{
+			//TODO 하드코딩 수정
+			IHealthInterface::Execute_InflictDamage(TargetActor, 50.f);
+			return;
+		}
+
+	}
+
+	// 2. 자원을 얻을 수 있는 대상인지 확인
 	if (UHarvestableComponent* HarvestComp = TargetActor->FindComponentByClass<UHarvestableComponent>())
 	{
 		// 서버에서 자원 획득 진행 (OnHitted_Implementation 실행)
 		FHarvestRes HarvRes = IHarvestable::Execute_OnHitted(HarvestComp, this, HitLocation);
 		if (HarvRes.HarvesResult)
 		{
+			// 서버에서 만들어준 자원을 인벤토리에 넣는다.
 			for (const FHarvestItemResult& ItemRes : HarvRes.HarvestedItems)
 			{
 				if (ItemRes.ItemData && InventoryComponent)
@@ -285,20 +299,17 @@ void AActionCharacter::Server_ProcessAttackTarget_Implementation(AActor* TargetA
 					int32 RemainCnt = 0;
 					InventoryComponent->AddItem(ItemRes.ItemData, ItemRes.Count, RemainCnt);
 
-					UE_LOG(LogTemp, Display, TEXT("[서버] 자원 [%s]를 %d개 획득! (스위트스팟: %s, 고갈보너스: %s)"),
-						*(ItemRes.ItemData->DisplayName.ToString()),
-						ItemRes.Count,
-						HarvRes.bHitSweetSpot ? TEXT("O") : TEXT("X"),
-						HarvRes.bIsDepleted ? TEXT("O") : TEXT("X"));
+					//// For Debug
+					//UE_LOG(LogTemp, Display, TEXT("[서버] 자원 [%s]를 %d개 획득! (스위트스팟: %s, 고갈보너스: %s)"),
+					//	*(ItemRes.ItemData->DisplayName.ToString()),
+					//	ItemRes.Count,
+					//	HarvRes.bHitSweetSpot ? TEXT("O") : TEXT("X"),
+					//	HarvRes.bIsDepleted ? TEXT("O") : TEXT("X"));
 				}
 			}
 		}
 	}
-	// 2. 자원이 아니라 공격을 받는 대상인 경우 (추후 구현)
-	else
-	{
-		UE_LOG(LogTemp, Display, TEXT("TODO 공격을 받는 인터페이스 구현"));
-	}
+
 }
 
 bool AActionCharacter::Server_GrantHarvestReward_Validate(UItemDataBase* ItemData, int32 Count)
