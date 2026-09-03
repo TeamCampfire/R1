@@ -1,4 +1,4 @@
-#include "Component/HarvestableComponent.h"
+﻿#include "Component/HarvestableComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Kismet/GameplayStatics.h"
 #include "Character/ActionCharacter.h"
@@ -27,10 +27,13 @@ void UHarvestableComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// 부모 액터의 네트워크 복제 활성화 (컴포넌트 복제 및 OnRep 수신을 위해 필수)
 	if (AActor* MyOwner = GetOwner())
 	{
-		MyOwner->SetReplicates(true);
+		// 서버일 때만 복제 켜기를 실행하도록 가드!
+		if (MyOwner->HasAuthority())
+		{
+			MyOwner->SetReplicates(true);
+		}
 	}
 }
 
