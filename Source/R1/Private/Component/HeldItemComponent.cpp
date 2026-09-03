@@ -6,7 +6,7 @@
 #include "Component/HeldItemComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Item/HeldItemBase.h"
-#include "Data/Item/EquipmentItemData.h"
+#include "Data/Item/HeldItemData.h"
 #include "Character/ActionCharacter.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "EnhancedInputComponent.h"
@@ -109,7 +109,7 @@ AHeldItemBase* UHeldItemComponent::EquipItem(UItemDataBase* ItemData)
 		return nullptr;
 	}
 
-	UEquipmentItemData* EquipData = Cast<UEquipmentItemData>(ItemData);
+	UHeldItemData* EquipData = Cast<UHeldItemData>(ItemData);
 	if (EquipData)
 	{
 		return EquipHeldItemByData(EquipData);
@@ -118,7 +118,7 @@ AHeldItemBase* UHeldItemComponent::EquipItem(UItemDataBase* ItemData)
 	return nullptr;
 }
 
-AHeldItemBase* UHeldItemComponent::EquipHeldItemByData(UEquipmentItemData* EquipItemData)
+AHeldItemBase* UHeldItemComponent::EquipHeldItemByData(UHeldItemData* EquipItemData)
 {
 	if (!EquipItemData)
 	{

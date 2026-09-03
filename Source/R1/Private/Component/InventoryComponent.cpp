@@ -1,9 +1,10 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Component/InventoryComponent.h"
 #include "Data/Item/ItemDataBase.h"
 #include "Data/Item/EquipmentItemData.h"
+#include "Data/Item/HeldItemData.h"
 #include "Item/ItemPickup.h"
 #include "GameFramework/Character.h"
 #include "Component/HeldItemComponent.h"
@@ -384,15 +385,14 @@ void UInventoryComponent::UseBeltSlot(int32 BeltIndex)
 			TransferItem(FInventorySlotRef{ EInventorySlotCategory::Belt, BeltIndex }, FInventorySlotRef{ EInventorySlotCategory::Equipment, 0 }, 0);
 			break;
 
-		case EItemCategory::Weapon:
-		case EItemCategory::Tool:
+		case EItemCategory::HeldItem:
 		{
 			// 1. 현재 선택된 벨트 슬롯 갱신
 			HeldBeltIndex = BeltIndex;
 			// 2. HeldItemComponent를 찾아 도구 장착 실행
 			if (UHeldItemComponent* HeldItemComp = GetOwner() ? GetOwner()->FindComponentByClass<UHeldItemComponent>() : nullptr)
 			{
-				if (UEquipmentItemData* EquipData = Cast<UEquipmentItemData>(Instance.ItemData))
+				if (UHeldItemData* EquipData = Cast<UHeldItemData>(Instance.ItemData))
 				{
 					HeldItemComp->EquipHeldItemByData(EquipData);
 				}
@@ -525,6 +525,108 @@ bool UInventoryComponent::Server_ThrowItem_Validate(FInventorySlotRef Slot, int3
 void UInventoryComponent::Server_ThrowItem_Implementation(FInventorySlotRef Slot, int32 Count)
 {
 	ThrowItem(Slot, Count);
+}
+
+int32 UInventoryComponent::GetItemCount(const UItemDataBase* ItemData) const
+{
+	if (!ItemData)
+	{
+		return 0;
+	}
+
+	int32 Total = 0;
+
+	// 메인 슬롯 검사
+	for (const FItemInstance& Slot : MainSlots)
+	{
+		if (Slot.ItemData == ItemData)
+		{
+			Total += Slot.StackCount;
+		}
+	}
+
+	// 벨트 슬롯 검사
+	for (const FItemInstance& Slot : BeltSlots)
+	{
+		if (Slot.ItemData == ItemData)
+		{
+			Total += Slot.StackCount;
+		}
+	}
+
+	// 장비슬롯은 재료가 들어갈 일 없으니 제외
+
+	return Total;
+}
+
+bool UInventoryComponent::HasEnoughOf(const UItemDataBase* ItemData, int32 Amount) const
+{
+	return GetItemCount(ItemData) >= Amount;
+}
+
+bool UInventoryComponent::HasIngredients(const TArray<FCraftIngredient>& Ingredients) const
+{
+	for (const FCraftIngredient& Ingredient : Ingredients)
+	{
+		UItemDataBase* RequiredItem = Ingredient.Item.LoadSynchronous();
+		if (!RequiredItem)
+		{
+			continue;	// 재료 칸이 비어있는 레시피 데이터 — 요구사항 없음으로 취급
+		}
+
+		if (GetItemCount(RequiredItem) < Ingredient.Amount)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+bool UInventoryComponent::CanCraftItem(const UItemDataBase* ItemToCraft) const
+{
+	return ItemToCraft && HasIngredients(ItemToCraft->CraftingCost);
+}
+
+bool UInventoryComponent::ConsumeIngredients(const TArray<FCraftIngredient>& Ingredients)
+{
+	if (!HasIngredients(Ingredients))
+	{
+		return false;
+	}
+
+	for (const FCraftIngredient& Ingredient : Ingredients)
+	{
+		if (UItemDataBase* RequiredItem = Ingredient.Item.LoadSynchronous())
+		{
+			ConsumeItemCount(RequiredItem, Ingredient.Amount);
+		}
+	}
+
+	return true;
+}
+
+void UInventoryComponent::ConsumeItemCount(const UItemDataBase* ItemData, int32 CountToRemove)
+{
+	auto RemoveFrom = [this, ItemData, &CountToRemove](EInventorySlotCategory Category)
+	{
+		TArray<FItemInstance>& Array = GetSlotArray(Category);
+		for (int32 Index = 0; Index < Array.Num() && CountToRemove > 0; ++Index)
+		{
+			const FItemInstance& Slot = Array[Index];
+			if (Slot.ItemData != ItemData)
+			{
+				continue;
+			}
+
+			const int32 AmountToTake = FMath::Min(Slot.StackCount, CountToRemove);
+			const int32 Remaining = Slot.StackCount - AmountToTake;
+			SetSlot(Category, Index, Remaining > 0 ? FItemInstance(Slot.ItemData, Remaining) : FItemInstance());
+			CountToRemove -= AmountToTake;
+		}
+	};
+
+	RemoveFrom(EInventorySlotCategory::Main);
+	RemoveFrom(EInventorySlotCategory::Belt);
 }
 
 void UInventoryComponent::PrintInventoryInfo()
