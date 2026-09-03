@@ -187,7 +187,7 @@ void AActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EIC->BindAction(IA_Use_BeltSlot_4, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 3);
 		EIC->BindAction(IA_Use_BeltSlot_5, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 4);
 		EIC->BindAction(IA_Use_BeltSlot_6, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 5);
-	
+
 		// 공격 (좌클릭 / 도구 주 액션)
 		if (IA_Attack)
 		{

@@ -10,6 +10,8 @@
 #include "GameFramework/PlayerState.h"
 #include "EngineUtils.h"
 #include "UserSettings/EnhancedInputUserSettings.h"
+#include "Framework/MainHUD.h"
+#include "Widget/Multiplayer/MultiplayerMenuWidget.h"
 
 #include "BuildingSystem/Component/BuildingPlacementComponent.h"
 #include "Data/Building/BuildingPartDefinition.h"
@@ -23,6 +25,14 @@ AActionPlayerController::AActionPlayerController()
 void AActionPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// 게임 입력 모드로 설정
+	if (IsLocalPlayerController())
+	{
+		SetInputMode(FInputModeGameOnly());
+		SetShowMouseCursor(false);
+		FlushPressedKeys();
+	}
 
 	UEnhancedInputLocalPlayerSubsystem* SubSystem =
 		ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
@@ -71,6 +81,17 @@ void AActionPlayerController::BeginPlay()
 				*GetNameSafe(UIMappingContext), bUIRegistered ? TEXT("성공") : TEXT("실패"),
 				MappingCount);
 		}
+	}
+}
+
+void AActionPlayerController::SetupInputComponent()
+{
+	Super::SetupInputComponent();
+
+	if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(InputComponent))
+	{
+		// Esc: 게임 메뉴 토글
+		EIC->BindAction(IA_GameMenuToggle, ETriggerEvent::Started, this, &AActionPlayerController::OnGameMenuTogglePressed);
 	}
 }
 
@@ -139,15 +160,22 @@ void AActionPlayerController::SetOptionsInputState(bool bOpen)
 	ApplyUIInputState(bOpen);
 }
 
+void AActionPlayerController::SetGameMenuInputState(bool bOpen)
+{
+	ApplyUIInputState(bOpen);
+}
+
 void AActionPlayerController::ApplyUIInputState(bool bOpen)
 {
+	FlushPressedKeys();	// UI 토글 순간 눌려있던 키가 계속 적용되는 것 방지
+
 	// 열려있는 UI 패널이 하나도 없다가 하나 생길 때(0→1)만 게임 입력을 끄고,
 	// 마지막 하나가 닫힐 때(1→0)만 게임 입력을 복구한다 — 인벤토리를 연 채로 옵션을
 	// 열었다가 옵션만 닫아도 인벤토리가 열려있는 한 게임 입력이 되살아나지 않는다.
 	OpenUIPanelCount = FMath::Max(0, OpenUIPanelCount + (bOpen ? 1 : -1));
 	const bool bAnyPanelOpen = OpenUIPanelCount > 0;
 
-	bShowMouseCursor = bAnyPanelOpen;
+	SetShowMouseCursor(bAnyPanelOpen);
 
 	if (UEnhancedInputLocalPlayerSubsystem* SubSystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 	{
@@ -284,6 +312,31 @@ void AActionPlayerController::TestHydrationDamage(int32 PlayerIndex)
 		StatComp->TestDecreaseHydration();
 		return;
 	}
+}
+
+void AActionPlayerController::OnGameMenuTogglePressed()
+{
+	AMainHUD* HUD = GetHUD<AMainHUD>();
+	UMultiplayerMenuWidget* GameMenuWidget = HUD ? HUD->GetGameMenuWidget() : nullptr;
+	if (!GameMenuWidget)
+		return;
+
+	const bool bOpen = GameMenuWidget->GetVisibility() == ESlateVisibility::Collapsed;
+
+	if (bOpen)
+	{
+		GameMenuWidget->RefreshMenuState();
+		GameMenuWidget->RefreshSessions();
+	}
+
+	GameMenuWidget->SetVisibility(
+		bOpen
+		? ESlateVisibility::Visible
+		: ESlateVisibility::Collapsed
+	);
+
+	SetGameMenuInputState(bOpen);	// Temp
+	// ApplyUIInpuState(bOpen);
 }
 
 void AActionPlayerController::ServerTestInflictDamage_Implementation()

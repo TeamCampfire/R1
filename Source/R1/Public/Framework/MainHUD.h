@@ -12,6 +12,7 @@
 
 class UInteractionPromptWidget;
 class UMainHUDWidget;
+class UMultiplayerMenuWidget;
 
 /**
  *
@@ -22,17 +23,27 @@ class R1_API AMainHUD : public AHUD
 	GENERATED_BODY()
 
 public:
+
 	UFUNCTION(BlueprintCallable)
 	UMainHUDWidget* GetMainHudWidget() const;
+	UMultiplayerMenuWidget* GetGameMenuWidget() const;
 
 protected:
+
 	virtual void BeginPlay() override;
 
 protected:
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TSubclassOf<UMainHUDWidget> MainHudWidgetClass = nullptr;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	TObjectPtr<UMainHUDWidget> MainHudWidgetInstance = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TSubclassOf<UMultiplayerMenuWidget> GameMenuWidgetClass = nullptr;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	TObjectPtr<UMultiplayerMenuWidget> GameMenuWidgetInstance = nullptr;
 
 };

@@ -24,12 +24,19 @@ class R1_API AActionPlayerController : public APlayerController
 	GENERATED_BODY()
 	
 public:
+
 	AActionPlayerController();
 
 protected:
+
 	virtual void BeginPlay() override;
 
+	// Called to bind functionality to input
+	virtual void SetupInputComponent() override;
+
+
 public:
+
 	// 플레이어가 건축 좌키 눌렀을 때 컨트롤러로 넘어온 함수
 	void OnConfirmBuildingPlacement();
 
@@ -42,41 +49,51 @@ public:
 
 	//  ===================================================================================
 public:
+
 	virtual void OnPossess(APawn* InPawn) override;
 	UFUNCTION()
 	void PossessChar(AActionCharacter* InNewChar);
 
 public:
+
 	// 인벤토리 패널이 열리면 마우스 커서를 보여주고 UI 입력을 받도록, 닫히면 다시 게임 전용 입력으로 되돌린다.
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	void SetInventoryInputState(bool bOpen);
-
 	// 옵션 패널이 열리면 마우스 커서를 보여주고 UI 입력을 받도록, 닫히면 다시 게임 전용 입력으로 되돌린다.
 	// SetInventoryInputState와 동일한 카운터(OpenUIPanelCount)를 공유하므로, 인벤토리와 옵션을
 	// 동시에 열어도 마지막 하나가 닫힐 때까지 게임 입력이 잘못 복구되지 않는다.
 	UFUNCTION(BlueprintCallable, Category = "Options")
 	void SetOptionsInputState(bool bOpen);
 
+	// Temp: 없애도 될 거 같은데 !!!!!!!!!
+	// GameMenu 패널이 열리면 마우스 커서를 보여주고 UI 입력을 받도록, 닫히면 다시 게임 전용 입력으로 되돌린다.
+	UFUNCTION(BlueprintCallable, Category = "GameMenu")
+	void SetGameMenuInputState(bool bOpen);
+
 	// 리스폰 지점(액터) 설정 함수
 	UFUNCTION(BlueprintCallable, Category = "Respawn")
 	void SetRespawnPoint(AActor* InRespawnPoint);
 	// 리스폰 지점(액터) 반환 함수
-	UFUNCTION(BlueprintCallable, Category = "Respawn")
-	AActor* GetRespawnPoint();
 
-protected:
 	// 폰 변경 감지 함수
 	virtual void OnRep_Pawn() override;
 
 	// Debug---------------------------------------------------------------------------------------------------------------------
+	UFUNCTION(BlueprintCallable, Category = "Respawn")
+	AActor* GetRespawnPoint();
+
+protected:
 	UFUNCTION(Server, Reliable)
 	void ServerTestInflictDamage();
+	// --------------------------------------------------------------------------------------------------------------------------
+	
 	UFUNCTION(Exec)
 	void TestDamage(int32 PlayerIndex);
 	UFUNCTION(Exec)
 	void TestHydrationDamage(int32 PlayerIndex);
-	// --------------------------------------------------------------------------------------------------------------------------
+
 protected:
+
 	// 기본 입력 맵핑 컨텍스트(캐릭터 조작) — 인벤토리가 열려있는 동안엔 제거된다.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UInputMappingContext> DefaultMappingContext = nullptr;
@@ -88,20 +105,33 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UInputMappingContext> UIMappingContext = nullptr;
 
-	// 플레이어 리스폰 지점
-	UPROPERTY()
-	TObjectPtr<AActor> RespawnPoint;
+	// 게임 메뉴 토글
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UInputAction> IA_GameMenuToggle;
+
+	void OnGameMenuTogglePressed();	// 게임 메뉴 토글
 
 	// SetInventoryInputState/SetOptionsInputState가 공유하는 "현재 열려있는 UI 패널 개수" —
 	// 0→1로 바뀔 때만 게임 입력을 끄고, 1→0으로 바뀔 때만 게임 입력을 복구한다.
 	void ApplyUIInputState(bool bOpen);
 	int32 OpenUIPanelCount = 0;
+
+	// 플레이어 리스폰 지점
+	UPROPERTY()
+	TObjectPtr<AActor> RespawnPoint;
+
 public:
+
 	// 컨트롤러 연결 캐릭터 변경 시 호출되는 델리게이트
 	FOnPossessedCharChange OnPossessedCharChange;
 
 private:
+
 	// 입력 우선 순위
 	int32 GameInputPriority = 1;
 	int32 UIInputPriority = 2;
+
+	/* UI 사용 상태 */
+	bool bInventoryOpen = false;
+	bool bGameMenuOpen = false;
 };

@@ -8,7 +8,24 @@ public class R1 : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "AnimGraphRuntime", "UMG", "Slate", "SlateCore", "Water", "CableComponent", "Niagara", "NavigationSystem", "AIModule" });
+		PublicDependencyModuleNames.AddRange(new string[] {
+			"Core",
+			"CoreUObject",
+			"Engine",
+			"InputCore",
+			"EnhancedInput",
+			"AnimGraphRuntime",
+			"UMG",
+			"Slate",
+			"SlateCore",
+			"Water",
+			"CableComponent",
+			"Niagara",
+			"OnlineSubsystem",		// 세션 관리
+			"OnlineSubsystemUtils",	// 세션 관리
+			"NavigationSystem",
+			"AIModule"
+		});
 
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "GameplayTags" });
