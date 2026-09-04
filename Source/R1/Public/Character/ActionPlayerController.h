@@ -78,6 +78,9 @@ public:
 	// 폰 변경 감지 함수
 	virtual void OnRep_Pawn() override;
 
+	// 서버에 스폰 요청 함수
+	UFUNCTION(Server, Reliable)
+	void RequestSpawn();
 	// Debug---------------------------------------------------------------------------------------------------------------------
 	UFUNCTION(BlueprintCallable, Category = "Respawn")
 	AActor* GetRespawnPoint();

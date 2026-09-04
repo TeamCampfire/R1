@@ -10,10 +10,13 @@
 #include "Blueprint/UserWidget.h"
 #include "MainHUDWidget.generated.h"
 
+class UCanvasPanel;
 class UInteractionPromptWidget;
 class UInventoryWidget;
 class UBeltBarWidget;
 class UOptionsWidget;
+class UDeathScreenOverlayWidget;
+class AActionPlayerController;
 /**
  * 
  */
@@ -41,6 +44,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Options")
 	bool IsOptionsPanelOpen() const;
 
+public:
+	// 플레이어 컨트롤러 캐싱
+	UPROPERTY()
+	TObjectPtr<AActionPlayerController> CachedController;
+
 protected:
 	//~ Begin UUserWidget Interface
 	virtual void NativeOnInitialized() override;
@@ -49,6 +57,24 @@ protected:
 
 	// 현재 표시 중인 건축 안내 메시지를 숨기는 함수
 	void HideBuildingPlacementMessage();
+
+	// 사망창 띄우기
+	void ShowDeathScreen();
+	// 사망창 숨기기
+	void HideDeathScreen();
+
+	UFUNCTION()
+	void OnPossessedCharChange();
+	UFUNCTION()
+	void OnDeath();
+	UFUNCTION()
+	void OnRespawnClicked();
+
+
+	void BindDelegatesToNewChar();
+	// 설정, 사망화면 등을 제외한 모든 HUD 패널
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UCanvasPanel> HUDPanel;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UInteractionPromptWidget> InteractionPromptWidget;
@@ -74,4 +100,9 @@ protected:
 
 	UPROPERTY(Transient, meta = (BindWidgetAnim))
 	TObjectPtr<UWidgetAnimation> Anim_BuildingPlacementMessage; // WBP_MainHUD에서 만든 설치 실패 메시지 페이드 애니메이션
+
+	// 사망 화면
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UDeathScreenOverlayWidget> DeathScreenOverlay;
+
 };

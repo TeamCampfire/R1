@@ -152,8 +152,7 @@ bool ATestGameMode::FindRandomSpawnLocation(FVector& OutLocation) const
 			Params
 		);
 
-		if (!bHit)
-			continue;
+		if (!bHit) continue;
 
 		if (Hit.Component.IsValid() &&
 			Hit.Component->GetCollisionProfileName() == TEXT("WaterBodyCollision"))

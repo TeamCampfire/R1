@@ -28,4 +28,13 @@ public:
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Calories")
 	void RecoverCalories(float inAmount);
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Calories")
+	float GetCaloriesDropRate() const;
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Calories")
+	void SetCaloriesDropRate(float InDropRate);
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Calories")
+	void ResetCaloriesDropRate();
 };
