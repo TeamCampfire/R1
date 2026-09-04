@@ -1,4 +1,5 @@
 ﻿#include "Spawner/HarvestSpawner.h"
+#include "Engine/AssetManager.h"
 
 // Sets default values
 AHarvestSpawner::AHarvestSpawner()
@@ -49,7 +50,7 @@ AActor* AHarvestSpawner::SpawnHarvestableObject(TSubclassOf<AActor> TargetClass)
 		FVector StartPos = RandPos3D;
 		FVector EndPos = RandPos3D + FVector::DownVector * 10000.f;
 
-		//1-2. ECC_WorldStatic만 감지
+		//1-2. ECC_WorldStatic,ECC_WorldDynamic만 감지
 		FCollisionObjectQueryParams ObjectQueryParams;
 		ObjectQueryParams.AddObjectTypesToQuery(ECC_WorldStatic);
 		ObjectQueryParams.AddObjectTypesToQuery(ECC_WorldDynamic);
@@ -102,6 +103,50 @@ void AHarvestSpawner::OnActorDepleted(AActor* DestroyedActor)
 	);
 }
 
+void AHarvestSpawner::OnTargetClassesLoaded()
+{
+	PendingList.Empty();
+
+
+	// SpawnTargetArray[i] 타겟을  MaxCntArray[i]개 만큼 소환 
+	for (int i = 0; i < SpawnTargetArray.Num(); i++)
+	{
+		TSubclassOf<AActor> LoadedClass = SpawnTargetArray[i].Get();
+		if (!LoadedClass) return;
+		for (int j = 0; j < MaxCntArray[i]; j++)
+		{
+			PendingList.Add(LoadedClass);
+			//if (SpawnHarvestableObject(SpawnTargetArray[i]) == nullptr)
+			//{
+			//	UE_LOG(LogTemp, Warning, TEXT("[AHarvestSpawner::InitializeSpawner()] : Something Wrong With Spawn"));
+			//	return;
+			//}
+		}
+	}
+
+	// 3. 한 번에 스폰하지 않고 타이머로 분할 스폰 시작 (히치 완전 제거)
+	GetWorld()->GetTimerManager().SetTimer(
+		SpawnTimerHandle,
+		this,
+		&AHarvestSpawner::ProcessPendingSpawns,
+		SpawnInterval,
+		true
+	);
+}
+
+void AHarvestSpawner::ProcessPendingSpawns()
+{
+	if (PendingList.Num() == 0)
+	{
+		GetWorldTimerManager().ClearTimer(SpawnTimerHandle);
+		return;
+	}
+
+	// 큐에서 하나 꺼내어 스폰
+	TSubclassOf<AActor> ClassToSpawn = PendingList.Pop();
+	SpawnHarvestableObject(ClassToSpawn);
+}
+
 void AHarvestSpawner::InitializeSpawner()
 {
 	if (SpawnTargetArray.Num() == 0)
@@ -116,16 +161,18 @@ void AHarvestSpawner::InitializeSpawner()
 		return;
 	}
 
-	// SpawnTargetArray[i] 타겟을  MaxCntArray[i]개 만큼 소환 
-	for (int i = 0; i < SpawnTargetArray.Num(); i++)
+	// 소환할 목록
+	TArray<FSoftObjectPath> TargetsToLoad;
+	for (TSoftClassPtr<AActor>& SpawnTarget : SpawnTargetArray)
 	{
-		for (int j = 0; j < MaxCntArray[i]; j++)
-		{
-			if (SpawnHarvestableObject(SpawnTargetArray[i]) == nullptr)
-			{
-				UE_LOG(LogTemp, Warning, TEXT("[AHarvestSpawner::InitializeSpawner()] : Something Wrong With Spawn"));
-				return;
-			}
-		}
+		if (SpawnTarget.IsNull()) continue;
+		TargetsToLoad.Add(SpawnTarget.ToSoftObjectPath());
 	}
+
+	FStreamableManager& StreamableManager = UAssetManager::GetStreamableManager();
+	AsyncHandle = StreamableManager.RequestAsyncLoad(
+		TargetsToLoad,
+		FStreamableDelegate::CreateUObject(this, &AHarvestSpawner::OnTargetClassesLoaded)
+	);
+
 }

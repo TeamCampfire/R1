@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Engine/StreamableManager.h"
 #include "HarvestSpawner.generated.h"
 
 UCLASS()
@@ -31,12 +32,16 @@ private:
 	UFUNCTION(BlueprintCallable)
 	void OnActorDepleted(AActor* DestroyedActor);
 
+	void OnTargetClassesLoaded();
+
+	void ProcessPendingSpawns();
+
 public:
 
 protected:
 	//TODO 데이터 에셋으로 넘어가기
 	UPROPERTY(EditDefaultsOnly, Category = "Spawn|Target")
-	TArray<TSubclassOf<AActor>> SpawnTargetArray;
+	TArray<TSoftClassPtr<AActor>> SpawnTargetArray;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Spawn|Target")
 	TArray<int32> MaxCntArray;
@@ -47,6 +52,15 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Spawn")
 	float Delay = 10.0f;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Spawn")
+	float SpawnInterval = 0.2f;
+
 	/*UPROPERTY(EditDefaultsOnly, Category = "Spawn|Target")
 	TArray<TObjectPtr<TSubclassOf<AActor>>> TreeArray;*/
+
+private:
+	TSharedPtr<FStreamableHandle> AsyncHandle;
+
+	TArray<TSubclassOf<AActor>> PendingList;
+	FTimerHandle SpawnTimerHandle;
 };
