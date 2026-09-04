@@ -14,7 +14,6 @@ class UCanvasPanel;
 class UInteractionPromptWidget;
 class UInventoryWidget;
 class UBeltBarWidget;
-class UOptionsWidget;
 class UDeathScreenOverlayWidget;
 class AActionPlayerController;
 /**
@@ -36,13 +35,6 @@ public:
 	// 건축 설치 실패 메시지를 화면에 표시하는 함수
 	// 같은 메시지를 연속으로 요청하면 기존 타이머를 초기화하여 마지막 요청 시점부터 DisplayDuration 동안 다시 표시
 	void ShowBuildingPlacementMessage(const FText& Message, float DisplayDuration = 1.5f);
-
-	// 옵션(환경설정) 패널을 열려있으면 닫고, 닫혀있으면 연다. 전환 후 열림 상태를 돌려준다.
-	UFUNCTION(BlueprintCallable, Category = "Options")
-	bool ToggleOptionsPanel();
-
-	UFUNCTION(BlueprintPure, Category = "Options")
-	bool IsOptionsPanelOpen() const;
 
 public:
 	// 플레이어 컨트롤러 캐싱
@@ -84,9 +76,6 @@ protected:
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UBeltBarWidget> BeltBarWidget;
-
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
-	TObjectPtr<UOptionsWidget> OptionsWidget;
 
 	// 건축 메시지 관련
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidget))

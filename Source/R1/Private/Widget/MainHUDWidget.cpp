@@ -7,7 +7,6 @@
 #include "Components/TextBlock.h"
 #include "Components/CanvasPanel.h"
 #include "Animation/WidgetAnimation.h"
-#include "Widget/Options/OptionsWidget.h"
 #include "Widget/DeathScreenOverlayWidget.h"
 #include "Character/ActionPlayerController.h"
 #include "Character/ActionCharacter.h"
@@ -43,12 +42,6 @@ void UMainHUDWidget::NativeOnInitialized()
 	// 게임을 시작했을 때 이전 디자인용 테스트 문구가 화면에 표시되지 않도록 숨겨요
 	if (true == IsValid(Border_BuildingPlacementMessage))
 		Border_BuildingPlacementMessage->SetVisibility(ESlateVisibility::Collapsed);
-
-	// 옵션 패널도 마찬가지로 ESC 토글 전엔 닫힌 채로 시작한다.
-	if (OptionsWidget)
-	{
-		OptionsWidget->SetVisibility(ESlateVisibility::Collapsed);
-	}
 }
 
 void UMainHUDWidget::NativeDestruct()
@@ -189,30 +182,3 @@ void UMainHUDWidget::ShowBuildingPlacementMessage(const FText& Message, float Di
 		SafeDisplayDuration,
 		false);
 }
-
-bool UMainHUDWidget::ToggleOptionsPanel()
-{
-	if (!OptionsWidget)
-	{
-		return false;
-	}
-
-	const bool bNewOpenState = !IsOptionsPanelOpen();
-	OptionsWidget->SetVisibility(bNewOpenState ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
-
-	if (bNewOpenState)
-	{
-		// 열 때마다 다시 채운다 — 이 위젯은 게임 시작 시 한 번만 만들어지고 이후엔 Visibility만
-		// 토글되므로, 최초 생성 시점에 Enhanced Input 등록이 아직 안 끝나 있었어도 다음에 열 때는
-		// 최신 키 매핑으로 다시 채워진다.
-		OptionsWidget->RefreshActiveCategory();
-	}
-
-	return bNewOpenState;
-}
-
-bool UMainHUDWidget::IsOptionsPanelOpen() const
-{
-	return OptionsWidget && OptionsWidget->GetVisibility() != ESlateVisibility::Collapsed;
-}
-
