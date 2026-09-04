@@ -90,7 +90,7 @@ void UStatComponent::SetCaloriesDropRate_Implementation(float InDropRate)
 
 void UStatComponent::ResetCaloriesDropRate_Implementation()
 {
-	CaloryDropRate = DefaultCaloryDropRate;
+	SetParameter(EParameterType::CaloriesDropRate, DefaultCaloryDropRate);
 }
 
 float UStatComponent::GetCurrentHydration_Implementation() const
@@ -131,7 +131,7 @@ void UStatComponent::SetHydrationDropRate_Implementation(float InDropRate)
 
 void UStatComponent::ResetHydrationDropRate_Implementation()
 {
-	HydrationDropRate = DefaultHydrationDropRate;
+	SetParameter(EParameterType::HydrationDropRate, DefaultHydrationDropRate);
 }
 
 float UStatComponent::GetCurrentTemperature_Implementation() const
@@ -397,12 +397,37 @@ void UStatComponent::DecreaseParameter(EParameterType InEParameterType, float In
 
 }
 
+void UStatComponent::SetParameter(EParameterType InEParameterType, float InAmount)
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+	if (!bAlive) return;
+
+	switch (InEParameterType)
+	{
+	case EParameterType::HydrationDropRate:
+	{
+		HydrationDropRate = InAmount;
+		break;
+	}
+	case EParameterType::CaloriesDropRate:
+	{
+		CaloryDropRate = InAmount;
+		break;
+	}
+	}
+}
+
 void UStatComponent::DrainSurvivalStats()
 {
 	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
 
 	Execute_DecreaseCalories(this, CaloryDropRate);
 	Execute_DecreaseHydration(this, HydrationDropRate);
+	// 칼로리, 수분 감소율 세팅
+	float SprintCaloryMultiplier	= (CachedCharacter->IsSprinting()) ? 20.0f : 1.0f;
+	float SprintHydrationMultiplier = (CachedCharacter->IsSprinting()) ? 20.0f : 1.0f;
+	Execute_SetCaloriesDropRate(this, DefaultCaloryDropRate * SprintCaloryMultiplier);
+	Execute_SetHydrationDropRate(this, DefaultHydrationDropRate * SprintCaloryMultiplier);
 }
 
 void UStatComponent::UpdateStatusEffectDamage()
@@ -499,6 +524,8 @@ void UStatComponent::OnRep_bAlive()
 void UStatComponent::BeginPlay()
 {
 	Super::BeginPlay();
+
+	CachedCharacter = Cast<AActionCharacter>(GetOwner());
 
 	// For Debug.
 	GetWorld()->GetTimerManager().SetTimer(

@@ -53,6 +53,8 @@ public:
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 	UFUNCTION(BlueprintCallable, Category = "Movement|Input")
 	void SetSprintInputMode(ESprintInputMode NewNode);
 
@@ -106,6 +108,9 @@ protected:
 	void OnAttackReleased();	// 공격키 뗌 (좌클릭 뗌 / 도구 주 액션 종료)
 	void OnSecondaryActionPressed();	// 보조 액션 시작 (우클릭 / 도구 보조 기능 / 조준)
 	void OnSecondaryActionReleased();	// 보조 액션 종료 (우클릭 뗌)
+
+	UFUNCTION(Server, Reliable)
+	void ServerSetIsSprinting(bool bIsSprintingNew);
 
 	void OnBuildingPlacementPressed();
 	void OnRotateBuildingPartPressed();
@@ -302,6 +307,7 @@ protected:
 
 protected:
 	// 스프린트 모드
+	UPROPERTY(Replicated);
 	bool bIsSprinting = false;
 
 	// 크라우치 모드는 기본 내장 변수 사용

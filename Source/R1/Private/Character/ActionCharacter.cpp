@@ -26,6 +26,8 @@
 #include "InputAction.h"
 #include "EnhancedInputSubsystems.h"
 
+#include "Net/UnrealNetwork.h"
+
 // Sets default values
 AActionCharacter::AActionCharacter()
 {
@@ -215,6 +217,12 @@ void AActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	}
 }
 
+void AActionCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AActionCharacter, bIsSprinting);
+}
+
 void AActionCharacter::OnSecondaryActionPressed()
 {
 	if (HeldItemComponent)
@@ -229,6 +237,13 @@ void AActionCharacter::OnSecondaryActionReleased()
 	{
 		HeldItemComponent->UseSecondaryAction(false);
 	}
+}
+
+void AActionCharacter::ServerSetIsSprinting_Implementation(bool bIsSprintingNew)
+{
+	bIsSprinting = bIsSprintingNew;
+
+	ApplyMovementSettings();
 }
 
 void AActionCharacter::SetSprintInputMode(ESprintInputMode NewNode)
@@ -464,6 +479,12 @@ void AActionCharacter::OnSprintPressed()
 		//UE_LOG(LogTemp, Log, TEXT("OnSprintPressed Started"));
 	}
 	ApplyMovementSettings();
+
+	// 서버에 RPC 보내기
+	if (!HasAuthority())
+	{
+		ServerSetIsSprinting(bIsSprinting);
+	}
 }
 
 void AActionCharacter::OnSprintReleased()
@@ -473,6 +494,12 @@ void AActionCharacter::OnSprintReleased()
 		bIsSprinting = false;
 		ApplyMovementSettings();
 		//UE_LOG(LogTemp, Log, TEXT("OnSprintPressed Released"));
+
+		// 서버에 RPC 보내기
+		if (!HasAuthority())
+		{
+			ServerSetIsSprinting(bIsSprinting);
+		}
 	}
 	// Toggle 모드에서는 뗄 때 아무것도 안 함
 }

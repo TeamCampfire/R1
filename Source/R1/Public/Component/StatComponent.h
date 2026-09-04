@@ -11,6 +11,7 @@
 #include "Interface/StatusEffectInterface.h"
 #include "Interface/TemperatureInterface.h"
 #include "Interface/HydrationInterface.h"
+#include "Character/ActionCharacter.h"
 #include "StatComponent.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStatEmpty);
@@ -21,7 +22,9 @@ enum class EParameterType : uint8
 {
 	Health,
 	Hydration,
+	HydrationDropRate,
 	Calories,
+	CaloriesDropRate,
 	Temperature
 };
 
@@ -78,6 +81,8 @@ protected:
 	void IncreaseParameter(EParameterType InEParameterType, float InAmount);
 	// 파라미터 증가 내부처리 함수
 	void DecreaseParameter(EParameterType inEParameterType, float inAmount);
+	// 파라미터 설정 내부처리용 함수
+	void SetParameter(EParameterType inEParameterType, float inAmount);
 	// 틱마다 허기, 수분 감소
 	void DrainSurvivalStats();
 	// 굶주림, 갈증 데미지 효과 적용 함수
@@ -86,6 +91,9 @@ protected:
 	void ApplyStarvationDamage();
 	void ApplyDehydrationDamage();
 
+	// Owner캐릭터 캐시용
+	UPROPERTY()
+	TObjectPtr<AActionCharacter> CachedCharacter = nullptr;
 
 	// 현재 체력 리플리케이션 함수
 	UFUNCTION()
@@ -134,10 +142,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float DehydrationDamage = 1.0f;
 
-	// 초당 칼로리 감소율
+	// 초당 칼로리 감소율(기본)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float DefaultCaloryDropRate = 0.016f;
-	// 초당 수분 감소율
+	// 초당 수분 감소율(기본)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float DefaultHydrationDropRate = 0.0032f;
 	// 칼로리 감소율
