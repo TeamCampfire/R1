@@ -605,8 +605,13 @@ bool UInventoryComponent::ConsumeIngredients(const TArray<FCraftIngredient>& Ing
 	return true;
 }
 
-void UInventoryComponent::ConsumeItemCount(const UItemDataBase* ItemData, int32 CountToRemove)
+bool UInventoryComponent::ConsumeItemCount(const UItemDataBase* ItemData, int32 CountToRemove)
 {
+	if (!HasEnoughOf(ItemData, CountToRemove))
+	{
+		return false;
+	}
+
 	auto RemoveFrom = [this, ItemData, &CountToRemove](EInventorySlotCategory Category)
 	{
 		TArray<FItemInstance>& Array = GetSlotArray(Category);
@@ -627,6 +632,7 @@ void UInventoryComponent::ConsumeItemCount(const UItemDataBase* ItemData, int32 
 
 	RemoveFrom(EInventorySlotCategory::Main);
 	RemoveFrom(EInventorySlotCategory::Belt);
+	return true;
 }
 
 void UInventoryComponent::PrintInventoryInfo()

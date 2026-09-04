@@ -196,12 +196,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Inventory|Crafting")
 	bool CanCraftItem(const UItemDataBase* ItemToCraft) const;
 
-	// 메인→벨트 순서로 슬롯을 훑으며 CountToRemove만큼 소비(차감)한다. 단일 아이템만
-	// 소비하고 싶을 때 직접 호출해도 되고, ConsumeIngredients가 재료 목록을 돌면서
-	// 이 함수를 재사용하기도 한다. 호출 전 HasEnoughOf로 수량이 충분한지 확인돼 있다고
-	// 가정한다(여기서는 부족 여부를 따로 검사하지 않고 있는 만큼만 뺀다).
+	// 아이템 하나를 CountToRemove만큼 소비(삭제)한다. 수량이 부족하면 아무것도 지우지
+	// 않고 false를 반환한다(내부적으로 HasEnoughOf부터 확인 — 호출하는 쪽에서 미리
+	// 확인할 필요 없음). 충분하면 메인→벨트 순으로 슬롯을 훑어 차감하고 true 반환.
+	// 여러 종류를 한 번에 처리하려면 ConsumeIngredients(재료 목록)를 쓰면 된다.
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Crafting")
-	void ConsumeItemCount(const UItemDataBase* ItemData, int32 CountToRemove);
+	bool ConsumeItemCount(const UItemDataBase* ItemData, int32 CountToRemove);
 
 	// Ingredients를 실제로 차감한다. 하나라도 부족하면 아무것도 차감하지 않고 false를
 	// 반환한다(부분 차감 금지 — 전부 있어야 전부 뺀다). 결과물 지급(인벤토리 추가/월드
