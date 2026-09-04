@@ -113,8 +113,7 @@ enum class EItemEffectType : uint8
 	RestoreHunger	UMETA(DisplayName = "Restore Hunger"),
 	RestoreThirst	UMETA(DisplayName = "Restore Thirst"),
 	Poison			UMETA(DisplayName = "Poison (중독, 예: 생고기)"),
-	BleedReduction	UMETA(DisplayName = "Bleed Reduction (지혈, 예: 붕대)"),
-	HorseSprintSpeedBoost	UMETA(DisplayName = "Horse Sprint Speed Boost (말 질주 속도, 예: 사과)")
+	BleedReduction	UMETA(DisplayName = "Bleed Reduction (지혈, 예: 붕대)")
 };
 
 USTRUCT(BlueprintType)

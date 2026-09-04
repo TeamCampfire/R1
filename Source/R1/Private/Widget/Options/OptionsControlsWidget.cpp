@@ -10,6 +10,21 @@
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
 
+namespace
+{
+	// 단축키 목록에 표시할 고정 순서 — 각 IA의 PlayerMappableKeySettings.Name 값이다.
+	// Profile->GetPlayerMappingRows()는 TMap(+ 내부는 TSet)이라 등록 이력에 따라 실행마다
+	// 순서가 달라질 수 있어서(예: 처음엔 상호작용이 맨 위, 나중엔 왼쪽이 맨 위) 여기서 직접 정렬한다.
+	// 여기 없는 이름(나중에 새로 Player Mappable로 추가된 액션 등)은 그냥 이 목록 뒤에 붙는다 —
+	// 순서만 못 정할 뿐 목록에 자동으로 나타나는 기존 동작은 그대로 유지된다.
+	const TArray<FName> GRowOrderPriority = {
+		TEXT("MoveForward"), TEXT("MoveBackward"), TEXT("MoveLeft"), TEXT("MoveRight"),
+		TEXT("Jump"), TEXT("Sprint"), TEXT("Crouch"),
+		TEXT("Interact"), TEXT("Attack"), TEXT("SecondaryAction"),
+		TEXT("InventoryToggle"),
+	};
+}
+
 void UOptionsControlsWidget::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
@@ -48,27 +63,38 @@ void UOptionsControlsWidget::RefreshRows()
 		return;
 	}
 
-	int32 RowCount = 0;
-	int32 MappingCount = 0;
-
+	// 먼저 전부 모아서 GRowOrderPriority 기준으로 정렬한 다음 행을 만든다(순서 고정 이유는 위 주석 참고).
+	TArray<FPlayerKeyMapping> SortedMappings;
 	for (const TPair<FName, FKeyMappingRow>& RowPair : Profile->GetPlayerMappingRows())
 	{
-		++RowCount;
 		for (const FPlayerKeyMapping& Mapping : RowPair.Value.Mappings)
 		{
-			++MappingCount;
-			UKeyRebindRowWidget* Row = WidgetTree->ConstructWidget<UKeyRebindRowWidget>(KeyRebindRowClass);
-			if (!Row)
-			{
-				continue;
-			}
-
-			Row->Setup(this, Mapping.GetMappingName(), Mapping.GetSlot());
-			KeyRowContainer->AddChild(Row);
+			SortedMappings.Add(Mapping);
 		}
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("[KeyRebind] RefreshRows 완료 — 매핑 행 %d개, 총 매핑 %d개"), RowCount, MappingCount);
+	SortedMappings.Sort([](const FPlayerKeyMapping& A, const FPlayerKeyMapping& B)
+	{
+		int32 IndexA = GRowOrderPriority.IndexOfByKey(A.GetMappingName());
+		int32 IndexB = GRowOrderPriority.IndexOfByKey(B.GetMappingName());
+		if (IndexA == INDEX_NONE) { IndexA = GRowOrderPriority.Num(); }
+		if (IndexB == INDEX_NONE) { IndexB = GRowOrderPriority.Num(); }
+		return IndexA < IndexB;
+	});
+
+	for (const FPlayerKeyMapping& Mapping : SortedMappings)
+	{
+		UKeyRebindRowWidget* Row = WidgetTree->ConstructWidget<UKeyRebindRowWidget>(KeyRebindRowClass);
+		if (!Row)
+		{
+			continue;
+		}
+
+		Row->Setup(this, Mapping.GetMappingName(), Mapping.GetSlot());
+		KeyRowContainer->AddChild(Row);
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("[KeyRebind] RefreshRows 완료 — 총 매핑 %d개"), SortedMappings.Num());
 }
 
 void UOptionsControlsWidget::HandleResetClicked()
@@ -130,18 +156,20 @@ void UOptionsControlsWidget::RequestKeyRebind(FName InMappingName, EPlayerMappab
 		return;
 	}
 
+	UEnhancedInputUserSettings* UserSettings = GetUserSettings();
+	const FPlayerKeyMapping* NewActionMapping = UserSettings ? UserSettings->FindCurrentMappingForSlot(InMappingName, InSlot) : nullptr;
+
 	PendingMappingName = InMappingName;
 	PendingSlot = InSlot;
 	PendingNewKey = NewKey;
+	// 리바인딩 전에 PendingMappingName이 쓰고 있던 키 — Replace 시 충돌 상대에게 이걸 넘겨서 맞바꾼다.
+	PendingOldKey = NewActionMapping ? NewActionMapping->GetCurrentKey() : FKey();
 	PendingConflictMappingName = ConflictName;
 	PendingConflictSlot = ConflictMapping->GetSlot();
 
 	if (ConflictDialog)
 	{
-		UEnhancedInputUserSettings* UserSettings = GetUserSettings();
-		const FPlayerKeyMapping* NewActionMapping = UserSettings ? UserSettings->FindCurrentMappingForSlot(InMappingName, InSlot) : nullptr;
 		const FText NewActionName = NewActionMapping ? NewActionMapping->GetDisplayName() : FText::FromName(InMappingName);
-
 		ConflictDialog->ShowConflict(NewKey.GetDisplayName(), ConflictMapping->GetDisplayName(), NewActionName);
 	}
 }
@@ -199,9 +227,15 @@ void UOptionsControlsWidget::ApplyKeyMapping(FName InMappingName, EPlayerMappabl
 
 void UOptionsControlsWidget::HandleConflictReplaceConfirmed()
 {
-	if (UEnhancedInputUserSettings* UserSettings = GetUserSettings())
+	// 기존에 그 키를 쓰던 액션(PendingConflictMappingName)은 자리를 비워두는 대신, 리바인딩 대상이
+	// 원래 쓰고 있던 키(PendingOldKey)를 받는다 — 즉 두 액션의 키를 맞바꾼다(예: 앞으로 W ↔ 뒤로 S를
+	// 뒤로에 W를 배정하면 앞으로 S / 뒤로 W로 스왑). 원래 미지정(빈 키)이었을 때만 그냥 비운다.
+	if (PendingOldKey.IsValid())
 	{
-		// 기존에 그 키를 쓰던 액션에서 먼저 빼앗는다 — 안 그러면 두 액션이 같은 키를 같이 쓰게 된다.
+		ApplyKeyMapping(PendingConflictMappingName, PendingConflictSlot, PendingOldKey);
+	}
+	else if (UEnhancedInputUserSettings* UserSettings = GetUserSettings())
+	{
 		FMapPlayerKeyArgs UnmapArgs;
 		UnmapArgs.MappingName = PendingConflictMappingName;
 		UnmapArgs.Slot = PendingConflictSlot;
