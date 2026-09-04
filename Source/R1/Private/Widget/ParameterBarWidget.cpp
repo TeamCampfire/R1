@@ -27,25 +27,32 @@ void UParameterBarWidget::UpdateParameterBar(float inCurrent, float inMax)
 
 	if (GetWorld()->GetTimerManager().IsTimerActive(ParameterBarTimerHandle)) return;
 
-	float DeltaTime = GetWorld()->GetDeltaSeconds();
+	constexpr float TimerInterval = 1.f / 60.f;
 	GetWorld()->GetTimerManager().SetTimer(
 		ParameterBarTimerHandle,
-		FTimerDelegate::CreateLambda([this, DeltaTime]()
+		FTimerDelegate::CreateWeakLambda(this, [this]()
 			{
+				if (!GetWorld() || !Bar)
+					return;
+
+				const float DeltaTime = GetWorld()->GetDeltaSeconds();
+
 				CurrentPercent = FMath::FInterpTo(
 					CurrentPercent,
 					TargetPercent,
 					DeltaTime,
 					InterpSpeed
 			);
-				Bar->SetPercent(CurrentPercent);
 
 				if (FMath::IsNearlyEqual(CurrentPercent, TargetPercent, 0.001f))
 				{
+					CurrentPercent = TargetPercent;
 					GetWorld()->GetTimerManager().ClearTimer(ParameterBarTimerHandle);
 				}
+
+				Bar->SetPercent(CurrentPercent);
 			}),
-		DeltaTime,
+		TimerInterval,
 		true
 	);
 }
