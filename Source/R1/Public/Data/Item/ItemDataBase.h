@@ -86,10 +86,6 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item|Crafting")
 	TArray<FCraftIngredient> CraftingCost;
 
-	// 연구(블루프린트 해금)에 필요한 스크랩 비용. 0이면 처음부터 제작 가능한 기본 아이템.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item|Crafting", meta = (ClampMin = "0"))
-	int32 ResearchCost = 0;
-
 private:
 	// Category가 Equipment/HeldItem/Placeable이면 MaxStackSize를 1로 강제한다 — 디자이너가
 	// 실수로 다른 값을 넣거나 에디터에서 Category만 바꿔도 즉시(에디터)/로드 시(런타임) 정정된다.

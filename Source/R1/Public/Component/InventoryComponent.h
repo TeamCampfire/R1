@@ -185,29 +185,19 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Inventory|Crafting")
 	bool HasEnoughOf(const UItemDataBase* ItemData, int32 Amount) const;
 
-	// Ingredients에 명시된 재료가 전부 충분한지 확인한다. 건축/제작/합성 어느 쪽이든
-	// "재료 목록"(TArray<FCraftIngredient>)만 있으면 공용으로 쓸 수 있다.
-	UFUNCTION(BlueprintPure, Category = "Inventory|Crafting")
-	bool HasIngredients(const TArray<FCraftIngredient>& Ingredients) const;
-
 	// ItemToCraft->CraftingCost를 만족하는지 확인하는 편의 함수(제작/합성처럼 결과물이
-	// 곧 하나의 아이템 애셋인 경우용). 건축 파츠처럼 별도 데이터 타입을 쓰게 되면
-	// 그쪽 재료 목록을 HasIngredients에 직접 넘기면 된다.
+	// 곧 하나의 아이템 애셋인 경우용).
 	UFUNCTION(BlueprintPure, Category = "Inventory|Crafting")
 	bool CanCraftItem(const UItemDataBase* ItemToCraft) const;
 
-	// 메인→벨트 순서로 슬롯을 훑으며 CountToRemove만큼 소비(차감)한다. 단일 아이템만
-	// 소비하고 싶을 때 직접 호출해도 되고, ConsumeIngredients가 재료 목록을 돌면서
-	// 이 함수를 재사용하기도 한다. 호출 전 HasEnoughOf로 수량이 충분한지 확인돼 있다고
-	// 가정한다(여기서는 부족 여부를 따로 검사하지 않고 있는 만큼만 뺀다).
+	// 아이템 하나를 CountToRemove만큼 소비(삭제)한다. 수량이 부족하면 아무것도 지우지
+	// 않고 false를 반환한다(내부적으로 HasEnoughOf부터 확인 — 호출하는 쪽에서 미리
+	// 확인할 필요 없음). 충분하면 메인→벨트 순으로 슬롯을 훑어 차감하고 true 반환.
+	// 여러 종류를 한 번에 처리해야 하면(제작/합성/건축) 이 함수를 재료 개수만큼 반복
+	// 호출하면 된다 — 건축 시스템(BuildingPlacementComponent)도 이미 이 방식으로
+	// 자기 재료 목록을 순회하며 이 함수만 쓰고 있다.
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Crafting")
-	void ConsumeItemCount(const UItemDataBase* ItemData, int32 CountToRemove);
-
-	// Ingredients를 실제로 차감한다. 하나라도 부족하면 아무것도 차감하지 않고 false를
-	// 반환한다(부분 차감 금지 — 전부 있어야 전부 뺀다). 결과물 지급(인벤토리 추가/월드
-	// 배치 등)은 호출하는 쪽(제작/건축/합성 각자)의 책임이고, 이 함수는 재료 차감만 한다.
-	UFUNCTION(BlueprintCallable, Category = "Inventory|Crafting")
-	bool ConsumeIngredients(const TArray<FCraftIngredient>& Ingredients);
+	bool ConsumeItemCount(const UItemDataBase* ItemData, int32 CountToRemove);
 
 protected:
 	// Called when the game starts
@@ -228,6 +218,18 @@ private:
 
 	// TransferItem의 대상이 장비슬롯일 때 처리하는 부분만 분리 — 부위 일치 검사 + 스왑 로직.
 	EMoveSlotResult EquipToSlot(const FInventorySlotRef& From, const FItemInstance& SourceInstance);
+
+	// Ingredients에 명시된 재료가 전부 충분한지 확인한다. CanCraftItem 내부 전용 —
+	// 크래프팅은 별도 컴포넌트로 분리될 예정이라, 외부에서는 이 목록형 대신
+	// ConsumeItemCount(단일 아이템)를 재료 개수만큼 반복 호출하는 방식을 쓴다
+	// (건축 시스템이 이미 그렇게 쓰고 있음 — InventoryComponent.h의 ConsumeItemCount 참고).
+	bool HasIngredients(const TArray<FCraftIngredient>& Ingredients) const;
+
+	// Ingredients를 실제로 차감한다. 하나라도 부족하면 아무것도 차감하지 않고 false를
+	// 반환한다(부분 차감 금지 — 전부 있어야 전부 뺀다). CanCraftItem과 짝을 이루는
+	// 내부 전용 함수 — 외부 호출자가 필요해지면(별도 크래프팅 컴포넌트 등) 그때 다시
+	// public으로 꺼내면 된다.
+	bool ConsumeIngredients(const TArray<FCraftIngredient>& Ingredients);
 
 	UFUNCTION()
 	void OnRep_Slots();
