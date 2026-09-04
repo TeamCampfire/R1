@@ -20,6 +20,7 @@ AItemPickup::AItemPickup()
 
 
 	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
+	Mesh->bReceivesDecals = false; // 도끼 자국, 피, 스위트스팟 등 모든 데칼 무시!
 	SetRootComponent(Mesh);
 	
 	// 드랍 시 자연스럽게 바닥/다른 오브젝트 위에 안착하도록 물리 시뮬레이션은 켜두되,

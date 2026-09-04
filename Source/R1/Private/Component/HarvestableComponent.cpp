@@ -6,6 +6,8 @@
 #include "Data/Item/ItemDataBase.h"
 #include "Item/ItemPickup.h"
 #include "NiagaraFunctionLibrary.h"
+#include "Component/HeldItemComponent.h"
+#include "Data/Item/HeldItemData.h"
 
 // Sets default values for this component's properties
 UHarvestableComponent::UHarvestableComponent()
@@ -43,39 +45,69 @@ FHarvestRes UHarvestableComponent::OnHitted_Implementation(AActionCharacter* InC
 	if (!GetOwner()->HasAuthority()) return FHarvestRes();
 
 	FHarvestRes Res;
+	// TODO 기본값 삭제
+	float Damage = 10.0f;
+	float ItemCnt = 10;
 	if (CurrentHp <= 0 || !InCharacter) return Res;
 
-	// 1. 체력 감소 (임시 50)
-	CurrentHp -= 50.f;
 
-	// 2. 피격 피드백(사운드/FX/데칼) 및 스위트스팟 배율 산출
-	const float YieldMultiplier = ProcessHitFeedback(InCharacter, HitLocation, Res.bHitSweetSpot);
-
-	// 3. 고갈(파괴) 조건 판정 (Rust 방식)
-	// - 스위트스팟을 쓰는 오브젝트: 피가 다 닳아도 '스위트스팟(X자)을 쳐야만' 최종 파괴 & 보너스 수확!
-	// - 스위트스팟을 안 쓰는 오브젝트: 피가 다 닳으면 즉시 파괴 & 보너스 수확!
-	const bool bCanDeplete = (CurrentHp <= 0) && (!bUseSweetSpot || Res.bHitSweetSpot);
-
-	if (bCanDeplete)
+	// 0. 데이터 세팅
+	if (UHeldItemComponent* Comp = InCharacter->GetHeldItemComponent())
 	{
-		CurrentHp = 0.f;
-		Res.bIsDepleted = true;
-
-		// 고갈 보너스 수확 (드럼통은 바닥 드랍, 나무/돌은 인벤토리)
-		ProcessDepletion(YieldMultiplier, Res.HarvestedItems);
-
-		IHarvestable::Execute_OnHarvestEnd(this);
+		if(UHeldItemData* ItemData = Comp->GetCurrentEquippedItemData())
+			Damage = ItemData->Damage;
 	}
-	else
-	{
-		// 피가 다 닳았는데 스위트스팟을 안 쳐서 안 부서진 경우: 피를 최소치(1.0f)로 유지하여 쓰러지지 않게 함
-		if (CurrentHp <= 0)
-		{
-			CurrentHp = 1.0f;
-		}
 
-		// 일반 타격 아이템 수확
-		CollectYieldItems(HarvestYields, YieldMultiplier, Res.HarvestedItems);
+	//1. 스위트스팟 맞았는지 확인
+	bool IsHitted = SweetSpotHitted(HitLocation);
+	if (IsHitted)
+	{
+		Damage *= 2;
+		ItemCnt *= 2;
+	}
+
+	// 1. 체력 감소
+	CurrentHp -= Damage;
+
+	// 2. 모든 클라이언트(및 호스트)에 타격 FX/사운드/임팩트데칼 브로드캐스트
+	FRotator DecalRot = (InCharacter->GetActorLocation() - HitLocation).Rotation();
+	Multicast_PlayHitEffects(HitLocation, IsHitted, DecalRot);
+
+	// 3. 아이템 획득
+
+	// 기본 아이템 획득
+	if (DefaultItem)
+		Res.HarvestedItems.Add(FHarvestItemResult(DefaultItem, ItemCnt));
+
+	// 보너스 아이템
+	TArray<FHarvestItemResult> HarverstAdditiveItems;
+	CollectYieldItems(HarvestAdditiveYields, HarverstAdditiveItems);
+	for (auto& Item : HarverstAdditiveItems)
+	{
+		Res.HarvestedItems.Add(Item);
+	}
+
+	// 4. 부숴진 경우에 아이템을 획득하는 경우
+	if (CurrentHp <= 0)
+	{
+		if (bGiveItemWhenDestroy)
+		{
+			TArray<FHarvestItemResult> DestroyAdditiveItems;
+			CollectYieldItems(DestroyAdditiveYields, DestroyAdditiveItems);
+			if (bDropItemsInWorldOnDepleted)
+			{
+				SpawnWorldPickups(DestroyAdditiveItems);
+			}
+			else
+			{
+				for (auto& Item : DestroyAdditiveItems)
+				{
+					Res.HarvestedItems.Add(Item);
+				}
+			}
+
+		}
+		IHarvestable::Execute_OnHarvestEnd(this);
 	}
 
 	Res.HarvesResult = (Res.HarvestedItems.Num() > 0 || Res.bIsDepleted);
@@ -113,6 +145,30 @@ float UHarvestableComponent::ProcessHitFeedback(AActionCharacter* InCharacter, c
 	Multicast_PlayHitEffects(HitLocation, bOutHitSweetSpot, DecalRot);
 
 	return Multiplier;
+}
+
+bool UHarvestableComponent::SweetSpotHitted(const FVector& HitLocation)
+{
+	// 스위트스팟 적중 판정 (서버의 SweetSpotTransform 위치 기준)
+	if (bUseSweetSpot)
+	{
+		// 아직 스위트스팟이 생성되지 않은 첫 타격인 경우
+		if (SweetSpotTransform.GetLocation().IsNearlyZero())
+		{
+			GenerateSweetSpot_Server();
+		}
+		else
+		{
+			// 이미 스위트스팟이 존재하는 경우 거리 비교
+			float DistSqr = FVector::DistSquared(HitLocation, SweetSpotTransform.GetLocation());
+			if (DistSqr <= FMath::Square(SweetSpotHitRadius))
+			{
+				GenerateSweetSpot_Server(); // 적중 성공 시 다음 스위트스팟 위치로 이동
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 void UHarvestableComponent::Multicast_PlayHitEffects_Implementation(const FVector& HitLocation, bool bIsSweetSpot, const FRotator& DecalRot)
@@ -172,7 +228,7 @@ void UHarvestableComponent::GenerateSweetSpot_Server()
 		if (GetOwner()->ActorLineTraceSingle(HitRes, TraceStart, TraceEnd, ECC_Visibility, Param))
 		{
 			SpawnPos = HitRes.ImpactPoint;
-			SpawnRot = (-HitRes.ImpactNormal).Rotation();
+			SpawnRot = (HitRes.ImpactNormal).Rotation();
 		}
 	}
 	else
@@ -195,7 +251,7 @@ void UHarvestableComponent::GenerateSweetSpot_Server()
 		if (GetOwner()->ActorLineTraceSingle(HitRes, TraceStart, TraceEnd, ECC_Visibility, Param))
 		{
 			SpawnPos = HitRes.ImpactPoint;
-			SpawnRot = (-HitRes.ImpactNormal).Rotation();
+			SpawnRot = HitRes.ImpactNormal.Rotation();
 		}
 	}
 
@@ -246,7 +302,7 @@ void UHarvestableComponent::OnRep_SweetSpotTransform()
 	}
 }
 
-void UHarvestableComponent::CollectYieldItems(const TArray<FHarvestItemYield>& InYields, float Multiplier, TArray<FHarvestItemResult>& OutResults)
+void UHarvestableComponent::CollectYieldItems(const TArray<FHarvestItemYield>& InYields, TArray<FHarvestItemResult>& OutResults)
 {
 	for (const FHarvestItemYield& Yield : InYields)
 	{
@@ -258,8 +314,7 @@ void UHarvestableComponent::CollectYieldItems(const TArray<FHarvestItemYield>& I
 			continue;
 		}
 
-		int32 YieldCount = FMath::CeilToInt32(Yield.BaseCount * Multiplier);
-		if (YieldCount <= 0) continue;
+		if (Yield.BaseCount <= 0) continue;
 
 		// 기존 목록에 동일 아이템이 있으면 수량 합산, 없으면 추가
 		FHarvestItemResult* Existing = OutResults.FindByPredicate([&Yield](const FHarvestItemResult& Item) {
@@ -268,70 +323,18 @@ void UHarvestableComponent::CollectYieldItems(const TArray<FHarvestItemYield>& I
 
 		if (Existing)
 		{
-			Existing->Count += YieldCount;
+			Existing->Count += Yield.BaseCount;
 		}
 		else
 		{
 			FHarvestItemResult NewItem;
 			NewItem.ItemData = Yield.ItemData;
-			NewItem.Count = YieldCount;
+			NewItem.Count = Yield.BaseCount;
 			OutResults.Add(NewItem);
 		}
 	}
 }
 
-void UHarvestableComponent::ProcessDepletion(float Multiplier, TArray<FHarvestItemResult>& InOutResults)
-{
-	CurrentHp = 0.f;
-	if (!bGiveFinalBonus) return;
-
-	// 1. 별도의 고갈 보너스 아이템 목록(FinalBonusYields)이 명시된 경우 (드럼통, 보물상자 등)
-	if (FinalBonusYields.Num() > 0)
-	{
-		TArray<FHarvestItemResult> BonusItems;
-		CollectYieldItems(FinalBonusYields, Multiplier, BonusItems);
-
-		if (bDropItemsInWorldOnDepleted)
-		{
-			SpawnWorldPickups(BonusItems);
-		}
-		else
-		{
-			for (const FHarvestItemResult& BonusItem : BonusItems)
-			{
-				FHarvestItemResult* Existing = InOutResults.FindByPredicate([&BonusItem](const FHarvestItemResult& Item) {
-					return Item.ItemData == BonusItem.ItemData;
-				});
-
-				if (Existing)
-				{
-					Existing->Count += BonusItem.Count;
-				}
-				else
-				{
-					InOutResults.Add(BonusItem);
-				}
-			}
-		}
-	}
-	// 2. 아이템 누락시 기본 아이템에 배율만 적용해서 지급(사고 방지)
-	else
-	{
-		const float EffectiveBonus = (FinalBonusMultiplier > 0.0f) ? FinalBonusMultiplier : 1.0f;
-
-		TArray<FHarvestItemResult> BaseItems;
-		CollectYieldItems(HarvestYields, EffectiveBonus * Multiplier, BaseItems);
-
-		if (bDropItemsInWorldOnDepleted)
-		{
-			SpawnWorldPickups(BaseItems);
-		}
-		else
-		{
-			InOutResults.Append(BaseItems);
-		}
-	}
-}
 
 void UHarvestableComponent::SpawnWorldPickups(const TArray<FHarvestItemResult>& ItemsToSpawn)
 {
@@ -360,7 +363,12 @@ void UHarvestableComponent::SpawnWorldPickups(const TArray<FHarvestItemResult>& 
 
 void UHarvestableComponent::OnHarvestEnd_Implementation()
 {
-	UE_LOG(LogTemp, Display, TEXT("자원 액터의 자원 고갈 및 소멸"));
+	//UE_LOG(LogTemp, Display, TEXT("자원 액터의 자원 고갈 및 소멸"));
+	if (CurrentSweetSpotDecal)
+	{
+		CurrentSweetSpotDecal->DestroyComponent();
+		CurrentSweetSpotDecal = nullptr;
+	}
 	GetOwner()->Destroy();
 }
 

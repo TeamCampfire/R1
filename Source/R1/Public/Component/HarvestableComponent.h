@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -52,20 +52,23 @@ protected:
 	void				OnRep_SweetSpotTransform();
 
 protected:
-	// 채집 시 획득할 아이템 목록 (다중 아이템 및 확률 지원)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Item")
-	TArray<FHarvestItemYield> HarvestYields;
+	TObjectPtr<UItemDataBase> DefaultItem;
+
+	// 채집 시 획득할 보너스 아이템 목록 (기본 아이템 말고 다른거)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Item")
+	TArray<FHarvestItemYield> HarvestAdditiveYields;
 
 	// 고갈(파괴) 시 아이템을 인벤토리로 직접 주지 않고 월드 바닥에 AItemPickup 액터를 스폰하여 드랍할지 여부 (드럼통, 상자 등)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Item")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Item|Bonus")
 	bool bDropItemsInWorldOnDepleted = false;
 
 	// 월드 드랍 시 스폰할 ItemPickup 액터 클래스 (기본: AItemPickup)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Item", meta = (EditCondition = "bDropItemsInWorldOnDepleted"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Item|Bonus", meta = (EditCondition = "bDropItemsInWorldOnDepleted"))
 	TSubclassOf<AItemPickup> ItemPickupClass;
 
 	// 월드 드랍 시 퍼지는 랜덤 반경 (cm)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Item", meta = (EditCondition = "bDropItemsInWorldOnDepleted"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Item|Bonus", meta = (EditCondition = "bDropItemsInWorldOnDepleted"))
 	float DropImpulseRadius = 60.0f;
 
 	//TOOD Data 기반으로 초기화
@@ -147,26 +150,25 @@ protected:
 
 	// ---- 고갈 마무리 보너스 (Final Finish Bonus) ----
 	// 자원 고갈(마지막 타격) 시 보너스 수확 지급 여부
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Bonus")
-	bool bGiveFinalBonus = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Item|Bonus")
+	bool bGiveItemWhenDestroy = true;
 
 	// 고갈 시 추가로 지급할 별도 보너스 아이템 목록 (비어있을 경우 기본 HarvestYields에 FinalBonusMultiplier가 적용됨)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Bonus")
-	TArray<FHarvestItemYield> FinalBonusYields;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Item|Bonus")
+	TArray<FHarvestItemYield> DestroyAdditiveYields;
 
-	// FinalBonusYields가 비어있을 때 기본 채집량에 적용할 고갈 보너스 배율
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Bonus")
-	float FinalBonusMultiplier = 2.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Item|Bonus")
+	float SweetSpotMultiplier = 2.0f;
 
 private:
 	// 피격 피드백(사운드/FX/데칼) 처리 및 스위트스팟 배율 계산
 	float ProcessHitFeedback(AActionCharacter* InCharacter, const FVector& HitLocation, bool& bOutHitSweetSpot);
 
-	// 아이템 수확 계산 헬퍼 함수
-	void CollectYieldItems(const TArray<FHarvestItemYield>& InYields, float Multiplier, TArray<FHarvestItemResult>& OutResults);
+	// 스위트 스팟 적중판정
+	bool SweetSpotHitted(const FVector& HitLocation);
 
-	// 자원 고갈 및 마무리 보너스 처리 헬퍼 함수
-	void ProcessDepletion(float Multiplier, TArray<FHarvestItemResult>& InOutResults);
+	// 아이템 수확 계산 헬퍼 함수
+	void CollectYieldItems(const TArray<FHarvestItemYield>& InYields, TArray<FHarvestItemResult>& OutResults);
 
 	// 월드 바닥에 AItemPickup 액터 스폰
 	void SpawnWorldPickups(const TArray<FHarvestItemResult>& ItemsToSpawn);
