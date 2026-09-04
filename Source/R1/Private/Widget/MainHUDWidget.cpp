@@ -5,13 +5,33 @@
 #include "TimerManager.h"
 #include "Components/Border.h"
 #include "Components/TextBlock.h"
+#include "Components/CanvasPanel.h"
 #include "Animation/WidgetAnimation.h"
+#include "Widget/DeathScreenOverlayWidget.h"
+#include "Character/ActionPlayerController.h"
+#include "Character/ActionCharacter.h"
+#include "Component/StatComponent.h"
 
 void UMainHUDWidget::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
 
 	//UE_LOG(LogTemp, Warning, TEXT("[InvToggle] MainHUDWidget::NativeOnInitialized. InventoryWidget=%s"), *GetNameSafe(InventoryWidget));
+
+	CachedController = Cast<AActionPlayerController>(GetOwningPlayer());
+	if (CachedController)
+	{
+		CachedController->OnPossessedCharChange.AddDynamic(
+			this,
+			&UMainHUDWidget::OnPossessedCharChange
+		);
+	}
+
+	// 캐릭터에 바인드
+	BindDelegatesToNewChar();
+
+	// 사망 창 숨기고 시작
+	HideDeathScreen();
 
 	// 인벤토리 패널은 토글로 열리는 화면이라 처음엔 닫힌 채로 시작한다.
 	if (InventoryWidget)
@@ -41,6 +61,60 @@ void UMainHUDWidget::HideBuildingPlacementMessage()
 {
 	if (true == IsValid(Border_BuildingPlacementMessage)) // 메시지 보더 숨겨요
 		Border_BuildingPlacementMessage->SetVisibility(ESlateVisibility::Collapsed);
+}
+
+void UMainHUDWidget::ShowDeathScreen()
+{
+	if (DeathScreenOverlay)
+		DeathScreenOverlay->SetVisibility(ESlateVisibility::Visible);
+
+	if (HUDPanel)
+		HUDPanel->SetVisibility(ESlateVisibility::Collapsed);
+}
+
+void UMainHUDWidget::HideDeathScreen()
+{
+	if (DeathScreenOverlay)
+		DeathScreenOverlay->SetVisibility(ESlateVisibility::Collapsed);
+	if (HUDPanel)
+		HUDPanel->SetVisibility(ESlateVisibility::Visible);
+}
+
+void UMainHUDWidget::OnPossessedCharChange()
+{
+	BindDelegatesToNewChar();
+	HideDeathScreen();
+}
+
+void UMainHUDWidget::OnDeath()
+{
+	ShowDeathScreen();
+}
+
+void UMainHUDWidget::OnRespawnClicked()
+{
+	CachedController->RequestSpawn();
+}
+
+void UMainHUDWidget::BindDelegatesToNewChar()
+{
+	if (AActionCharacter* Character = Cast<AActionCharacter>(CachedController->GetPawn()))
+	{
+		if (UStatComponent* StatComp = (Cast<IStatInterface>(Character))->GetStatComponent())
+		{
+			if (StatComp->OnDeath.IsAlreadyBound(this, &UMainHUDWidget::OnDeath))
+			{
+				StatComp->OnDeath.RemoveDynamic(this, &UMainHUDWidget::OnDeath);
+			}
+
+			StatComp->OnDeath.AddDynamic(this, &UMainHUDWidget::OnDeath);
+		}
+	}
+	if (DeathScreenOverlay->OnRespawnClicked.IsAlreadyBound(this, &UMainHUDWidget::OnRespawnClicked))
+	{
+		DeathScreenOverlay->OnRespawnClicked.RemoveDynamic(this, &UMainHUDWidget::OnRespawnClicked);
+	}
+	DeathScreenOverlay->OnRespawnClicked.AddDynamic(this, &UMainHUDWidget::OnRespawnClicked);
 }
 
 bool UMainHUDWidget::ToggleInventoryPanel()

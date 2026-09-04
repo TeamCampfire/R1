@@ -26,6 +26,8 @@
 #include "InputAction.h"
 #include "EnhancedInputSubsystems.h"
 
+#include "Net/UnrealNetwork.h"
+
 // Sets default values
 AActionCharacter::AActionCharacter()
 {
@@ -65,6 +67,11 @@ AActionCharacter::AActionCharacter()
 	FirstPersonCamera->SetupAttachment(GetCapsuleComponent());
 	FirstPersonCamera->SetRelativeLocation(FVector(0.f, 0.f, BaseEyeHeight)); // 캡슐 기준 눈높이
 	FirstPersonCamera->bUsePawnControlRotation = true;
+
+	FirstPersonMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("FirstPersonMesh"));
+	FirstPersonMesh->SetupAttachment(FirstPersonCamera);
+	FirstPersonMesh->SetRelativeLocationAndRotation(FVector(0, 0, -130), FRotator(0, -90, 0));
+
 
 	bUseControllerRotationYaw = true;	// 캐릭터 몸체(액터) 자체가 좌우로 회전하도록
 	GetCharacterMovement()->bOrientRotationToMovement = false; // 이동 방향으로 자동 회전하지 않게 (1인칭은 항상 카메라 보는 방향이 정면)
@@ -212,6 +219,12 @@ void AActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	}
 }
 
+void AActionCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AActionCharacter, bIsSprinting);
+}
+
 void AActionCharacter::OnSecondaryActionPressed()
 {
 	if (HeldItemComponent)
@@ -226,6 +239,13 @@ void AActionCharacter::OnSecondaryActionReleased()
 	{
 		HeldItemComponent->UseSecondaryAction(false);
 	}
+}
+
+void AActionCharacter::ServerSetIsSprinting_Implementation(bool bIsSprintingNew)
+{
+	bIsSprinting = bIsSprintingNew;
+
+	ApplyMovementSettings();
 }
 
 void AActionCharacter::SetSprintInputMode(ESprintInputMode NewNode)
@@ -461,6 +481,12 @@ void AActionCharacter::OnSprintPressed()
 		//UE_LOG(LogTemp, Log, TEXT("OnSprintPressed Started"));
 	}
 	ApplyMovementSettings();
+
+	// 서버에 RPC 보내기
+	if (!HasAuthority())
+	{
+		ServerSetIsSprinting(bIsSprinting);
+	}
 }
 
 void AActionCharacter::OnSprintReleased()
@@ -470,6 +496,12 @@ void AActionCharacter::OnSprintReleased()
 		bIsSprinting = false;
 		ApplyMovementSettings();
 		//UE_LOG(LogTemp, Log, TEXT("OnSprintPressed Released"));
+
+		// 서버에 RPC 보내기
+		if (!HasAuthority())
+		{
+			ServerSetIsSprinting(bIsSprinting);
+		}
 	}
 	// Toggle 모드에서는 뗄 때 아무것도 안 함
 }

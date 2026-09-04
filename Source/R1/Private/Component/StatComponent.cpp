@@ -14,6 +14,8 @@ void UStatComponent::InitializeStat()
 	CurrentHealth		= MaxHealth;
 	CurrentHydration	= MaxHydration;
 	CurrentCalories		= MaxCalories;
+	CaloryDropRate		= DefaultCaloryDropRate;
+	HydrationDropRate	= DefaultHydrationDropRate;
 	bAlive = true;
 }
 
@@ -76,6 +78,21 @@ void UStatComponent::RecoverCalories_Implementation(float InAmount)
 	//UE_LOG(LogTemp, Log, TEXT("Calories : %.1f / %.1f"), CurrentCalories, MaxCalories);
 }
 
+float UStatComponent::GetCaloriesDropRate_Implementation() const
+{
+	return CaloryDropRate;
+}
+
+void UStatComponent::SetCaloriesDropRate_Implementation(float InDropRate)
+{
+	CaloryDropRate = InDropRate;
+}
+
+void UStatComponent::ResetCaloriesDropRate_Implementation()
+{
+	SetParameter(EParameterType::CaloriesDropRate, DefaultCaloryDropRate);
+}
+
 float UStatComponent::GetCurrentHydration_Implementation() const
 {
 	return CurrentHydration;
@@ -100,6 +117,21 @@ void UStatComponent::RecoverHydration_Implementation(float InAmount)
 	IncreaseParameter(EParameterType::Hydration, InAmount);
 	//DEBUG
 	//UE_LOG(LogTemp, Log, TEXT("Hydration : %.1f / %.1f"), CurrentHydration, MaxHydration);
+}
+
+float UStatComponent::GetHydrationDropRate_Implementation() const
+{
+	return HydrationDropRate;
+}
+
+void UStatComponent::SetHydrationDropRate_Implementation(float InDropRate)
+{
+	HydrationDropRate = InDropRate;
+}
+
+void UStatComponent::ResetHydrationDropRate_Implementation()
+{
+	SetParameter(EParameterType::HydrationDropRate, DefaultHydrationDropRate);
 }
 
 float UStatComponent::GetCurrentTemperature_Implementation() const
@@ -365,12 +397,37 @@ void UStatComponent::DecreaseParameter(EParameterType InEParameterType, float In
 
 }
 
+void UStatComponent::SetParameter(EParameterType InEParameterType, float InAmount)
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+	if (!bAlive) return;
+
+	switch (InEParameterType)
+	{
+	case EParameterType::HydrationDropRate:
+	{
+		HydrationDropRate = InAmount;
+		break;
+	}
+	case EParameterType::CaloriesDropRate:
+	{
+		CaloryDropRate = InAmount;
+		break;
+	}
+	}
+}
+
 void UStatComponent::DrainSurvivalStats()
 {
 	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
 
-	Execute_DecreaseCalories(this, DefaultCaloryDropRate);
-	Execute_DecreaseHydration(this, DefaultHydrationDropRate);
+	Execute_DecreaseCalories(this, CaloryDropRate);
+	Execute_DecreaseHydration(this, HydrationDropRate);
+	// 칼로리, 수분 감소율 세팅
+	float SprintCaloryMultiplier	= (CachedCharacter->IsSprinting()) ? 20.0f : 1.0f;
+	float SprintHydrationMultiplier = (CachedCharacter->IsSprinting()) ? 20.0f : 1.0f;
+	Execute_SetCaloriesDropRate(this, DefaultCaloryDropRate * SprintCaloryMultiplier);
+	Execute_SetHydrationDropRate(this, DefaultHydrationDropRate * SprintCaloryMultiplier);
 }
 
 void UStatComponent::UpdateStatusEffectDamage()
@@ -426,10 +483,10 @@ void UStatComponent::ApplyDehydrationDamage()
 
 void UStatComponent::OnRep_CurrentHealth()
 {
-	UE_LOG(LogTemp, Warning,
+	/*UE_LOG(LogTemp, Warning,
 		TEXT("[CLIENT] OnRep_CurrentHealth Owner=%s Health=%.2f"),
 		*GetNameSafe(GetOwner()),
-		CurrentHealth);
+		CurrentHealth);*/
 
 	OnHealthChange.Broadcast(CurrentHealth, MaxHealth);
 }
@@ -455,20 +512,30 @@ void UStatComponent::OnRep_PlayerStatusEffects()
 	OnStatusEffectChange.Broadcast();
 }
 
+void UStatComponent::OnRep_bAlive()
+{
+	if (!bAlive)
+	{
+		OnDeath.Broadcast();
+	}
+}
+
 
 void UStatComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
+	CachedCharacter = Cast<AActionCharacter>(GetOwner());
+
 	// For Debug.
-	//GetWorld()->GetTimerManager().SetTimer(
-	//	SurvivalStatTimerHandle,
-	//	this,
-	//	&UStatComponent::DrainSurvivalStats,
-	//	SurvivalStatUpdateInterval,
-	//	true,
-	//	SurvivalStatUpdateInterval
-	//);
+	GetWorld()->GetTimerManager().SetTimer(
+		SurvivalStatTimerHandle,
+		this,
+		&UStatComponent::DrainSurvivalStats,
+		SurvivalStatUpdateInterval,
+		true,
+		SurvivalStatUpdateInterval
+	);
 }
 
 void UStatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)

@@ -12,6 +12,7 @@
 #include "Components/PanelWidget.h"
 #include "Data/Item/ItemDataBase.h"
 #include "Data/Item/EquipmentItemData.h"
+#include "Data/Item/HeldItemData.h"
 #include "Data/Item/ConsumableItemData.h"
 #include "GameFramework/Pawn.h"
 #include "Character/ActionPlayerController.h"
@@ -180,6 +181,13 @@ void UDetailInfoWidget::RebuildInfoRows(const FItemInstance& Selected)
 	if (const UEquipmentItemData* EquipmentData = Cast<UEquipmentItemData>(Selected.ItemData))
 	{
 		for (const FEquipmentStatModifier& Modifier : EquipmentData->StatModifiers)
+		{
+			AddStatTextRow(Modifier.StatType, Modifier.Value);
+		}
+	}
+	else if (const UHeldItemData* HeldData = Cast<UHeldItemData>(Selected.ItemData))
+	{
+		for (const FEquipmentStatModifier& Modifier : HeldData->StatModifiers)
 		{
 			AddStatTextRow(Modifier.StatType, Modifier.Value);
 		}

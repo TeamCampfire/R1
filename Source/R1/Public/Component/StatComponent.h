@@ -11,6 +11,7 @@
 #include "Interface/StatusEffectInterface.h"
 #include "Interface/TemperatureInterface.h"
 #include "Interface/HydrationInterface.h"
+#include "Character/ActionCharacter.h"
 #include "StatComponent.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStatEmpty);
@@ -21,7 +22,9 @@ enum class EParameterType : uint8
 {
 	Health,
 	Hydration,
+	HydrationDropRate,
 	Calories,
+	CaloriesDropRate,
 	Temperature
 };
 
@@ -52,11 +55,17 @@ public:
 	virtual float GetMaxCalories_Implementation() const override;
 	virtual bool DecreaseCalories_Implementation(float InAmount) override;
 	virtual void RecoverCalories_Implementation(float InAmount) override;
+	virtual float GetCaloriesDropRate_Implementation() const override;
+	virtual void SetCaloriesDropRate_Implementation(float InDropRate) override;
+	virtual void ResetCaloriesDropRate_Implementation() override;
 	// 수분
 	virtual float GetCurrentHydration_Implementation() const override;
 	virtual float GetMaxHydration_Implementation() const override;
 	virtual bool DecreaseHydration_Implementation(float InAmount) override;
 	virtual void RecoverHydration_Implementation(float InAmount) override;
+	virtual float GetHydrationDropRate_Implementation() const override;
+	virtual void SetHydrationDropRate_Implementation(float InDropRate) override;
+	virtual void ResetHydrationDropRate_Implementation() override;
 	// 체온
 	virtual float GetCurrentTemperature_Implementation() const override;
 	virtual bool IncreaseTemperature_Implementation(float InAmount) override;
@@ -72,6 +81,8 @@ protected:
 	void IncreaseParameter(EParameterType InEParameterType, float InAmount);
 	// 파라미터 증가 내부처리 함수
 	void DecreaseParameter(EParameterType inEParameterType, float inAmount);
+	// 파라미터 설정 내부처리용 함수
+	void SetParameter(EParameterType inEParameterType, float inAmount);
 	// 틱마다 허기, 수분 감소
 	void DrainSurvivalStats();
 	// 굶주림, 갈증 데미지 효과 적용 함수
@@ -80,6 +91,9 @@ protected:
 	void ApplyStarvationDamage();
 	void ApplyDehydrationDamage();
 
+	// Owner캐릭터 캐시용
+	UPROPERTY()
+	TObjectPtr<AActionCharacter> CachedCharacter = nullptr;
 
 	// 현재 체력 리플리케이션 함수
 	UFUNCTION()
@@ -93,6 +107,8 @@ protected:
 	// 현재 상태이상 리플리케이션 함수
 	UFUNCTION()
 	void OnRep_PlayerStatusEffects();
+	UFUNCTION()
+	void OnRep_bAlive();
 protected:
 	//UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	//float CurrentStamina = 100.0f;
@@ -126,12 +142,18 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float DehydrationDamage = 1.0f;
 
-	// 초당 칼로리 감소율
+	// 초당 칼로리 감소율(기본)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float DefaultCaloryDropRate = 10.016f;
-	// 초당 수분 감소율
+	float DefaultCaloryDropRate = 0.016f;
+	// 초당 수분 감소율(기본)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float DefaultHydrationDropRate = 10.0032f;
+	float DefaultHydrationDropRate = 0.0032f;
+	// 칼로리 감소율
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	float CaloryDropRate = 0.016f;
+	// 수분 감소율
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	float HydrationDropRate = 0.0032f;
 
 
 	// 목마름 시작 수치
@@ -166,7 +188,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float DebugDamage = 50.0f;
 
-	UPROPERTY(Replicated)
+	UPROPERTY(ReplicatedUsing = OnRep_bAlive)
 	bool bAlive = false;
 private:
 

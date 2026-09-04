@@ -652,16 +652,14 @@ bool UBuildingPlacementComponent::HasEnoughResources(const UBuildingPartDefiniti
 	const UInventoryComponent* Inventory = OwnerCharacter->GetInventoryComponent();
 	if (false == IsValid(Inventory)) return false;	
 
-	// TODO 구현되지 않은 아이템이 많아서 다 구현된다면 살려야 해요
+	// 필요한 재료 수량 확인해서 건축할 수 있는지 확인
 	for (const FBuildingResourceCost& ResourceCost : Definition->ResourceCosts)
 	{
 		// 유효하지 않은 재료와, 개수라면 설치 불가
 		if (false == IsValid(ResourceCost.ItemData) || ResourceCost.RequiredCount <= 0) return false;
 
-		//TODO 아직 인벤토리에 들어있는 총 아이템 개수를 반환하는 함수가 구현되어있지 않음
-		//TODO 지금은 임의로 실패를 가정하지만, 인벤토리 기능 구현 후 코드 수정이 필요함!
-		//TODO (성공이 들어온다면 그건 필요 자원이 적어서 프리패스인 경우임)
-		const int32 OwnedResourceCount = 0;// Inventory->GetItemCount(ResourceCost.ItemData);
+		// 인벤토리가 들고 있는 아이템 개수를 가져와 요구하는 재료 개수랑 비교해요
+		const int32 OwnedResourceCount = Inventory->GetItemCount(ResourceCost.ItemData);
 		if (OwnedResourceCount < ResourceCost.RequiredCount) return false;
 	}
 	return true;
@@ -1164,19 +1162,19 @@ bool UBuildingPlacementComponent::TryConsumeRequiredResources(const UBuildingPar
 	// 진짜 아이템을 소모하기 전에 자원이 충분한지 검사
 	if (false == HasEnoughResources(Definition)) return false;
 
-	//TODO 인벤토리에서 아이템 소모 관련 함수가 구현되면 살릴 부분
-	//for (const FBuildingResourceCost& ResourceCost : Definition->ResourceCosts)
-	//{
-	//	if (false == IsValid(ResourceCost.ItemData) || 0 >= ResourceCost.RequiredCount) return false;
+	for (const FBuildingResourceCost& ResourceCost : Definition->ResourceCosts)
+	{
+		if (false == IsValid(ResourceCost.ItemData) || 0 >= ResourceCost.RequiredCount) return false;
 
-	//	const bool bConsumed = Inventory->ConsumeItem(ItemData, ResourceCost.RequiredCount); // 자원 소모에 성공했는가?
-	//	if (false == bConsumed)
-	//	{
-	//		UE_LOG(LogTemp, Warning, TEXT("[TryConsumeRequiredResources] : 자원 소모에 실패했습니다. Item=%s, Count=%d"),
-	//			*GetNameSafe(ResourceCost.ItemData), ResourceCost.RequiredCount);
-	//		return false;
-	//	}
-	//}
+		// 실제로 인벤토리의 자원 소모에 성공했는가?
+		const bool bConsumed = Inventory->ConsumeItemCount(ResourceCost.ItemData, ResourceCost.RequiredCount);
+		if (false == bConsumed)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[TryConsumeRequiredResources] : 자원 소모에 실패했습니다. Item=%s, Count=%d"),
+				*GetNameSafe(ResourceCost.ItemData), ResourceCost.RequiredCount);
+			return false;
+		}
+	}
 
 	return true;
 }

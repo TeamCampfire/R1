@@ -11,6 +11,7 @@
 #include "EngineUtils.h"
 #include "UserSettings/EnhancedInputUserSettings.h"
 #include "Framework/MainHUD.h"
+#include "Framework/GameMode/TestGameMode.h"
 #include "Widget/Multiplayer/MultiplayerMenuWidget.h"
 
 #include "BuildingSystem/Component/BuildingPlacementComponent.h"
@@ -216,6 +217,18 @@ void AActionPlayerController::SetRespawnPoint(AActor* InRespawnPoint)
 	RespawnPoint = InRespawnPoint;
 }
 
+
+void AActionPlayerController::RequestSpawn_Implementation()
+{
+	if (!HasAuthority()) return;
+
+	ATestGameMode* GM = GetWorld()->GetAuthGameMode<ATestGameMode>();
+
+	if (!GM) return;
+
+	GM->RespawnPlayer(this);
+}
+
 AActor* AActionPlayerController::GetRespawnPoint()
 {
 	return RespawnPoint;
@@ -277,11 +290,22 @@ void AActionPlayerController::TestDamage(int32 PlayerIndex)
 		UStatComponent* StatComp = TargetCharacter->GetStatComponent();
 
 		if (!StatComp) return;
+		UE_LOG(LogTemp, Warning,
+			TEXT("=== TARGET STAT === Character=%s Ptr=%p StatComp=%s Ptr=%p Owner=%s OwnerPtr=%p"),
+			*GetNameSafe(TargetCharacter),
+			TargetCharacter,
+			*GetNameSafe(StatComp),
+			StatComp,
+			*GetNameSafe(StatComp->GetOwner()),
+			StatComp->GetOwner());
 
 		UE_LOG(LogTemp, Warning,
 			TEXT("=== TARGET FOUND === %s"),
 			*GetNameSafe(TargetCharacter));
-
+		UE_LOG(LogTemp, Warning,
+			TEXT("TargetCharacter=%s Ptr=%p"),
+			*GetNameSafe(TargetCharacter),
+			TargetCharacter);
 		StatComp->TestInflictDamage();
 		return;
 	}
@@ -291,7 +315,7 @@ void AActionPlayerController::TestDamage(int32 PlayerIndex)
 
 void AActionPlayerController::TestHydrationDamage(int32 PlayerIndex)
 {
-	//if (!HasAuthority()) return;
+	if (!HasAuthority()) return;
 
 	for (TActorIterator<AActionCharacter> It(GetWorld()); It; ++It)
 	{

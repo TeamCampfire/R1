@@ -12,10 +12,10 @@ void UParameterBarWidget::UpdateParameterBar(float inCurrent, float inMax)
 	float Div = FMath::Max(inMax, 0.001f);
 	TargetPercent = inCurrent / Div;
 	CurrentText->SetText(FText::AsNumber(FMath::FloorToInt(inCurrent)));
-	UE_LOG(LogTemp, Warning,
+	/*UE_LOG(LogTemp, Warning,
 		TEXT("[UI] UpdateParameterBar Widget=%s Current=%.2f"),
 		*GetNameSafe(this),
-		inCurrent);
+		inCurrent);*/
 	//// 죽을 때 UI 잔상 처리
 	//if (FMath::IsNearlyZero(inCurrent))
 	//{

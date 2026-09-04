@@ -77,8 +77,9 @@ private:
 	// Title/Description/Icon/Split 슬라이더 범위 등 전체 갱신. 선택 없음이면 RootPanel만 Collapsed.
 	void RefreshDisplay();
 
-	// "정보" 섹션 스탯 행 재생성. 장비/도구(UEquipmentItemData::StatModifiers)와
-	// 소비(UConsumableItemData::Effects) 둘 다 텍스트 행으로 채운다 — 런타임에 새로 만든
+	// "정보" 섹션 스탯 행 재생성. 장비(UEquipmentItemData::StatModifiers), 무기/도구
+	// (UHeldItemData::StatModifiers), 소비(UConsumableItemData::Effects) 셋 다 텍스트 행으로
+	// 채운다 — 런타임에 새로 만든
 	// UParameterBarWidget(바)이 이 프로젝트 환경에서 내부 구조가 제대로 안 그려지는 문제가
 	// 있어서(원인 미확정) 이미 검증된 텍스트 방식으로 통일했다.
 	void RebuildInfoRows(const FItemInstance& Selected);

@@ -19,7 +19,7 @@
  * 플레이 동작을 참고해 확정한 구조로, 벨트는 메인 슬롯을 가리키는 참조가 아니라
  * 진짜 별도 저장공간이다. 세 풀 사이의 이동/장착/해제는 전부 TransferItem() 하나로 처리한다.
  *
- * 무기(Weapon)/도구(Tool)는 장비슬롯을 쓰지 않는다 — 벨트 슬롯을 선택(UseBeltSlot)하면
+ * 무기/도구(EItemCategory::HeldItem)는 장비슬롯을 쓰지 않는다 — 벨트 슬롯을 선택(UseBeltSlot)하면
  * 손에 들고, 같은 슬롯을 다시 선택하면 손에서 내리는 방식으로 "장착" 개념을 대신한다.
  */
 
@@ -118,7 +118,7 @@ public:
 
 	// 벨트 슬롯 "사용/선택" — 이동(TransferItem)과는 별개의 액션이다(예: 단축키 1~6).
 	// 빈 슬롯이면: 지금 손에 든(HeldBeltIndex) 무기/도구가 있으면 그걸 내려놓고, 없으면 무동작.
-	// Weapon/Tool은 HeldBeltIndex를 토글(선택 = 손에 듦, 같은 칸 재선택 = 손을 내림).
+	// HeldItem(무기/도구)은 HeldBeltIndex를 토글(선택 = 손에 듦, 같은 칸 재선택 = 손을 내림).
 	// Equipment(의류)는 장비창에 장착/교체. Consumable은 즉시 효과 적용 후 1개 소모(0개가 되면
 	// 슬롯을 비움). 그 외(Misc 등)는 무동작.
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
@@ -174,6 +174,40 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	inline int32 GetCurrentHeledBeltIndex() const { return HeldBeltIndex; }
+
+	// 메인+벨트 슬롯을 통틀어 해당 아이템을 총 몇 개 갖고 있는지. 장비(착용) 슬롯은 제외한다 —
+	// 제작 재료(Misc/Consumable)는 애초에 장비 슬롯에 들어갈 수 없어서 셀 이유가 없다.
+	UFUNCTION(BlueprintPure, Category = "Inventory|Crafting")
+	int32 GetItemCount(const UItemDataBase* ItemData) const;
+
+	// 아이템 하나에 대해 Amount만큼 충분히 갖고 있는지. GetItemCount(ItemData) >= Amount와
+	// 동일하지만, 재료 목록을 만들 필요 없이 단일 아이템만 확인하고 싶을 때 쓴다.
+	UFUNCTION(BlueprintPure, Category = "Inventory|Crafting")
+	bool HasEnoughOf(const UItemDataBase* ItemData, int32 Amount) const;
+
+	// Ingredients에 명시된 재료가 전부 충분한지 확인한다. 건축/제작/합성 어느 쪽이든
+	// "재료 목록"(TArray<FCraftIngredient>)만 있으면 공용으로 쓸 수 있다.
+	UFUNCTION(BlueprintPure, Category = "Inventory|Crafting")
+	bool HasIngredients(const TArray<FCraftIngredient>& Ingredients) const;
+
+	// ItemToCraft->CraftingCost를 만족하는지 확인하는 편의 함수(제작/합성처럼 결과물이
+	// 곧 하나의 아이템 애셋인 경우용). 건축 파츠처럼 별도 데이터 타입을 쓰게 되면
+	// 그쪽 재료 목록을 HasIngredients에 직접 넘기면 된다.
+	UFUNCTION(BlueprintPure, Category = "Inventory|Crafting")
+	bool CanCraftItem(const UItemDataBase* ItemToCraft) const;
+
+	// 아이템 하나를 CountToRemove만큼 소비(삭제)한다. 수량이 부족하면 아무것도 지우지
+	// 않고 false를 반환한다(내부적으로 HasEnoughOf부터 확인 — 호출하는 쪽에서 미리
+	// 확인할 필요 없음). 충분하면 메인→벨트 순으로 슬롯을 훑어 차감하고 true 반환.
+	// 여러 종류를 한 번에 처리하려면 ConsumeIngredients(재료 목록)를 쓰면 된다.
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Crafting")
+	bool ConsumeItemCount(const UItemDataBase* ItemData, int32 CountToRemove);
+
+	// Ingredients를 실제로 차감한다. 하나라도 부족하면 아무것도 차감하지 않고 false를
+	// 반환한다(부분 차감 금지 — 전부 있어야 전부 뺀다). 결과물 지급(인벤토리 추가/월드
+	// 배치 등)은 호출하는 쪽(제작/건축/합성 각자)의 책임이고, 이 함수는 재료 차감만 한다.
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Crafting")
+	bool ConsumeIngredients(const TArray<FCraftIngredient>& Ingredients);
 
 protected:
 	// Called when the game starts
@@ -232,7 +266,7 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_Slots, Category = "Inventory")
 	TArray<FItemInstance> EquipmentSlots;
 
-	// 현재 손에 든 벨트 슬롯 인덱스(Weapon/Tool 아이템에만 의미가 있음). 없으면 INDEX_NONE.
+	// 현재 손에 든 벨트 슬롯 인덱스(HeldItem 아이템에만 의미가 있음). 없으면 INDEX_NONE.
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_Slots, Category = "Inventory")
 	int32 HeldBeltIndex = INDEX_NONE;
 

@@ -23,10 +23,10 @@ public:
 	// 플레이어 사망 처리 함수
 	void HandlePlayerDeath(AActionCharacter* InDeadChar);
 
-protected:
 	// 플레이어 리스폰 함수
 	UFUNCTION(BlueprintCallable)
 	void RespawnPlayer(AController* InController);
+protected:
 
 	// 스폰 가능한 지점 찾는 함수
 	bool FindRandomSpawnLocation(FVector& OutLocation) const;

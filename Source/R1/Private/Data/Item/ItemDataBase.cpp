@@ -28,9 +28,10 @@ void UItemDataBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChange
 
 void UItemDataBase::EnforceStackRulesForCategory()
 {
-	// 장비/무기/도구는 슬롯당 1개만 보관 가능(스택 불가) — Weapon/Tool은 전용 서브클래스가
-	// 없어서(EquipmentItemData처럼 생성자에서 고정할 수 없음) Category 기준으로 여기서 강제한다.
-	if (Category == EItemCategory::Equipment || Category == EItemCategory::Weapon || Category == EItemCategory::Tool)
+	// 장비/무기·도구/설치물은 슬롯당 1개만 보관 가능(스택 불가) — 설치물(모닥불/제작대
+	// 등)도 러스트 기준 스택되지 않는다. 각 서브클래스 생성자에서도 직접 고정하지만,
+	// Category만 바뀌고 클래스가 다른 실수 등을 막기 위한 안전망.
+	if (Category == EItemCategory::Equipment || Category == EItemCategory::HeldItem || Category == EItemCategory::Placeable)
 	{
 		MaxStackSize = 1;
 	}
