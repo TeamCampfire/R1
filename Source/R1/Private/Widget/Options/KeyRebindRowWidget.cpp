@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Widget/Options/KeyRebindRowWidget.h"
@@ -49,8 +49,13 @@ void UKeyRebindRowWidget::NativeOnInitialized()
 	if (ResetRowButton)
 	{
 		ResetRowButton->OnClicked.AddDynamic(this, &UKeyRebindRowWidget::HandleResetRowClicked);
-		// 평소엔 숨겨뒀다가 마우스가 이 행 위에 있는 동안만(NativeOnMouseEnter/Leave) 보여준다.
-		ResetRowButton->SetVisibility(ESlateVisibility::Collapsed);
+		// 평소엔 투명하게 숨겨뒀다가 마우스가 이 행 위에 있는 동안만(NativeOnMouseEnter/Leave) 보여준다.
+		// Visibility(Hidden/Collapsed)로 토글하면 그 전환 순간 레이아웃/히트테스트 경로가 다시 계산되면서
+		// KeyButton -> ResetRowButton으로 커서를 옮기는 도중에 부모(이 행)의 MouseLeave가 잘못 튀어
+		// 버튼이 도로 숨어버리는 문제가 있었다. RenderOpacity+IsEnabled만 바꾸면 위젯이 항상 Visible
+		// 상태를 유지해서 히트테스트 트리 구조가 절대 안 바뀌므로 이 문제가 안 생긴다.
+		ResetRowButton->SetRenderOpacity(0.f);
+		ResetRowButton->SetIsEnabled(false);
 	}
 }
 
@@ -98,7 +103,8 @@ void UKeyRebindRowWidget::NativeOnMouseEnter(const FGeometry& InGeometry, const 
 
 	if (ResetRowButton)
 	{
-		ResetRowButton->SetVisibility(ESlateVisibility::Visible);
+		ResetRowButton->SetRenderOpacity(1.f);
+		ResetRowButton->SetIsEnabled(true);
 	}
 }
 
@@ -108,7 +114,8 @@ void UKeyRebindRowWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
 
 	if (ResetRowButton)
 	{
-		ResetRowButton->SetVisibility(ESlateVisibility::Collapsed);
+		ResetRowButton->SetRenderOpacity(0.f);
+		ResetRowButton->SetIsEnabled(false);
 	}
 }
 
