@@ -52,11 +52,17 @@ public:
 	virtual float GetMaxCalories_Implementation() const override;
 	virtual bool DecreaseCalories_Implementation(float InAmount) override;
 	virtual void RecoverCalories_Implementation(float InAmount) override;
+	virtual float GetCaloriesDropRate_Implementation() const override;
+	virtual void SetCaloriesDropRate_Implementation(float InDropRate) override;
+	virtual void ResetCaloriesDropRate_Implementation() override;
 	// 수분
 	virtual float GetCurrentHydration_Implementation() const override;
 	virtual float GetMaxHydration_Implementation() const override;
 	virtual bool DecreaseHydration_Implementation(float InAmount) override;
 	virtual void RecoverHydration_Implementation(float InAmount) override;
+	virtual float GetHydrationDropRate_Implementation() const override;
+	virtual void SetHydrationDropRate_Implementation(float InDropRate) override;
+	virtual void ResetHydrationDropRate_Implementation() override;
 	// 체온
 	virtual float GetCurrentTemperature_Implementation() const override;
 	virtual bool IncreaseTemperature_Implementation(float InAmount) override;
@@ -93,6 +99,8 @@ protected:
 	// 현재 상태이상 리플리케이션 함수
 	UFUNCTION()
 	void OnRep_PlayerStatusEffects();
+	UFUNCTION()
+	void OnRep_bAlive();
 protected:
 	//UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	//float CurrentStamina = 100.0f;
@@ -128,10 +136,16 @@ protected:
 
 	// 초당 칼로리 감소율
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float DefaultCaloryDropRate = 10.016f;
+	float DefaultCaloryDropRate = 0.016f;
 	// 초당 수분 감소율
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float DefaultHydrationDropRate = 10.0032f;
+	float DefaultHydrationDropRate = 0.0032f;
+	// 칼로리 감소율
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	float CaloryDropRate = 0.016f;
+	// 수분 감소율
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	float HydrationDropRate = 0.0032f;
 
 
 	// 목마름 시작 수치
@@ -166,7 +180,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float DebugDamage = 50.0f;
 
-	UPROPERTY(Replicated)
+	UPROPERTY(ReplicatedUsing = OnRep_bAlive)
 	bool bAlive = false;
 private:
 

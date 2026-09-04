@@ -29,4 +29,13 @@ public:
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Hydration")
 	void RecoverHydration(float inAmount);
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Hydration")
+	float GetHydrationDropRate() const;
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Hydration")
+	void SetHydrationDropRate(float InDropRate);
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Hydration")
+	void ResetHydrationDropRate();
 };
