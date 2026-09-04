@@ -12,38 +12,44 @@
 
 class AActionCharacter;
 class UCharacterMovementComponent;
+class USkeletalMeshComponent;
 /**
- * 
+ *
  */
 UCLASS()
 class R1_API UActionAnimInstance : public UAnimInstance
 {
 	GENERATED_BODY()
-	
+
 protected:
-    virtual void NativeInitializeAnimation() override;
-    virtual void NativeUpdateAnimation(float DeltaSeconds) override;
+	virtual void NativeInitializeAnimation() override;
+	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 
-    UPROPERTY(BlueprintReadOnly, Category = "Movement")
-    float Speed = 0.f;
+	UPROPERTY(BlueprintReadOnly, Category = "Movement")
+	float Speed = 0.f;
 
-    UPROPERTY(BlueprintReadOnly, Category = "Movement")
-    float Direction = 0.f;
+	UPROPERTY(BlueprintReadOnly, Category = "Movement")
+	float Direction = 0.f;
 
-    UPROPERTY(BlueprintReadOnly, Category = "Movement")
-    bool bIsCrouched = false;
+	UPROPERTY(BlueprintReadOnly, Category = "Movement")
+	bool bIsCrouched = false;
 
-    UPROPERTY(BlueprintReadOnly, Category = "Movement")
-    bool bIsFalling = false;
+	UPROPERTY(BlueprintReadOnly, Category = "Movement")
+	bool bIsFalling = false;
 
-    UPROPERTY(BlueprintReadOnly, Category = "Movement")
-    bool bIsSprinting = false;
+	UPROPERTY(BlueprintReadOnly, Category = "Movement")
+	bool bIsSprinting = false;
+
+
+	UPROPERTY(BlueprintReadOnly, Category = "Anim")
+	TObjectPtr<USkeletalMeshComponent> SourceSkeletalMesh;
+
 
 private:
-    UPROPERTY()
-    TObjectPtr<AActionCharacter> OwningCharacter;
+	UPROPERTY()
+	TObjectPtr<AActionCharacter> OwningCharacter;
 
-    UPROPERTY()
-    TObjectPtr<UCharacterMovementComponent> MovementComponent;
+	UPROPERTY()
+	TObjectPtr<UCharacterMovementComponent> MovementComponent;
 
 };

@@ -14,6 +14,7 @@ void UActionAnimInstance::NativeInitializeAnimation()
 	if (OwningCharacter)
 	{
 		MovementComponent = OwningCharacter->GetCharacterMovement();
+		SourceSkeletalMesh = OwningCharacter->GetMesh();
 	}
 }
 

@@ -66,6 +66,11 @@ AActionCharacter::AActionCharacter()
 	FirstPersonCamera->SetRelativeLocation(FVector(0.f, 0.f, BaseEyeHeight)); // 캡슐 기준 눈높이
 	FirstPersonCamera->bUsePawnControlRotation = true;
 
+	FirstPersonMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("FirstPersonMesh"));
+	FirstPersonMesh->SetupAttachment(FirstPersonCamera);
+	FirstPersonMesh->SetRelativeLocationAndRotation(FVector(0, 0, -130), FRotator(0, -90, 0));
+
+
 	bUseControllerRotationYaw = true;	// 캐릭터 몸체(액터) 자체가 좌우로 회전하도록
 	GetCharacterMovement()->bOrientRotationToMovement = false; // 이동 방향으로 자동 회전하지 않게 (1인칭은 항상 카메라 보는 방향이 정면)
 
