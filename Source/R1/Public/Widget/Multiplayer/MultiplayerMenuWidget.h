@@ -41,6 +41,9 @@ protected:
 	virtual void NativeOnInitialized() override;
 	virtual void NativeDestruct() override;
 
+	// 파생 게임 메뉴가 기존 BindWidget 버튼에 화면 전환 동작만 추가할 수 있도록 제공한다.
+	UButton* GetOptionButton() const { return OptionButton; }
+
 private:
 
 	// 위젯 UI 기능 처리 함수

@@ -361,7 +361,7 @@ void UMultiplayerMenuWidget::SetBusy(bool bInBusy, const FText& Message)
 	if (StatusText) StatusText->SetText(Message);
 	if (LeaveSessionButton) LeaveSessionButton->SetIsEnabled(!bBusy && SessionSubsystem && SessionSubsystem->IsInSession());
 	if (ExitGameButton) ExitGameButton->SetIsEnabled(!bBusy);
-	if (OptionButton) OptionButton->SetIsEnabled(!bBusy);
+	//if (OptionButton) OptionButton->SetIsEnabled(!bBusy);
 	if (RefreshButton) RefreshButton->SetIsEnabled(!bBusy);
 	if (HostButton) HostButton->SetIsEnabled(!bBusy);
 	if (JoinButton) JoinButton->SetIsEnabled(!bBusy && SelectedSessionIndex != INDEX_NONE && CanJoinSelectedSession());
