@@ -178,9 +178,7 @@ void UBuildingRadialMenuWidget::UpdateResourceCostInfo(const UBuildingPartDefini
 		}
 
 		UItemDataBase* ResourceItem = ResourceCost.ItemData.Get();
-		// TODO 인벤토리 아이템 함수 구현되면 살릴
-		//const int32 OwnedCount = IsValid(Inventory) ? Inventory->GetItemCount(ResourceItem): 0;
-		const int32 OwnedCount = 0; //! 이건 임시 테스트용
+		const int32 OwnedCount = IsValid(Inventory) ? Inventory->GetItemCount(ResourceItem): 0;
 
 		if (OwnedCount < ResourceCost.RequiredCount) // 설치 요구 개수보다 보유한 숫자가 작으면 기각
 			bHasValidCostData = false;
