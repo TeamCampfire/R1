@@ -11,6 +11,18 @@ AHeldItemBase::AHeldItemBase()
 	PrimaryActorTick.bCanEverTick = true;
 	bReplicates = true;
 	SetReplicateMovement(true);
+
+	if (ItemMesh1P)
+	{
+		ItemMesh1P->SetOnlyOwnerSee(true);
+		ItemMesh1P->SetCastShadow(false);
+	}
+
+	if (ItemMesh3P)
+	{
+		ItemMesh3P->SetOwnerNoSee(true);
+		ItemMesh3P->SetCastHiddenShadow(true);
+	}
 }
 
 void AHeldItemBase::BeginPlay()

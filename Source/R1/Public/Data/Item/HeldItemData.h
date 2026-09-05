@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.09.03
+﻿/// 최초작성 : 2026.09.03
 /// 작 성 자 : 최 요 환
 /// 간단설명 : 손에 드는 무기/도구(HeldItem) 아이템 정의 클래스
 
@@ -65,4 +65,21 @@ public:
 	// 최대 내구도 (정적 불변값)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HeldItem|Durability", meta = (EditCondition = "bHasDurability", ClampMin = "1.0"))
 	float MaxDurability = 100.0f;
+
+	// 좌클릭 몽타주
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HeldItem|Animation")
+	TObjectPtr<UAnimMontage> PrimaryMontage;
+
+	// 우클릭 몽타주
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HeldItem|Animation")
+	TObjectPtr<UAnimMontage> SecondaryMontage;
+
+	// 해당 아이템에 사용할 애니메이션 레이어
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HeldItem|Animation")
+	TSubclassOf<UAnimInstance> AnimLayer;
+
+	// 손에 장착될 메시
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HeldItem|Mesh")
+	TObjectPtr<USkeletalMeshComponent> WeaponMesh;
+
 };

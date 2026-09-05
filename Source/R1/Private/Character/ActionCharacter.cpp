@@ -618,30 +618,30 @@ void AActionCharacter::OnAttackPressed()
 		return;
 	}
 
-	if (!AM_Attack)
-	{
-		UE_LOG(LogTemp, Display, TEXT("AM_Attack was nullptr"));
-		return;
-	}
+	//if (!AM_Attack)
+	//{
+	//	UE_LOG(LogTemp, Display, TEXT("AM_Attack was nullptr"));
+	//	return;
+	//}
 
-	if (UAnimInstance* Instance = GetMesh()->GetAnimInstance())
-	{
-		if (!Instance->IsAnyMontagePlaying())
-		{
-			// 1) 로컬 클라이언트 선행 재생 (인풋 랙 제거)
-			PlayAnimMontage(AM_Attack);
+	//if (UAnimInstance* Instance = GetMesh()->GetAnimInstance())
+	//{
+	//	if (!Instance->IsAnyMontagePlaying())
+	//	{
+	//		// 1) 로컬 클라이언트 선행 재생 (인풋 랙 제거)
+	//		PlayAnimMontage(AM_Attack);
 
-			// 2) 리슨 서버 및 다른 클라이언트 동기화
-			if (!HasAuthority())
-			{
-				Server_PlayAttackMontage();
-			}
-			else
-			{
-				Multicast_PlayAttackMontage();
-			}
-		}
-	}
+	//		// 2) 리슨 서버 및 다른 클라이언트 동기화
+	//		if (!HasAuthority())
+	//		{
+	//			Server_PlayAttackMontage();
+	//		}
+	//		else
+	//		{
+	//			Multicast_PlayAttackMontage();
+	//		}
+	//	}
+	//}
 }
 
 void AActionCharacter::Server_PlayAttackMontage_Implementation()

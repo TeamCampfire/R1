@@ -131,6 +131,8 @@ protected:
 	// 무브먼트 값 갱신
 	void ApplyMovementSettings();
 
+	USkeletalMeshComponent* GetFirstPersonMesh() const { return FirstPersonMesh; }
+
 private:
 	// 공격 범위안에 있는 액터를 반환하는 함수
 	bool DetectdObjectInAttackRange(FHitResult& OutHitRes);
