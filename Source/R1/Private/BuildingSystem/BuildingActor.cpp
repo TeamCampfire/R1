@@ -1,6 +1,9 @@
 ﻿#include "BuildingSystem/BuildingActor.h"
 #include "Data/Building/BuildingPartDefinition.h"
 #include "Net/UnrealNetwork.h"
+#include "Data/Item/ItemDataBase.h"
+#include "Item/ItemPickup.h"
+
 ABuildingActor::ABuildingActor()
 {
  	PrimaryActorTick.bCanEverTick = false;
@@ -32,6 +35,10 @@ void ABuildingActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ABuildingActor, PlacedParts); // PlacedParts는 변경될 때 마다 계속 클라에 복제할게요
+
+	// 건물 전체 내구도도 복제..
+	DOREPLIFETIME(ABuildingActor, CurrentDurability);
+	DOREPLIFETIME(ABuildingActor, MaxDurability);
 }
 
 UStaticMeshComponent* ABuildingActor::AddPart(UBuildingPartDefinition* Definition, const FTransform& InRelativeTransform)
@@ -80,10 +87,19 @@ UStaticMeshComponent* ABuildingActor::AddPart(UBuildingPartDefinition* Definitio
 	PlacedPart.PartID = FGuid::NewGuid();
 	PlacedPart.Definition = Definition;
 	PlacedPart.RelativeTransform = NewPart->GetRelativeTransform();
-	PlacedPart.CurDurability = Definition->MaxDurability;
+	//PlacedPart.CurDurability = Definition->MaxDurability;
 	PlacedPart.MeshComponent = NewPart;
 
 	PlacedParts.Add(MoveTemp(PlacedPart));
+
+	const float AddedDurability = FMath::Max(0.f, static_cast<float>(Definition->MaxDurability)); // 이상한 쓰레기 음수값 제외
+
+	// 현재값과 최대값을 함께 증가
+	CurrentDurability += AddedDurability;
+	MaxDurability += AddedDurability;
+
+	UE_LOG(LogTemp, Log, TEXT("[ABuildingActor::AddPart] 내구도 추가 완료. Added=%.1f, Current=%.1f, Max=%.1f"),
+		AddedDurability, CurrentDurability, MaxDurability);
 
 	UE_LOG(LogTemp, Warning, TEXT("[ABuildingActor::AddPart] Authority: %s / PlacedParts Num: %d"),
 		HasAuthority() ? TEXT("Server") : TEXT("Client"), PlacedParts.Num());
@@ -274,4 +290,141 @@ void ABuildingActor::ResolveAdjacentFoundationConnections(FGuid NewPartID, float
 				break;
 		}
 	}
+}
+
+bool ABuildingActor::DemolishAndDropResources()
+{
+	// 실제 월드 아이템 생성과 건물 제거는 반드시 서버에서만 수행해야 해요
+	if (false == HasAuthority())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ABuildingActor::DemolishAndDropResources()] : 서버에서만 건물을 해체할 수 있습니다."));
+		return false;
+	}
+
+	TMap<UItemDataBase*, int32> Refunds; // 다시 반환시킬 자원들 데이터
+	if (false == BuildDemolitionRefunds(Refunds))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ABuildingActor::DemolishAndDropResources()] : 환급 자원 계산에 실패했습니다."));
+		return false;
+	}
+
+	// 중간에 픽업 생성이 실패했을 때.. 이미 생성한 자원만 남는 문제를 막기 위해 기억해둠
+	TArray<AItemPickup*> SpawnedPickups;
+
+	int32 RefundIndex = 0;
+	const int32 RefundTypeCount = Refunds.Num();
+
+	for (const TPair<UItemDataBase*, int32>& Refund : Refunds)
+	{
+		if (false == IsValid(Refund.Key) || 0 >= Refund.Value) continue;
+
+
+		// 여러 종류의 자원 픽업이 완전히 같은 자리에 겹치지 않도록 건물 중심 주변에 원형으로 조금씩 나누어 생성
+		const float DropAngle = RefundTypeCount > 0 ? (2.0f * PI * RefundIndex) / static_cast<float>(RefundTypeCount): 0.0f;
+
+		const FVector DropOffset(FMath::Cos(DropAngle) * 80.0f, FMath::Sin(DropAngle) * 80.0f, 100.0f);
+		const FVector DropLocation = GetActorLocation() + DropOffset;
+		const FTransform DropTransform(FRotator::ZeroRotator, DropLocation);
+
+		// 픽얻액터로 다시 자원 생성해요
+		AItemPickup* Pickup = GetWorld()->SpawnActor<AItemPickup>(AItemPickup::StaticClass(), DropTransform);
+
+		if (false == IsValid(Pickup))
+		{
+			// 해체 자체는 실패시킴, 이번 호출에서 이미 만든 픽업도 지워 재시도 시 자원이 중복 환급되지 않게
+			for (AItemPickup* SpawnedPickup : SpawnedPickups)
+			{
+				if (true == IsValid(SpawnedPickup))
+					SpawnedPickup->Destroy();
+			}
+
+			UE_LOG(LogTemp, Warning, TEXT("[ABuildingActor::DemolishAndDropResources()] : 환급 아이템 스폰에 실패했습니다."));
+			return false;
+		}
+
+		// 기존 ItemPickup에 자원 종류와 합산된 수량을 전달
+		Pickup->InitializeFromItem(Refund.Key, Refund.Value);
+		SpawnedPickups.Add(Pickup);
+		++RefundIndex;
+	}
+
+	// 환급 픽업 생성이 끝난 뒤에만! 건물 전체 제거를 요청
+	if (false == Destroy())
+	{
+		// 건물 제거가 실패했다면 환급 픽업도 되돌려서
+		// 건물과 자원이 동시에 남는 중복 환급을 방지
+		for (AItemPickup* SpawnedPickup : SpawnedPickups)
+		{
+			if (true == IsValid(SpawnedPickup))
+				SpawnedPickup->Destroy();
+		}
+
+		UE_LOG(LogTemp, Warning, TEXT("[ABuildingActor::DemolishAndDropResources()] : 건물 제거 요청에 실패했습니다."));
+		return false;
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("[Building Demolition] 건물 전체 해체 완료. PartCount=%d, RefundTypeCount=%d"), PlacedParts.Num(), Refunds.Num());
+	return true;
+}
+
+bool ABuildingActor::ApplyBuildingDamage(float DamageAmount)
+{
+	// 건물 내구도는 서버가 단독으로 변경해야 해요 고로 클라가 호출하면 데미지 적용 안 해요
+	if (false == HasAuthority())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ABuildingActor::ApplyBuildingDamage] 서버에서만 피해를 적용할 수 있습니다."));
+		return false;
+	}
+
+	// 0 또는 음수 피해는 잘못된 요청이므로 데미지 적용 안 해요
+	if (DamageAmount <= 0.f)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ABuildingActor::ApplyBuildingDamage] DamageAmount가 올바르지 않습니다. Damage=%.1f"), DamageAmount);
+		return false;
+	}
+
+	// 최대 내구도가 없는 건물은 정상적인 내구도 데이터가 구성되지 않은 상태
+	if (MaxDurability <= 0.f)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ABuildingActor::ApplyBuildingDamage] 건물의 최대 내구도가 설정되지 않았습니다."));
+		return false;
+	}
+
+	const float PreviousDurability = CurrentDurability;
+	CurrentDurability = FMath::Max(0.f, CurrentDurability - DamageAmount); // 내구도 음수 방지
+	ForceNetUpdate(); // 변경된 내구도가 클라이언트에 전달될 수 있도록 복제 갱신
+
+	UE_LOG(LogTemp, Log, TEXT("[ABuildingActor::ApplyBuildingDamage] Damage=%.1f, Durability=%.1f -> %.1f / %.1f"),
+		DamageAmount, PreviousDurability, CurrentDurability, MaxDurability);
+
+	// 내구도가 남아 있다면 피해 처리만 마치고 건물은 유지
+	if (CurrentDurability > 0.f) return true;
+	UE_LOG(LogTemp, Log, TEXT("[ABuildingActor::ApplyBuildingDamage] 내구도가 0이 되어 건물 전체를 파괴합니다."));
+
+	// 기존에 구현한 자원 드롭 및 건물 전체 제거 함수로 연결!
+	return DemolishAndDropResources();
+}
+
+bool ABuildingActor::BuildDemolitionRefunds(TMap<class UItemDataBase*, int32>& OutRefunds) const
+{
+	OutRefunds.Reset();
+
+	// 구성 파츠가 하나도 없다면 환급할 대상도 없으므로 잘못된 건물 상태로 판단
+	if (PlacedParts.Num() == 0) return false;
+
+	for (const FPlacedBuildingPart& PlacedPart : PlacedParts)
+	{
+		// 어떤 파츠의 원본 데이터가 유효하지 않으면 자원이 누락된 채 건물이 삭제되는 일을 막ㅏ요
+		if (false == IsValid(PlacedPart.Definition)) return false;
+
+		for (const FBuildingResourceCost& ResourceCost : PlacedPart.Definition->ResourceCosts)
+		{
+			// 비용 데이터가 비어 있거나 잘못된 파츠는 해체 자체를 막아버려요
+			if (false == IsValid(ResourceCost.ItemData) || 0 >= ResourceCost.RequiredCount) return false;
+
+			// 같은 자원이 여러 파츠의 비용에 포함되어 있어도 하나의 픽업 수량으로 합산시켜요
+			OutRefunds.FindOrAdd(ResourceCost.ItemData.Get()) += ResourceCost.RequiredCount;
+		}
+	}
+	return true;
 }
