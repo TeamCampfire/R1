@@ -36,6 +36,14 @@ public:
 	// 같은 메시지를 연속으로 요청하면 기존 타이머를 초기화하여 마지막 요청 시점부터 DisplayDuration 동안 다시 표시
 	void ShowBuildingPlacementMessage(const FText& Message, float DisplayDuration = 1.5f);
 
+	// 건물 내구도 UI 표시하는 함수
+	UFUNCTION(BlueprintCallable, Category = "Building|Durability")
+	void ShowBuildingDurability(float CurrentDurability, float MaxDurability);
+
+	// 건물 내구도 UI 숨기는 함수
+	UFUNCTION(BlueprintCallable, Category = "Building|Durability")
+	void HideBuildingDurability();
+
 public:
 	// 플레이어 컨트롤러 캐싱
 	UPROPERTY()
@@ -94,4 +102,7 @@ protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UDeathScreenOverlayWidget> DeathScreenOverlay;
 
+	// BuildingDurability 건물 내구도 UI
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<class UBuildingDurabilityWidget> BuildingDurabilityWidget;
 };
