@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.30
+﻿/// 최초작성 : 2026.08.30
 /// 작 성 자 : 주 형 진
 
 // Fill out your copyright notice in the Description page of Project Settings.
@@ -56,4 +56,11 @@ public:
 protected:
 	UPROPERTY(BlueprintReadOnly, Category = "HeldItem")
 	TObjectPtr<AActionCharacter> OwnerCharacter;
+
+	UPROPERTY(BlueprintReadOnly, Category = "HeldItem|ItemMesh")
+	TObjectPtr< USkeletalMeshComponent> ItemMesh1P;
+
+	UPROPERTY(BlueprintReadOnly, Category = "HeldItem|ItemMesh")
+	TObjectPtr< USkeletalMeshComponent> ItemMesh3P;
+
 };

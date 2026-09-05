@@ -11,6 +11,7 @@
 #include "Character/ActionPlayerController.h"
 #include "Character/ActionCharacter.h"
 #include "Component/StatComponent.h"
+#include "Widget/BuildingSystem/BuildingDurabilityWidget.h"
 
 void UMainHUDWidget::NativeOnInitialized()
 {
@@ -181,4 +182,18 @@ void UMainHUDWidget::ShowBuildingPlacementMessage(const FText& Message, float Di
 		&UMainHUDWidget::HideBuildingPlacementMessage,
 		SafeDisplayDuration,
 		false);
+}
+
+void UMainHUDWidget::ShowBuildingDurability(float CurrentDurability, float MaxDurability)
+{
+	if (false == IsValid(BuildingDurabilityWidget)) return;
+
+	BuildingDurabilityWidget->UpdateDurability(CurrentDurability, MaxDurability);
+	BuildingDurabilityWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+}
+
+void UMainHUDWidget::HideBuildingDurability()
+{
+	if (true == IsValid(BuildingDurabilityWidget))
+		BuildingDurabilityWidget->SetVisibility(ESlateVisibility::Collapsed);
 }

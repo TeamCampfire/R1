@@ -88,7 +88,11 @@ protected:
 	EPlayerMappableKeySlot PendingSlot = EPlayerMappableKeySlot::First;
 	FKey PendingNewKey;
 
-	// 보류 중인 요청과 충돌 중인, 기존에 그 키를 쓰고 있던 매핑 — Replace를 누르면 이걸 먼저 비운다.
+	// PendingMappingName이 리바인딩 전에 쓰고 있던 키 — Replace 시 충돌 상대에게 "교환"으로 넘겨준다.
+	FKey PendingOldKey;
+
+	// 보류 중인 요청과 충돌 중인, 기존에 그 키를 쓰고 있던 매핑 — Replace를 누르면 이 매핑이
+	// PendingOldKey를 받는다(스왑). PendingOldKey가 없으면(원래 미지정 상태였으면) 그냥 비운다.
 	FName PendingConflictMappingName;
 	EPlayerMappableKeySlot PendingConflictSlot = EPlayerMappableKeySlot::First;
 };

@@ -21,9 +21,6 @@ struct FPlacedBuildingPart
 	FTransform RelativeTransform = FTransform::Identity; // 껍데기 BuildingActor를 기준으로 한 상대 위치
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	float CurDurability = 0.f; // 현재 내구도
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	TObjectPtr<UStaticMeshComponent> MeshComponent; // 실제로 월드에 표시되는 런타임 메시 컴포넌트
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
@@ -65,6 +62,26 @@ public:
 
 	// 새 Foundation과 이미 설치된 Foundation 사이에서 서로 맞닿은 모든 연결면을 찾아 양쪽 소켓을 점유 처리하는 함수
 	void ResolveAdjacentFoundationConnections(FGuid NewPartID, float AnchorTolerance);
+
+	// 건물 전체의 현재 내구도 반환
+	UFUNCTION(BlueprintPure, Category = "Building") float GetCurrentDurability() const { return CurrentDurability; }
+
+	// 건물을 구성하는 모든 파츠의 내구도 합계를 반환 = 그게 곧 이 건물의 내구도
+	UFUNCTION(BlueprintPure, Category = "Building") float GetMaxDurability() const { return MaxDurability; }
+
+	// 이 BuildingActor를 구성하는 모든 파츠의 설치 비용을 자원으로 드롭한 뒤 건물 전체를 제거하는 함수
+	UFUNCTION(BlueprintCallable, Category = "Building")
+	bool DemolishAndDropResources();
+
+	// 건물 전체에 피해를 적용하는 함수, 반환값은 성공 여부
+	UFUNCTION(BlueprintCallable, Category = "Building")
+	bool ApplyBuildingDamage(float DamageAmount);
+
+private:
+	// PlacedParts 전체를 순회해 파츠별 ResourceCosts를 합산 계산하는 함수
+	// 예 : Foundation 목재 25 + Wall 목재 50  → 목재 75개로 하나의 환급 항목 생성
+	// 비용 데이터가 잘못된 파츠가 하나라도 있으면 false를 반환하여 건물을 삭제하지 못함 !
+	bool BuildDemolitionRefunds(TMap<class UItemDataBase*, int32>& OutRefunds) const;
 	//  ===================================================================================
 
 protected:
@@ -73,4 +90,10 @@ protected:
 
 	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Building")
 	TArray<FPlacedBuildingPart> PlacedParts; // 이 건물을 구성하는 모든 설치 완료 파츠 (클라에 동기화할)
+
+	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Building|Durability")
+	float CurrentDurability = 0.f; // 현재 건물에 남아 있는 전체 내구도
+
+	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Building|Durability")
+	float MaxDurability = 0.f; // 건물을 구성하는 모든 파츠의 최대 내구도 합계
 };
