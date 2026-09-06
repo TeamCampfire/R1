@@ -4,6 +4,7 @@
 #include "Widget/Inventory/DetailInfoWidget.h"
 #include "Blueprint/WidgetTree.h"
 #include "Widget/Inventory/InventoryDragDropOperation.h"
+#include "Component/WarehouseInventoryComponent.h"
 #include "Components/Widget.h"
 #include "Components/TextBlock.h"
 #include "Components/Image.h"
@@ -47,6 +48,7 @@ void UDetailInfoWidget::NativeOnInitialized()
 void UDetailInfoWidget::NativeDestruct()
 {
 	UnbindInventoryDelegates();
+	UnbindWarehouse();
 
 	if (AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer()))
 	{
@@ -54,6 +56,38 @@ void UDetailInfoWidget::NativeDestruct()
 	}
 
 	Super::NativeDestruct();
+}
+
+void UDetailInfoWidget::BindWarehouse(UWarehouseInventoryComponent* Warehouse)
+{
+	UnbindWarehouse();
+
+	BoundWarehouse = Warehouse;
+
+	if (Warehouse)
+	{
+		Warehouse->OnInventoryChanged.AddDynamic(this, &UDetailInfoWidget::HandleWarehouseChanged);
+		Warehouse->OnSelectionChanged.AddDynamic(this, &UDetailInfoWidget::HandleWarehouseChanged);
+	}
+
+	RefreshDisplay();
+}
+
+void UDetailInfoWidget::UnbindWarehouse()
+{
+	if (UWarehouseInventoryComponent* Warehouse = BoundWarehouse.Get())
+	{
+		Warehouse->OnInventoryChanged.RemoveDynamic(this, &UDetailInfoWidget::HandleWarehouseChanged);
+		Warehouse->OnSelectionChanged.RemoveDynamic(this, &UDetailInfoWidget::HandleWarehouseChanged);
+	}
+
+	BoundWarehouse = nullptr;
+	RefreshDisplay();
+}
+
+void UDetailInfoWidget::HandleWarehouseChanged()
+{
+	RefreshDisplay();
 }
 
 void UDetailInfoWidget::UnbindInventoryDelegates()
@@ -90,8 +124,15 @@ void UDetailInfoWidget::HandleInventoryChanged()
 
 void UDetailInfoWidget::RefreshDisplay()
 {
+	// 창고 쪽 선택이 있으면 그걸 우선 보여준다 — UWarehouseWidget::HandlePlayerSlotClicked가
+	// 플레이어 슬롯을 클릭할 때마다 창고 선택을 지워주므로, 실제로는 둘 중 하나만 선택된 상태다.
+	UWarehouseInventoryComponent* Warehouse = BoundWarehouse.Get();
 	UInventoryComponent* Inventory = BoundInventory.Get();
-	const FItemInstance Selected = Inventory ? Inventory->GetSelectedItemInstance() : FItemInstance();
+
+	const bool bShowingWarehouseItem = Warehouse && Warehouse->bHasSelection;
+	const FItemInstance Selected = bShowingWarehouseItem
+		? Warehouse->GetSelectedItemInstance()
+		: (Inventory ? Inventory->GetSelectedItemInstance() : FItemInstance());
 
 	if (RootPanel)
 	{
@@ -146,7 +187,9 @@ void UDetailInfoWidget::RefreshDisplay()
 	}
 
 	// 분할 가능 = 스택형 아이템(MaxStackSize > 1)이고 현재 2개 이상 들고 있을 때만.
-	const bool bCanSplit = (ItemData->MaxStackSize > 1) && (Selected.StackCount > 1);
+	// 창고 아이템은 분할 드래그 대상이 아니다(NativeOnDragDetected가 SelectedSlotRef 기준으로
+	// 플레이어 인벤토리에서만 꺼내오므로) — 항상 숨긴다.
+	const bool bCanSplit = !bShowingWarehouseItem && (ItemData->MaxStackSize > 1) && (Selected.StackCount > 1);
 	if (SplitPanel)
 	{
 		SplitPanel->SetVisibility(bCanSplit ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
@@ -166,7 +209,7 @@ void UDetailInfoWidget::RefreshDisplay()
 	}
 
 	RebuildInfoRows(Selected);
-	RebuildActionButtons(Selected);
+	RebuildActionButtons(Selected, bShowingWarehouseItem);
 }
 
 void UDetailInfoWidget::RebuildInfoRows(const FItemInstance& Selected)
@@ -246,14 +289,21 @@ FLinearColor UDetailInfoWidget::GetEffectColor(EItemEffectType EffectType)
 	}
 }
 
-void UDetailInfoWidget::RebuildActionButtons(const FItemInstance& Selected)
+void UDetailInfoWidget::RebuildActionButtons(const FItemInstance& Selected, bool bIsWarehouseItem)
 {
 	// 버튼은 런타임에 만들지 않고 WBP에 미리 배치해둔 걸(UseButton 등) 카테고리에 따라
 	// 보이거나 숨기기만 한다 — 나중에 액션 버튼이 늘어나도 같은 방식으로 추가하면 된다.
 	if (UseButton)
 	{
-		const bool bIsConsumable = Selected.ItemData && Selected.ItemData->Category == EItemCategory::Consumable;
+		const bool bIsConsumable = !bIsWarehouseItem && Selected.ItemData && Selected.ItemData->Category == EItemCategory::Consumable;
 		UseButton->SetVisibility(bIsConsumable ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	}
+
+	// 버리기(ThrowItem)도 SelectedSlotRef 기준으로 플레이어 인벤토리에서만 동작하므로 창고
+	// 아이템을 보고 있을 때는 숨긴다.
+	if (DiscardButton)
+	{
+		DiscardButton->SetVisibility(bIsWarehouseItem ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
 	}
 }
 

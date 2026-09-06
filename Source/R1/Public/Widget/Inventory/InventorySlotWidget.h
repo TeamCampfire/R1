@@ -26,6 +26,11 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotClicked, FInventoryS
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotRightClicked, FInventorySlotRef, SlotRef);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotDragCancelled, FInventorySlotRef, SlotRef);
 
+// 드래그 시작 슬롯과 드롭된 슬롯의 ContainerId가 서로 다를 때만 발생한다(같으면 기존
+// FOnInventorySlotDropped가 그대로 발생). 창고처럼 한 화면에 서로 다른 인벤토리 두 개를
+// 같이 보여줄 때만 쓰이므로, ContainerId를 안 쓰는(항상 0인) 기존 위젯에는 절대 발생하지 않는다.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(FOnInventorySlotDroppedCross, int32, FromContainerId, FInventorySlotRef, FromSlot, int32, ToContainerId, FInventorySlotRef, ToSlot, int32, Count);
+
 /**
  * 슬롯 하나(장비/메인/벨트 공통)를 표현하는 재사용 위젯.
  *
@@ -57,6 +62,11 @@ public:
 	void SetSlotRef(const FInventorySlotRef& InSlotRef);
 	const FInventorySlotRef& GetSlotRef() const { return SlotRef; }
 
+	// 이 슬롯이 속한 컨테이너 식별자. 기본값 0 = 일반 인벤토리. 창고 화면처럼 한 화면에
+	// 서로 다른 인벤토리를 같이 그릴 때만 EnsureGridSlots 호출부가 값을 다르게 넘긴다.
+	void SetContainerId(int32 InContainerId) { ContainerId = InContainerId; }
+	int32 GetContainerId() const { return ContainerId; }
+
 	void Refresh(const FItemInstance& Instance);
 
 	// 클릭으로 이 슬롯이 선택됐는지(파란 테두리) — InventoryComponent::IsSlotSelected를 보고
@@ -86,10 +96,15 @@ public:
 		TFunctionRef<void(UInventorySlotWidget*)> OnSlotCreated,
 		TFunctionRef<bool(const FInventorySlotRef&)> IsSelectedFn,
 		TFunctionRef<bool(const FInventorySlotRef&)> IsHeldFn,
-		TArray<TObjectPtr<UInventorySlotWidget>>& OutWidgets);
+		TArray<TObjectPtr<UInventorySlotWidget>>& OutWidgets,
+		int32 ContainerId = 0);
 
 	UPROPERTY(BlueprintAssignable, Category = "Inventory")
 	FOnInventorySlotDropped OnSlotDropped;
+
+	// ContainerId가 서로 다른 슬롯 사이의 드롭에서만 발생 — 창고 전용.
+	UPROPERTY(BlueprintAssignable, Category = "Inventory")
+	FOnInventorySlotDroppedCross OnSlotDroppedCross;
 
 	// 이 슬롯이 (드래그가 아니라) 클릭됐을 때 — 아이템이 있는 슬롯에서만 발생한다.
 	UPROPERTY(BlueprintAssignable, Category = "Inventory")
@@ -153,4 +168,6 @@ private:
 	// 이 값을 보고 DragOp->bAutoHalfSplitOnEmptyTarget을 채운다.
 	bool bPendingMiddleButtonDrag = false;
 	bool bIsClickSelected = false;
+
+	int32 ContainerId = 0;
 };

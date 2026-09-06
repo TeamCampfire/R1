@@ -8,6 +8,7 @@
 #include "Item/ItemPickup.h"
 #include "GameFramework/Character.h"
 #include "Component/HeldItemComponent.h"
+#include "Component/WarehouseInventoryComponent.h"
 #include "Net/UnrealNetwork.h"   // DOREPLIFETIME 계열 매크로가 여기 정의돼 있음
 
 // Sets default values for this component's properties
@@ -633,6 +634,196 @@ bool UInventoryComponent::ConsumeItemCount(const UItemDataBase* ItemData, int32 
 	RemoveFrom(EInventorySlotCategory::Main);
 	RemoveFrom(EInventorySlotCategory::Belt);
 	return true;
+}
+
+void UInventoryComponent::SetSlotItem(const FInventorySlotRef& SlotRef, const FItemInstance& NewValue)
+{
+	SetSlot(SlotRef.Category, SlotRef.Index, NewValue);
+}
+
+bool UInventoryComponent::TransferWithWarehouse(UWarehouseInventoryComponent* Warehouse, FInventorySlotRef PlayerSlot, int32 WarehouseSlotIndex, int32 Count, bool bToWarehouse)
+{
+	if (!Warehouse || !Warehouse->StorageSlots.IsValidIndex(WarehouseSlotIndex))
+	{
+		return false;
+	}
+
+	TArray<FItemInstance>& PlayerArray = GetSlotArray(PlayerSlot.Category);
+	if (!PlayerArray.IsValidIndex(PlayerSlot.Index))
+	{
+		return false;
+	}
+
+	const FItemInstance& PlayerInstance = PlayerArray[PlayerSlot.Index];
+	const FItemInstance& WarehouseInstance = Warehouse->StorageSlots[WarehouseSlotIndex];
+
+	// bToWarehouse 방향에 따라 Source/Target을 정하면, 아래 이동/병합/교환 로직은
+	// TransferItem과 동일한 모양으로 방향에 무관하게 처리할 수 있다.
+	const FItemInstance SourceInstance = bToWarehouse ? PlayerInstance : WarehouseInstance;
+	const FItemInstance TargetInstance = bToWarehouse ? WarehouseInstance : PlayerInstance;
+
+	if (!SourceInstance.IsValid())
+	{
+		return false;
+	}
+
+	const int32 MoveCount = (Count > 0) ? FMath::Min(Count, SourceInstance.StackCount) : SourceInstance.StackCount;
+
+	FItemInstance NewSource;
+	FItemInstance NewTarget;
+
+	if (!TargetInstance.IsValid())
+	{
+		// 대상이 비어있음 → 그냥 이동.
+		NewTarget = SourceInstance;
+		NewTarget.StackCount = MoveCount;
+
+		const int32 Remaining = SourceInstance.StackCount - MoveCount;
+		NewSource = Remaining > 0 ? FItemInstance(SourceInstance.ItemData, Remaining) : FItemInstance();
+	}
+	else if (TargetInstance.ItemData == SourceInstance.ItemData && TargetInstance.StackCount < TargetInstance.ItemData->MaxStackSize)
+	{
+		// 같은 아이템 + 여유 있음 → 병합.
+		const int32 SpaceInTarget = TargetInstance.ItemData->MaxStackSize - TargetInstance.StackCount;
+		const int32 AmountToMerge = FMath::Min(SpaceInTarget, MoveCount);
+
+		NewTarget = TargetInstance;
+		NewTarget.StackCount += AmountToMerge;
+
+		const int32 Remaining = SourceInstance.StackCount - AmountToMerge;
+		NewSource = Remaining > 0 ? FItemInstance(SourceInstance.ItemData, Remaining) : FItemInstance();
+	}
+	else
+	{
+		// 다른 아이템 → 자리 교환.
+		NewTarget = SourceInstance;
+		NewSource = TargetInstance;
+	}
+
+	if (bToWarehouse)
+	{
+		SetSlotItem(PlayerSlot, NewSource);
+		Warehouse->SetSlotItem(WarehouseSlotIndex, NewTarget);
+	}
+	else
+	{
+		Warehouse->SetSlotItem(WarehouseSlotIndex, NewSource);
+		SetSlotItem(PlayerSlot, NewTarget);
+	}
+
+	return true;
+}
+
+bool UInventoryComponent::Server_TransferWithWarehouse_Validate(UWarehouseInventoryComponent* Warehouse, FInventorySlotRef PlayerSlot, int32 WarehouseSlotIndex, int32 Count, bool bToWarehouse)
+{
+	if (!Warehouse)
+	{
+		return false;
+	}
+
+	// 남의(창고) 컴포넌트를 건드리는 함수라 거리 검증을 반드시 둔다 — 기존 Server_TransferItem류의
+	// _Validate는 자기 자신의 슬롯만 다루므로 비어있어도 큰 문제가 없었지만, 이 함수는 원거리에서
+	// 악의적으로 창고 슬롯을 조작하는 걸 막아야 한다.
+	const AActor* PlayerOwner = GetOwner();
+	const AActor* WarehouseOwner = Warehouse->GetOwner();
+	if (!PlayerOwner || !WarehouseOwner)
+	{
+		return false;
+	}
+
+	const float DistSq = FVector::DistSquared(PlayerOwner->GetActorLocation(), WarehouseOwner->GetActorLocation());
+	return DistSq <= FMath::Square(Warehouse->MaxInteractDistance);
+}
+
+void UInventoryComponent::Server_TransferWithWarehouse_Implementation(UWarehouseInventoryComponent* Warehouse, FInventorySlotRef PlayerSlot, int32 WarehouseSlotIndex, int32 Count, bool bToWarehouse)
+{
+	TransferWithWarehouse(Warehouse, PlayerSlot, WarehouseSlotIndex, Count, bToWarehouse);
+}
+
+bool UInventoryComponent::TransferWithinWarehouse(UWarehouseInventoryComponent* Warehouse, int32 FromIndex, int32 ToIndex, int32 Count, bool bAutoHalfSplitIfTargetEmpty)
+{
+	if (!Warehouse || FromIndex == ToIndex)
+	{
+		return false;
+	}
+
+	if (!Warehouse->StorageSlots.IsValidIndex(FromIndex) || !Warehouse->StorageSlots.IsValidIndex(ToIndex))
+	{
+		return false;
+	}
+
+	const FItemInstance SourceInstance = Warehouse->StorageSlots[FromIndex];
+	const FItemInstance TargetInstance = Warehouse->StorageSlots[ToIndex];
+	if (!SourceInstance.IsValid())
+	{
+		return false;
+	}
+
+	const int32 MoveCount = (Count > 0) ? FMath::Min(Count, SourceInstance.StackCount) : SourceInstance.StackCount;
+
+	// 대상이 비어있음 → 그냥 이동(휠클릭 드래그로 빈 슬롯에 놓았고 Count 미지정이면 절반만).
+	if (!TargetInstance.IsValid())
+	{
+		const int32 ActualMoveCount = (bAutoHalfSplitIfTargetEmpty && Count <= 0 && SourceInstance.StackCount >= 2)
+			? (SourceInstance.StackCount / 2)
+			: MoveCount;
+
+		FItemInstance Moved = SourceInstance;
+		Moved.StackCount = ActualMoveCount;
+		Warehouse->SetSlotItem(ToIndex, Moved);
+
+		const int32 Remaining = SourceInstance.StackCount - ActualMoveCount;
+		Warehouse->SetSlotItem(FromIndex, Remaining > 0 ? FItemInstance(SourceInstance.ItemData, Remaining) : FItemInstance());
+
+		return true;
+	}
+
+	// 대상에 같은 아이템이 있고 여유가 있으면 병합.
+	if (TargetInstance.ItemData == SourceInstance.ItemData && TargetInstance.StackCount < TargetInstance.ItemData->MaxStackSize)
+	{
+		const int32 SpaceInTarget = TargetInstance.ItemData->MaxStackSize - TargetInstance.StackCount;
+		const int32 AmountToMerge = FMath::Min(SpaceInTarget, MoveCount);
+
+		FItemInstance MergedTarget = TargetInstance;
+		MergedTarget.StackCount += AmountToMerge;
+		Warehouse->SetSlotItem(ToIndex, MergedTarget);
+
+		const int32 Remaining = SourceInstance.StackCount - AmountToMerge;
+		Warehouse->SetSlotItem(FromIndex, Remaining > 0 ? FItemInstance(SourceInstance.ItemData, Remaining) : FItemInstance());
+
+		return true;
+	}
+
+	// 대상에 다른 아이템 → 자리 교환.
+	Warehouse->SetSlotItem(ToIndex, SourceInstance);
+	Warehouse->SetSlotItem(FromIndex, TargetInstance);
+
+	return true;
+}
+
+bool UInventoryComponent::Server_TransferWithinWarehouse_Validate(UWarehouseInventoryComponent* Warehouse, int32 FromIndex, int32 ToIndex, int32 Count, bool bAutoHalfSplitIfTargetEmpty)
+{
+	if (!Warehouse)
+	{
+		return false;
+	}
+
+	// Server_TransferWithWarehouse_Validate와 동일한 이유로 거리 검증을 둔다 — 남의(창고)
+	// 컴포넌트를 건드리는 함수라 원거리에서 악의적으로 조작하는 걸 막아야 한다.
+	const AActor* PlayerOwner = GetOwner();
+	const AActor* WarehouseOwner = Warehouse->GetOwner();
+	if (!PlayerOwner || !WarehouseOwner)
+	{
+		return false;
+	}
+
+	const float DistSq = FVector::DistSquared(PlayerOwner->GetActorLocation(), WarehouseOwner->GetActorLocation());
+	return DistSq <= FMath::Square(Warehouse->MaxInteractDistance);
+}
+
+void UInventoryComponent::Server_TransferWithinWarehouse_Implementation(UWarehouseInventoryComponent* Warehouse, int32 FromIndex, int32 ToIndex, int32 Count, bool bAutoHalfSplitIfTargetEmpty)
+{
+	TransferWithinWarehouse(Warehouse, FromIndex, ToIndex, Count, bAutoHalfSplitIfTargetEmpty);
 }
 
 void UInventoryComponent::PrintInventoryInfo()
