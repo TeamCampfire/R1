@@ -391,6 +391,16 @@ void AActionPlayerController::OnGameMenuTogglePressed()
 
 void AActionPlayerController::OnInventoryTogglePressed()
 {
+	// 캐릭터가 죽은 동안(사망 직후 UnPossess ~ 부활 전, 또는 살아있어도 bAlive=false인 짧은
+	// 순간)엔 인벤토리 토글을 무시한다 — 죽은 화면에서 인벤토리 패널을 열어봐야 HUDPanel 자체가
+	// Collapsed라 보이지도 않으면서 OpenUIPanelCount/커서 상태만 어긋나게 된다.
+	AActionCharacter* PossessedCharacter = Cast<AActionCharacter>(GetPawn());
+	const IHealthInterface* HealthInterface = PossessedCharacter ? Cast<IHealthInterface>(PossessedCharacter->GetStatComponent()) : nullptr;
+	if (!PossessedCharacter || !HealthInterface || !HealthInterface->IsAlive())
+	{
+		return;
+	}
+
 	AMainHUD* HUD = GetHUD<AMainHUD>();
 	UMainHUDWidget* MainHudWidget = HUD ? HUD->GetMainHudWidget() : nullptr;
 	if (!MainHudWidget)
