@@ -35,6 +35,7 @@ AActionCharacter::AActionCharacter()
 	PrimaryActorTick.bCanEverTick = true;
 	// Replicate 설정
 	bReplicates = true;
+	SetReplicateMovement(true);
 
 	// Head메시 생성
 	TorsoMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("HeadMesh"));
@@ -260,6 +261,26 @@ void AActionCharacter::SetCrouchInputMode(ECrouchInputMode NewMode)
 	CrouchInputMode = NewMode;
 	UnCrouch(); // 모드 전환 시 안전하게 초기화 (Hold 누르고 있던 중 전환 등)
 	ApplyMovementSettings();
+}
+
+void AActionCharacter::SetIsInVehicle(bool bIsInVehicleNew, bool bIsDriver)
+{
+	bIsSitting = bIsInVehicleNew;
+	LegMesh->SetVisibility(!bIsInVehicleNew);
+	FeetMesh->SetVisibility(!bIsInVehicleNew);
+
+	bUseControllerRotationYaw = !bIsInVehicleNew;
+
+	if (!HasAuthority())
+	{
+		TorsoMesh->SetVisibility(!bIsInVehicleNew);
+	}
+
+	if (bIsDriver)
+	{
+		GetMesh()->SetVisibility(!bIsInVehicleNew);
+	}
+	
 }
 
 void AActionCharacter::ProcessAttack()

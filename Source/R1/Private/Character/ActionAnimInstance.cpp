@@ -27,7 +27,6 @@ void UActionAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		return;
 	}
 
-	
 	const FVector Velocity = OwningCharacter->GetVelocity();
 	Speed = Velocity.Size2D();
 	
@@ -41,5 +40,6 @@ void UActionAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 
 	bIsCrouched = OwningCharacter->bIsCrouched;       // 엔진 내장 (public)
 	bIsFalling = MovementComponent->IsFalling();
-	bIsSprinting = OwningCharacter->IsSprinting();    
+	bIsSprinting = OwningCharacter->IsSprinting();
+	bIsSitting = OwningCharacter->IsSitting();
 }

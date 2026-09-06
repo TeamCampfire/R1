@@ -61,8 +61,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Movement|Input")
 	void SetCrouchInputMode(ECrouchInputMode NewMode);
 
-	virtual UStatComponent* GetStatComponent() const override;
+	void SetIsInVehicle(bool bIsInVehicleNew, bool bIsDriver);
+
 	FORCEINLINE bool IsSprinting() const { return bIsSprinting; }
+
+	FORCEINLINE bool IsSitting() const { return bIsSitting; }
+
+	// 스탯 컴포넌트
+	virtual UStatComponent* GetStatComponent() const override;
 	
 	// 공격 프로세스
 	UFUNCTION(BlueprintCallable)
@@ -319,6 +325,10 @@ protected:
 	// 크라우치 모드
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Input")
 	ECrouchInputMode CrouchInputMode = ECrouchInputMode::Hold; // 기본 Hold
+
+	// 탈것 탑승 중
+	UPROPERTY(BlueprintReadOnly)
+	bool bIsSitting = false;
 
 	// 스탯 컴포넌트
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
