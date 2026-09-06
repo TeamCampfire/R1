@@ -9,12 +9,14 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Component/InventoryComponent.h"
+#include "Campfire/CampfireTypes.h"
 #include "InventoryWidget.generated.h"
 
 class UInventoryComponent;
 class UTextBlock;
 class UPanelWidget;
 class UInventorySlotWidget;
+class ACampfireActor;
 
 /**
  * 인벤토리 패널(장비+메인) 위젯의 C++ 베이스.
@@ -45,6 +47,9 @@ public:
 	// MainHUDWidget::ToggleInventoryPanel이 닫는 시점에 호출한다.
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	void ClearSelection();
+
+	void SetActiveCampfire(ACampfireActor* Campfire) { ActiveCampfire = Campfire; }
+	void ClearActiveCampfire() { ActiveCampfire.Reset(); }
 
 protected:
 	//~ Begin UUserWidget Interface
@@ -103,8 +108,13 @@ private:
 	UFUNCTION()
 	void HandleSlotDragCancelled(FInventorySlotRef SlotRef);
 
+	UFUNCTION()
+	void HandleCampfireItemDropped(ACampfireActor* Campfire, FCampfireSlotRef FromSlot,
+		FInventorySlotRef ToSlot, int32 Count, bool bAutoHalfSplitOnEmptyTarget);
+
 	// 언바인딩용으로 보관. 소유 폰이 사라지는 경우도 있어 약한 참조로 들고 있는다.
 	TWeakObjectPtr<UInventoryComponent> BoundInventory;
+	TWeakObjectPtr<ACampfireActor> ActiveCampfire;
 
 	TArray<TObjectPtr<UInventorySlotWidget>> EquipmentSlotWidgets;
 	TArray<TObjectPtr<UInventorySlotWidget>> MainSlotWidgets;

@@ -9,6 +9,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Component/InventoryComponent.h"
+#include "Campfire/CampfireTypes.h"
 #include "Item/ItemInstance.h"
 #include "InventorySlotWidget.generated.h"
 
@@ -17,6 +18,7 @@ class UImage;
 class UTextBlock;
 class UWidget;
 class UPanelWidget;
+class ACampfireActor;
 
 // Count/bAutoHalfSplitOnEmptyTarget은 UInventoryDragDropOperation의 동명 필드를 그대로 전달한
 // 것 — Count가 0 이하면 슬롯 전체 이동, 양수면 그만큼만(DetailInfoWidget의 분할 드래그).
@@ -25,6 +27,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnInventorySlotDropped, FInventor
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotClicked, FInventorySlotRef, SlotRef);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotRightClicked, FInventorySlotRef, SlotRef);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotDragCancelled, FInventorySlotRef, SlotRef);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(FOnCampfireItemDroppedToInventory, ACampfireActor*, Campfire,
+	FCampfireSlotRef, FromSlot, FInventorySlotRef, ToSlot, int32, Count, bool, bAutoHalfSplitOnEmptyTarget);
 
 /**
  * 슬롯 하나(장비/메인/벨트 공통)를 표현하는 재사용 위젯.
@@ -102,6 +106,9 @@ public:
 	// 이 슬롯에서 시작한 드래그가 유효한 드롭 대상(슬롯) 없이 끝났을 때 — 월드에 드랍하는 용도.
 	UPROPERTY(BlueprintAssignable, Category = "Inventory")
 	FOnInventorySlotDragCancelled OnSlotDragCancelled;
+
+	UPROPERTY(BlueprintAssignable, Category = "Inventory")
+	FOnCampfireItemDroppedToInventory OnCampfireItemDropped;
 
 	// UInventoryDragDropOperation::DragCancelled에서 호출된다.
 	void NotifyDragCancelled();

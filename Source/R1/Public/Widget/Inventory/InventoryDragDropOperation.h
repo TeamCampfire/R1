@@ -9,9 +9,12 @@
 #include "CoreMinimal.h"
 #include "Blueprint/DragDropOperation.h"
 #include "Component/InventoryComponent.h"
+#include "Campfire/CampfireTypes.h"
 #include "InventoryDragDropOperation.generated.h"
 
 class UInventorySlotWidget;
+class ACampfireActor;
+class UItemDataBase;
 
 /**
  * 인벤토리 슬롯 드래그 시작 지점을 들고 다니는 페이로드.
@@ -24,6 +27,12 @@ class R1_API UInventoryDragDropOperation : public UDragDropOperation
 	GENERATED_BODY()
 
 public:
+	UPROPERTY(BlueprintReadWrite, Category = "Inventory")
+	EItemDragSourceType SourceType = EItemDragSourceType::PlayerInventory;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Inventory")
+	TObjectPtr<UItemDataBase> DraggedItemData;
+
 	UPROPERTY(BlueprintReadWrite, Category = "Inventory")
 	FInventorySlotRef SourceSlotRef;
 
@@ -42,6 +51,12 @@ public:
 	// 그 사실을 알려주기 위해 들고 있는다. UInventorySlotWidget::NativeOnDragDetected에서 설정.
 	UPROPERTY()
 	TWeakObjectPtr<UInventorySlotWidget> SourceWidget;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Campfire")
+	FCampfireSlotRef CampfireSourceSlot;
+
+	UPROPERTY()
+	TWeakObjectPtr<ACampfireActor> SourceCampfire;
 
 protected:
 	//~ Begin UDragDropOperation Interface

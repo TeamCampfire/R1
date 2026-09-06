@@ -239,6 +239,7 @@ void UInventorySlotWidget::NativeOnDragDetected(const FGeometry& InGeometry, con
 
 	UInventoryDragDropOperation* DragOp = NewObject<UInventoryDragDropOperation>(this);
 	DragOp->SourceSlotRef = SlotRef;
+	DragOp->DraggedItemData = CachedInstance.ItemData;
 	DragOp->SourceWidget = this;
 	DragOp->bAutoHalfSplitOnEmptyTarget = bPendingMiddleButtonDrag;
 	DragOp->Pivot = EDragPivot::CenterCenter;
@@ -284,7 +285,15 @@ bool UInventorySlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDrag
 
 	if (UInventoryDragDropOperation* DragOp = Cast<UInventoryDragDropOperation>(InOperation))
 	{
-		OnSlotDropped.Broadcast(DragOp->SourceSlotRef, SlotRef, DragOp->Count, DragOp->bAutoHalfSplitOnEmptyTarget);
+		if (DragOp->SourceType == EItemDragSourceType::Campfire)
+		{
+			OnCampfireItemDropped.Broadcast(DragOp->SourceCampfire.Get(), DragOp->CampfireSourceSlot,
+				SlotRef, DragOp->Count, DragOp->bAutoHalfSplitOnEmptyTarget);
+		}
+		else
+		{
+			OnSlotDropped.Broadcast(DragOp->SourceSlotRef, SlotRef, DragOp->Count, DragOp->bAutoHalfSplitOnEmptyTarget);
+		}
 		return true;
 	}
 

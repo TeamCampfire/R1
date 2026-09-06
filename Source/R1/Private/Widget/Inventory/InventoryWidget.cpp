@@ -10,6 +10,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Blueprint/UserWidget.h"
 #include "Character/ActionPlayerController.h"
+#include "Campfire/CampfireActor.h"
 
 UInventoryWidget* UInventoryWidget::ShowInventoryTestWidget(UObject* WorldContextObject, TSubclassOf<UInventoryWidget> WidgetClass)
 {
@@ -185,6 +186,7 @@ void UInventoryWidget::RebuildSlots()
 		SlotWidget->OnSlotClicked.AddDynamic(this, &UInventoryWidget::HandleSlotClicked);
 		SlotWidget->OnSlotRightClicked.AddDynamic(this, &UInventoryWidget::HandleSlotRightClicked);
 		SlotWidget->OnSlotDragCancelled.AddDynamic(this, &UInventoryWidget::HandleSlotDragCancelled);
+		SlotWidget->OnCampfireItemDropped.AddDynamic(this, &UInventoryWidget::HandleCampfireItemDropped);
 	};
 
 	auto IsSelectedFn = [Inventory](const FInventorySlotRef& SlotRef)
@@ -227,9 +229,26 @@ void UInventoryWidget::HandleSlotClicked(FInventorySlotRef SlotRef)
 
 void UInventoryWidget::HandleSlotRightClicked(FInventorySlotRef SlotRef)
 {
+	if (ActiveCampfire.IsValid())
+	{
+		if (AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer()))
+		{
+			PC->Server_QuickMoveInventoryToCampfire(ActiveCampfire.Get(), SlotRef);
+		}
+		return;
+	}
 	if (UInventoryComponent* Inventory = BoundInventory.Get())
 	{
 		Inventory->Server_QuickMoveItem(SlotRef);
+	}
+}
+
+void UInventoryWidget::HandleCampfireItemDropped(ACampfireActor* Campfire, FCampfireSlotRef FromSlot,
+	FInventorySlotRef ToSlot, int32 Count, bool bAutoHalfSplitOnEmptyTarget)
+{
+	if (AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer()))
+	{
+		PC->Server_MoveCampfireToInventory(Campfire, FromSlot, ToSlot, Count, bAutoHalfSplitOnEmptyTarget);
 	}
 }
 

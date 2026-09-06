@@ -12,6 +12,10 @@
 #include "Character/ActionCharacter.h"
 #include "Component/StatComponent.h"
 #include "Widget/BuildingSystem/BuildingDurabilityWidget.h"
+#include "Widget/Campfire/CampfireWidget.h"
+#include "Campfire/CampfireActor.h"
+#include "Component/InteractionComponent.h"
+#include "GameFramework/Pawn.h"
 
 void UMainHUDWidget::NativeOnInitialized()
 {
@@ -39,6 +43,7 @@ void UMainHUDWidget::NativeOnInitialized()
 	{
 		InventoryWidget->SetVisibility(ESlateVisibility::Collapsed);
 	}
+	if (CampfireWidget) CampfireWidget->SetVisibility(ESlateVisibility::Collapsed);
 
 	// 게임을 시작했을 때 이전 디자인용 테스트 문구가 화면에 표시되지 않도록 숨겨요
 	if (true == IsValid(Border_BuildingPlacementMessage))
@@ -47,6 +52,7 @@ void UMainHUDWidget::NativeOnInitialized()
 
 void UMainHUDWidget::NativeDestruct()
 {
+	CloseCampfire();
 	// 위젯이 제거될 때 예약된 타이머가 남아 제거된 위젯을 다시 호출하지 않도록 정리해줍니다
 	if (UWorld* World = GetWorld())
 		World->GetTimerManager().ClearTimer(BuildingPlacementMessageTimerHandle);
@@ -133,6 +139,7 @@ bool UMainHUDWidget::ToggleInventoryPanel()
 
 	if (!bNewOpenState)
 	{
+		CloseCampfire();
 		// 닫을 때는 선택 상태(파란 테두리)도 같이 초기화 — 다음에 열었을 때 예전 선택이 남아있지 않게.
 		InventoryWidget->ClearSelection();
 	}
@@ -141,6 +148,49 @@ bool UMainHUDWidget::ToggleInventoryPanel()
 	//	bNewOpenState, (int32)InventoryWidget->GetVisibility());
 
 	return bNewOpenState;
+}
+
+void UMainHUDWidget::OpenCampfire(ACampfireActor* Campfire)
+{
+	if (!IsValid(Campfire) || !InventoryWidget || !CampfireWidget) return;
+	const bool bInventoryWasOpen = IsInventoryPanelOpen();
+	InventoryWidget->SetVisibility(ESlateVisibility::Visible);
+	InventoryWidget->SetActiveCampfire(Campfire);
+	CampfireWidget->BindCampfire(Campfire);
+	CampfireWidget->SetVisibility(ESlateVisibility::Visible);
+	if (CachedController)
+	{
+		if (APawn* Pawn = CachedController->GetPawn())
+		{
+			if (UInteractionComponent* Interaction = Pawn->FindComponentByClass<UInteractionComponent>())
+			{
+				Interaction->SetActiveCampfire(Campfire);
+			}
+		}
+		if (!bInventoryWasOpen) CachedController->SetInventoryInputState(true);
+		bCampfireSessionOpen = true;
+	}
+}
+
+void UMainHUDWidget::CloseCampfire()
+{
+	if (InventoryWidget) InventoryWidget->ClearActiveCampfire();
+	if (CampfireWidget)
+	{
+		CampfireWidget->UnbindCampfire();
+		CampfireWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	if (CachedController)
+	{
+		if (APawn* Pawn = CachedController->GetPawn())
+		{
+			if (UInteractionComponent* Interaction = Pawn->FindComponentByClass<UInteractionComponent>())
+			{
+				Interaction->SetActiveCampfire(nullptr);
+			}
+		}
+	}
+	bCampfireSessionOpen = false;
 }
 
 bool UMainHUDWidget::IsInventoryPanelOpen() const

@@ -16,6 +16,8 @@ class UInventoryWidget;
 class UBeltBarWidget;
 class UDeathScreenOverlayWidget;
 class AActionPlayerController;
+class UCampfireWidget;
+class ACampfireActor;
 /**
  * 
  */
@@ -31,6 +33,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	bool IsInventoryPanelOpen() const;
+
+	UFUNCTION(BlueprintCallable, Category = "Campfire")
+	void OpenCampfire(ACampfireActor* Campfire);
+
+	UFUNCTION(BlueprintCallable, Category = "Campfire")
+	void CloseCampfire();
 
 	// 건축 설치 실패 메시지를 화면에 표시하는 함수
 	// 같은 메시지를 연속으로 요청하면 기존 타이머를 초기화하여 마지막 요청 시점부터 DisplayDuration 동안 다시 표시
@@ -81,6 +89,11 @@ protected:
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UInventoryWidget> InventoryWidget;
+
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UCampfireWidget> CampfireWidget;
+
+	bool bCampfireSessionOpen = false;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UBeltBarWidget> BeltBarWidget;

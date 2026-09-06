@@ -25,6 +25,7 @@
 
 class UItemDataBase;
 class AItemPickup;
+class UCampfireComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryChanged);
 
@@ -208,6 +209,7 @@ protected:
 	//~ End UActorComponent Interface
 
 private:
+	friend class UCampfireComponent;
 	// 단일 관문 — Main/Belt/Equipment 중 어디를 건드리든 반드시 이걸 거친다.
 	// 브로드캐스트가 누락되는 실수를 막고, 나중에 검증/리플리케이션 로직을 얹을 자리를 확보해둔다.
 	void SetSlot(EInventorySlotCategory Category, int32 Index, const FItemInstance& NewValue);

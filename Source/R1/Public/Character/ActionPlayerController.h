@@ -9,6 +9,8 @@
 #include "GameFramework/PlayerController.h"
 
 #include "Interface/RespawnPointInterface.h"
+#include "Component/InventoryComponent.h"
+#include "Campfire/CampfireTypes.h"
 #include "ActionPlayerController.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPossessedCharChange);
@@ -24,6 +26,25 @@ class R1_API AActionPlayerController : public APlayerController
 	GENERATED_BODY()
 	
 public:
+	UFUNCTION(Client, Reliable)
+	void Client_OpenCampfire(class ACampfireActor* Campfire);
+
+	UFUNCTION(Server, Reliable)
+	void Server_MoveInventoryToCampfire(ACampfireActor* Campfire, FInventorySlotRef From,
+		FCampfireSlotRef To, int32 Count, bool bHalfSplit);
+
+	UFUNCTION(Server, Reliable)
+	void Server_MoveCampfireToInventory(ACampfireActor* Campfire, FCampfireSlotRef From,
+		FInventorySlotRef To, int32 Count, bool bHalfSplit);
+
+	UFUNCTION(Server, Reliable)
+	void Server_QuickMoveInventoryToCampfire(ACampfireActor* Campfire, FInventorySlotRef From);
+
+	UFUNCTION(Server, Reliable)
+	void Server_QuickMoveCampfireToInventory(ACampfireActor* Campfire, FCampfireSlotRef From);
+
+	UFUNCTION(Server, Reliable)
+	void Server_SetCampfireLit(ACampfireActor* Campfire, bool bLit);
 
 	AActionPlayerController();
 
@@ -129,6 +150,8 @@ public:
 	FOnPossessedCharChange OnPossessedCharChange;
 
 private:
+	UInventoryComponent* GetPlayerInventory() const;
+	bool CanUseCampfire(ACampfireActor* Campfire) const;
 
 	// 입력 우선 순위
 	int32 GameInputPriority = 1;
