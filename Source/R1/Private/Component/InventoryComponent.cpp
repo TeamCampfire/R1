@@ -5,10 +5,13 @@
 #include "Data/Item/ItemDataBase.h"
 #include "Data/Item/EquipmentItemData.h"
 #include "Data/Item/HeldItemData.h"
+#include "Data/Item/ConsumableItemData.h"
 #include "Item/ItemPickup.h"
 #include "GameFramework/Character.h"
 #include "Component/HeldItemComponent.h"
+#include "Component/StatComponent.h"
 #include "Component/WarehouseInventoryComponent.h"
+#include "Character/ActionCharacter.h"
 #include "Net/UnrealNetwork.h"   // DOREPLIFETIME 계열 매크로가 여기 정의돼 있음
 
 // Sets default values for this component's properties
@@ -407,8 +410,8 @@ void UInventoryComponent::UseBeltSlot(int32 BeltIndex)
 
 		case EItemCategory::Consumable:
 		{
-			// TODO(UseItem 세부 구현): 실제 효과(Heal/RestoreHunger/RestoreThirst 등) 적용은
-			// StatComponent 연동 작업에서 처리. 지금은 수량 차감만 담당한다.
+			ApplyConsumableEffects(Cast<UConsumableItemData>(Instance.ItemData));
+
 			const int32 Remaining = Instance.StackCount - 1;
 			SetSlot(EInventorySlotCategory::Belt, BeltIndex, Remaining > 0 ? FItemInstance(Instance.ItemData, Remaining) : FItemInstance());
 			break;
@@ -444,11 +447,35 @@ bool UInventoryComponent::UseSelectedItem(const FInventorySlotRef& SlotRef)
 		return false;
 	}
 
-	// TODO(효과 적용): 실제 효과(Heal/RestoreHunger/RestoreThirst 등) 적용은 StatComponent 연동 후 처리.
-	// 지금은 UseBeltSlot의 Consumable 분기와 동일하게 수량 차감만 담당한다.
+	ApplyConsumableEffects(Cast<UConsumableItemData>(Instance.ItemData));
+
 	const int32 Remaining = Instance.StackCount - 1;
 	SetSlot(SlotRef.Category, SlotRef.Index, Remaining > 0 ? FItemInstance(Instance.ItemData, Remaining) : FItemInstance());
 	return true;
+}
+
+void UInventoryComponent::ApplyConsumableEffects(const UConsumableItemData* ConsumableData)
+{
+	if (!ConsumableData)
+	{
+		return;
+	}
+
+	// FindComponentByClass<UStatComponent>()를 쓰면 안 된다 — BP_PlayerV3의 상속 컴포넌트
+	// 템플릿 문제로 실제 게임에 쓰이는 것과 다른(InitializeStat을 거치지 않은) StatComponent
+	// 인스턴스를 찾아오는 게 확인됐다. 코드베이스 전역에서 StatComponent는 항상
+	// AActionCharacter::GetStatComponent()(멤버 포인터 접근자)로만 얻는다 — 그 관례를 따른다.
+	AActionCharacter* OwningCharacter = Cast<AActionCharacter>(GetOwner());
+	UStatComponent* StatComp = OwningCharacter ? OwningCharacter->GetStatComponent() : nullptr;
+	if (!StatComp)
+	{
+		return;
+	}
+
+	for (const FItemEffect& Effect : ConsumableData->Effects)
+	{
+		StatComp->ApplyItemEffect(Effect);
+	}
 }
 
 bool UInventoryComponent::Server_UseSelectedItem_Validate(FInventorySlotRef SlotRef)
