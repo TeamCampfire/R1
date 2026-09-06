@@ -55,19 +55,42 @@ void UHeldItemComponent::AttachHeldItemToCharacter(AHeldItemBase* ItemToAttach)
 	}
 	if (!OwnerCharacter) return;
 
-	USkeletalMeshComponent* CharacterMesh = OwnerCharacter->GetMesh();
-	const FName HandSocket = (CharacterMesh && CharacterMesh->DoesSocketExist(FName(TEXT("r_handSocket"))))
-		? FName(TEXT("r_handSocket"))
-		: ((CharacterMesh && CharacterMesh->DoesSocketExist(FName(TEXT("RightHandSocket")))) ? FName(TEXT("RightHandSocket")) : FName(NAME_None));
-
-	if (HandSocket != NAME_None && CharacterMesh)
+	// 1. 도구에 데이터 에셋의 WeaponMesh 적용
+	if (CurrentEquippedItemData)
 	{
-		ItemToAttach->AttachToComponent(CharacterMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, HandSocket);
+		ItemToAttach->InitItemVisual(CurrentEquippedItemData);
 	}
-	else
+
+	// 2. 3인칭 전신(GetMesh()) 소켓에 액터 및 3P 메시 부착
+	USkeletalMeshComponent* CharacterMesh = OwnerCharacter->GetMesh();
+	if (USkeletalMeshComponent* CharacterMesh = OwnerCharacter->GetMesh())
 	{
-		ItemToAttach->AttachToActor(OwnerCharacter, FAttachmentTransformRules::KeepRelativeTransform);
-		//ItemToAttach->SetActorRelativeLocation(FVector(40.f, 30.f, 0.f));
+		const FName HandSocket = CharacterMesh->DoesSocketExist(FName(TEXT("r_prop"))) ? FName(TEXT("r_prop")) : FName(NAME_None));
+
+
+		if (HandSocket != NAME_None && CharacterMesh)
+		{
+			ItemToAttach->AttachToComponent(CharacterMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, HandSocket);
+		}
+		else
+		{
+			ItemToAttach->AttachToActor(OwnerCharacter, FAttachmentTransformRules::KeepRelativeTransform);
+		}
+	}
+
+
+	// 3. 1인칭 팔(FirstPersonMesh) 소켓에 ItemMesh1P 분리 부착
+	if (USkeletalMeshComponent* FPMesh = OwnerCharacter->GetFirstPersonMesh())
+	{
+		if (USkeletalMeshComponent* Mesh1P = ItemToAttach->GetItemMesh1P())
+		{
+			const FName FPSocket = CharacterMesh->DoesSocketExist(FName(TEXT("r_prop"))) ? FName(TEXT("r_prop")) : FName(NAME_None));
+
+			if (FPSocket != NAME_None)
+			{
+				Mesh1P->AttachToComponent(FPMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, FPSocket);
+			}
+		}
 	}
 }
 
@@ -89,6 +112,15 @@ void UHeldItemComponent::OnRep_CurrentHeldItem(AHeldItemBase* PreviousHeldItem)
 	{
 		AttachHeldItemToCharacter(CurrentHeldItem);
 		CurrentHeldItem->OnEquipped(OwnerCharacter);
+
+		// 애니메이션 레이어 동적 링크
+		if (CurrentEquippedItemData && CurrentEquippedItemData->AnimLayer && OwnerCharacter)
+		{
+			if (USkeletalMeshComponent* TPMesh = OwnerCharacter->GetMesh())
+			{
+				TPMesh->LinkAnimClassLayers(CurrentEquippedItemData->AnimLayer);
+			}
+		}
 
 		// 로컬 컨트롤러인 경우 입력 컴포넌트 바인딩 전달
 		if (OwnerCharacter && OwnerCharacter->IsLocallyControlled() && OwnerCharacter->InputComponent)
@@ -168,6 +200,15 @@ AHeldItemBase* UHeldItemComponent::EquipHeldItemByClass(TSubclassOf<AHeldItemBas
 		AttachHeldItemToCharacter(CurrentHeldItem);
 		CurrentHeldItem->OnEquipped(OwnerCharacter);
 
+		// 애니메이션 레이어 동적 링크 (서버/호스트)
+		if (CurrentEquippedItemData && CurrentEquippedItemData->AnimLayer && OwnerCharacter)
+		{
+			if (USkeletalMeshComponent* TPMesh = OwnerCharacter->GetMesh())
+			{
+				TPMesh->LinkAnimClassLayers(CurrentEquippedItemData->AnimLayer);
+			}
+		}
+
 		// 호스트(리슨 서버)의 로컬 캐릭터인 경우 입력 바인딩 설정
 		if (OwnerCharacter->IsLocallyControlled() && OwnerCharacter->InputComponent)
 		{
@@ -183,6 +224,15 @@ AHeldItemBase* UHeldItemComponent::EquipHeldItemByClass(TSubclassOf<AHeldItemBas
 
 void UHeldItemComponent::UnequipHeldItem()
 {
+	// 이전 애니메이션 레이어 해제
+	if (CurrentEquippedItemData && CurrentEquippedItemData->AnimLayer && OwnerCharacter)
+	{
+		if (USkeletalMeshComponent* TPMesh = OwnerCharacter->GetMesh())
+		{
+			TPMesh->UnlinkAnimClassLayers(CurrentEquippedItemData->AnimLayer);
+		}
+	}
+
 	if (CurrentHeldItem)
 	{
 		CurrentHeldItem->OnUnequipped();

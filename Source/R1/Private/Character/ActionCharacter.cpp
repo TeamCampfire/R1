@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Character/ActionCharacter.h"
@@ -179,6 +179,7 @@ void AActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EIC->BindAction(IA_Interact, ETriggerEvent::Started, this, &AActionCharacter::OnInteractPressed);
 
 		EIC->BindAction(IA_Attack, ETriggerEvent::Started, this, &AActionCharacter::OnAttackPressed);
+		EIC->BindAction(IA_Attack, ETriggerEvent::Completed, this, &AActionCharacter::OnAttackReleased);
 
 		// 인벤토리 토글
 		EIC->BindAction(IA_InventoryToggle, ETriggerEvent::Started, this, &AActionCharacter::OnInventoryTogglePressed);
@@ -191,12 +192,6 @@ void AActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EIC->BindAction(IA_Use_BeltSlot_4, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 3);
 		EIC->BindAction(IA_Use_BeltSlot_5, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 4);
 		EIC->BindAction(IA_Use_BeltSlot_6, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 5);
-
-		// 공격 (좌클릭 / 도구 주 액션)
-		if (IA_Attack)
-		{
-			//EIC->BindAction(IA_Attack, ETriggerEvent::Started, this, &AActionCharacter::OnAttackPressed);
-		}
 
 		// 보조 액션 (우클릭 / 도구 보조 기능 / 조준 등)
 		if (IA_SecondaryAction)
@@ -642,6 +637,14 @@ void AActionCharacter::OnAttackPressed()
 	//		}
 	//	}
 	//}
+}
+
+void AActionCharacter::OnAttackReleased()
+{
+	if (HeldItemComponent && HeldItemComponent->GetCurrentHeldItem())
+	{
+		HeldItemComponent->UsePrimaryAction(false);
+	}
 }
 
 void AActionCharacter::Server_PlayAttackMontage_Implementation()

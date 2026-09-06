@@ -1,4 +1,4 @@
-﻿/// 최초작성 : 2026.08.25
+/// 최초작성 : 2026.08.25
 /// 작 성 자 : 최 요 환
 
 // Fill out your copyright notice in the Description page of Project Settings.
@@ -131,8 +131,6 @@ protected:
 	// 무브먼트 값 갱신
 	void ApplyMovementSettings();
 
-	USkeletalMeshComponent* GetFirstPersonMesh() const { return FirstPersonMesh; }
-
 private:
 	// 공격 범위안에 있는 액터를 반환하는 함수
 	bool DetectdObjectInAttackRange(FHitResult& OutHitRes);
@@ -222,6 +220,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Component")
 	class UInventoryComponent* GetInventoryComponent() const;
+
+	UFUNCTION(BlueprintPure, Category = "Mesh")
+	FORCEINLINE USkeletalMeshComponent* GetFirstPersonMesh() const { return FirstPersonMesh; }
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")

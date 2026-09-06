@@ -80,6 +80,6 @@ public:
 
 	// 손에 장착될 메시
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HeldItem|Mesh")
-	TObjectPtr<USkeletalMeshComponent> WeaponMesh;
+	TObjectPtr<USkeletalMesh> WeaponMesh;
 
 };
