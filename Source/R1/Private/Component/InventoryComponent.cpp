@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Component/InventoryComponent.h"
@@ -387,6 +387,18 @@ void UInventoryComponent::UseBeltSlot(int32 BeltIndex)
 
 		case EItemCategory::HeldItem:
 		{
+			// 이미 이 슬롯의 아이템을 들고 있는 경우 -> 손에서 내리기 (토글)
+			if (HeldBeltIndex == BeltIndex)
+			{
+				HeldBeltIndex = INDEX_NONE;
+				if (UHeldItemComponent* HeldItemComp = GetOwner() ? GetOwner()->FindComponentByClass<UHeldItemComponent>() : nullptr)
+				{
+					HeldItemComp->UnequipHeldItem();
+				}
+				OnInventoryChanged.Broadcast();
+				break;
+			}
+
 			// 1. 현재 선택된 벨트 슬롯 갱신
 			HeldBeltIndex = BeltIndex;
 			// 2. HeldItemComponent를 찾아 도구 장착 실행
@@ -398,9 +410,6 @@ void UInventoryComponent::UseBeltSlot(int32 BeltIndex)
 				}
 			}
 			OnInventoryChanged.Broadcast();
-
-			/// 헬드 컴포넌트에 아이템 장착
-
 			break;
 		}
 

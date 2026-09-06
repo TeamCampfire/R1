@@ -9,6 +9,7 @@
 #include "Data/Item/HeldItemData.h"
 #include "Character/ActionCharacter.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "EnhancedInputComponent.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -60,21 +61,29 @@ void UHeldItemComponent::AttachHeldItemToCharacter(AHeldItemBase* ItemToAttach)
 	{
 		ItemToAttach->InitItemVisual(CurrentEquippedItemData);
 	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[UHeldItemComponent::AttachHeldItemToCharacter] CurrentEquippedItemData is NULL!"));
+	}
 
 	// 2. 3인칭 전신(GetMesh()) 소켓에 액터 및 3P 메시 부착
-	USkeletalMeshComponent* CharacterMesh = OwnerCharacter->GetMesh();
 	if (USkeletalMeshComponent* CharacterMesh = OwnerCharacter->GetMesh())
 	{
-		const FName HandSocket = CharacterMesh->DoesSocketExist(FName(TEXT("r_prop"))) ? FName(TEXT("r_prop")) : FName(NAME_None));
+		const FName HandSocket = CharacterMesh->DoesSocketExist(FName(TEXT("r_prop"))) 
+			? FName(TEXT("r_prop")) 
+			: (CharacterMesh->DoesSocketExist(FName(TEXT("r_handSocket"))) 
+				? FName(TEXT("r_handSocket")) 
+				: (CharacterMesh->DoesSocketExist(FName(TEXT("RightHandSocket"))) ? FName(TEXT("RightHandSocket")) : FName(NAME_None)));
 
-
-		if (HandSocket != NAME_None && CharacterMesh)
+		if (HandSocket != NAME_None)
 		{
 			ItemToAttach->AttachToComponent(CharacterMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, HandSocket);
+			UE_LOG(LogTemp, Log, TEXT("[UHeldItemComponent::AttachHeldItemToCharacter] Attached 3P to socket: %s"), *HandSocket.ToString());
 		}
 		else
 		{
 			ItemToAttach->AttachToActor(OwnerCharacter, FAttachmentTransformRules::KeepRelativeTransform);
+			UE_LOG(LogTemp, Warning, TEXT("[UHeldItemComponent::AttachHeldItemToCharacter] 3P Hand socket NOT found, attached to Actor"));
 		}
 	}
 
@@ -82,13 +91,22 @@ void UHeldItemComponent::AttachHeldItemToCharacter(AHeldItemBase* ItemToAttach)
 	// 3. 1인칭 팔(FirstPersonMesh) 소켓에 ItemMesh1P 분리 부착
 	if (USkeletalMeshComponent* FPMesh = OwnerCharacter->GetFirstPersonMesh())
 	{
-		if (USkeletalMeshComponent* Mesh1P = ItemToAttach->GetItemMesh1P())
+		if (UStaticMeshComponent* Mesh1P = ItemToAttach->GetItemMesh1P())
 		{
-			const FName FPSocket = CharacterMesh->DoesSocketExist(FName(TEXT("r_prop"))) ? FName(TEXT("r_prop")) : FName(NAME_None));
+			const FName FPSocket = FPMesh->DoesSocketExist(FName(TEXT("r_prop"))) 
+				? FName(TEXT("r_prop")) 
+				: (FPMesh->DoesSocketExist(FName(TEXT("hand_rSocket"))) 
+					? FName(TEXT("hand_rSocket")) 
+					: (FPMesh->DoesSocketExist(FName(TEXT("r_handSocket"))) ? FName(TEXT("r_handSocket")) : FName(NAME_None)));
 
 			if (FPSocket != NAME_None)
 			{
 				Mesh1P->AttachToComponent(FPMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, FPSocket);
+				UE_LOG(LogTemp, Log, TEXT("[UHeldItemComponent::AttachHeldItemToCharacter] Attached 1P to socket: %s"), *FPSocket.ToString());
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[UHeldItemComponent::AttachHeldItemToCharacter] 1P Hand socket NOT found on FirstPersonMesh!"));
 			}
 		}
 	}
@@ -158,11 +176,14 @@ AHeldItemBase* UHeldItemComponent::EquipHeldItemByData(UHeldItemData* EquipItemD
 		return nullptr;
 	}
 
-	// 아이템 데이터에 정의된 손에 쥘 액터 클래스 스폰 및 장착
-	if (EquipItemData->HeldItemClass)
+	TSubclassOf<AHeldItemBase> ItemClassToSpawn = EquipItemData->HeldItemClass;
+
+
+	if (ItemClassToSpawn)
 	{
+		UnequipHeldItem();
 		CurrentEquippedItemData = EquipItemData;
-		return EquipHeldItemByClass(EquipItemData->HeldItemClass);
+		return EquipHeldItemByClass(ItemClassToSpawn);
 	}
 
 	return nullptr;
@@ -176,7 +197,15 @@ AHeldItemBase* UHeldItemComponent::EquipHeldItemByClass(TSubclassOf<AHeldItemBas
 		return nullptr;
 	}
 
-	UnequipHeldItem();
+	// CurrentEquippedItemData가 이미 세팅되어 있다면 보존하고 기존 액터만 정리
+	UHeldItemData* SavedItemData = CurrentEquippedItemData;
+	if (CurrentHeldItem)
+	{
+		CurrentHeldItem->OnUnequipped();
+		CurrentHeldItem->Destroy();
+		CurrentHeldItem = nullptr;
+	}
+	CurrentEquippedItemData = SavedItemData;
 
 	if (!OwnerCharacter)
 	{
@@ -200,9 +229,13 @@ AHeldItemBase* UHeldItemComponent::EquipHeldItemByClass(TSubclassOf<AHeldItemBas
 		AttachHeldItemToCharacter(CurrentHeldItem);
 		CurrentHeldItem->OnEquipped(OwnerCharacter);
 
-		// 애니메이션 레이어 동적 링크 (서버/호스트)
+		// 애니메이션 레이어 동적 링크 (서버/호스트: 1인칭 팔 & 3인칭 몸)
 		if (CurrentEquippedItemData && CurrentEquippedItemData->AnimLayer && OwnerCharacter)
 		{
+			if (USkeletalMeshComponent* FPMesh = OwnerCharacter->GetFirstPersonMesh())
+			{
+				FPMesh->LinkAnimClassLayers(CurrentEquippedItemData->AnimLayer);
+			}
 			if (USkeletalMeshComponent* TPMesh = OwnerCharacter->GetMesh())
 			{
 				TPMesh->LinkAnimClassLayers(CurrentEquippedItemData->AnimLayer);
@@ -224,9 +257,13 @@ AHeldItemBase* UHeldItemComponent::EquipHeldItemByClass(TSubclassOf<AHeldItemBas
 
 void UHeldItemComponent::UnequipHeldItem()
 {
-	// 이전 애니메이션 레이어 해제
+	// 이전 애니메이션 레이어 해제 (1인칭 팔 & 3인칭 몸)
 	if (CurrentEquippedItemData && CurrentEquippedItemData->AnimLayer && OwnerCharacter)
 	{
+		if (USkeletalMeshComponent* FPMesh = OwnerCharacter->GetFirstPersonMesh())
+		{
+			FPMesh->UnlinkAnimClassLayers(CurrentEquippedItemData->AnimLayer);
+		}
 		if (USkeletalMeshComponent* TPMesh = OwnerCharacter->GetMesh())
 		{
 			TPMesh->UnlinkAnimClassLayers(CurrentEquippedItemData->AnimLayer);

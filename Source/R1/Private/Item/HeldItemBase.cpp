@@ -6,6 +6,7 @@
 #include "Item/HeldItemBase.h"
 #include "Character/ActionCharacter.h"
 #include "Data/Item/HeldItemData.h"
+#include "Components/StaticMeshComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 
@@ -13,15 +14,19 @@ AHeldItemBase::AHeldItemBase()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	bReplicates = true;
-	SetReplicateMovement(true);
+	SetReplicateMovement(false);
 
-	ItemMesh3P = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("ItemMesh3P"));
+	ItemMesh3P = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ItemMesh3P"));
 	RootComponent = ItemMesh3P;
+	ItemMesh3P->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ItemMesh3P->SetCollisionResponseToAllChannels(ECR_Ignore);
 	ItemMesh3P->SetOwnerNoSee(true);
 	ItemMesh3P->SetCastHiddenShadow(true);
 
-	ItemMesh1P = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("ItemMesh1P"));
+	ItemMesh1P = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ItemMesh1P"));
 	ItemMesh1P->SetupAttachment(RootComponent);
+	ItemMesh1P->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ItemMesh1P->SetCollisionResponseToAllChannels(ECR_Ignore);
 	ItemMesh1P->SetOnlyOwnerSee(true);
 	ItemMesh1P->SetCastShadow(false);
 }
@@ -46,17 +51,33 @@ void AHeldItemBase::OnUnequipped()
 void AHeldItemBase::InitItemVisual(UHeldItemData* InItemData)
 {
 	ItemData = InItemData;
-	if (!ItemData || !ItemData->WeaponMesh) return;
+	if (!ItemData)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[AHeldItemBase::InitItemVisual] InItemData is NULL!"));
+		return;
+	}
+
+	if (!ItemData->WeaponMesh)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[AHeldItemBase::InitItemVisual] WeaponMesh is NULL in ItemData: %s"), *ItemData->GetName());
+		return;
+	}
 
 	if (ItemMesh1P)
 	{
-		ItemMesh1P->SetSkeletalMeshAsset(ItemData->WeaponMesh);
+		ItemMesh1P->SetStaticMesh(ItemData->WeaponMesh);
+		ItemMesh1P->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		ItemMesh1P->SetCollisionResponseToAllChannels(ECR_Ignore);
 	}
 
 	if (ItemMesh3P)
 	{
-		ItemMesh3P->SetSkeletalMeshAsset(ItemData->WeaponMesh);
+		ItemMesh3P->SetStaticMesh(ItemData->WeaponMesh);
+		ItemMesh3P->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		ItemMesh3P->SetCollisionResponseToAllChannels(ECR_Ignore);
 	}
+
+	UE_LOG(LogTemp, Log, TEXT("[AHeldItemBase::InitItemVisual] Successfully set WeaponMesh: %s"), *ItemData->WeaponMesh->GetName());
 }
 
 void AHeldItemBase::OnPrimaryActionStarted()
@@ -68,6 +89,7 @@ void AHeldItemBase::OnPrimaryActionStarted()
 	{
 		if (UAnimInstance* AnimInst = TPMesh->GetAnimInstance())
 		{
+			if (!AnimInst->IsAnyMontagePlaying()) return;
 			AnimInst->Montage_Play(ItemData->PrimaryMontage);
 		}
 	}

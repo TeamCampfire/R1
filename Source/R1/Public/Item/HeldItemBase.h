@@ -11,11 +11,12 @@
 
 class AActionCharacter;
 class UHeldItemData;
+class UStaticMeshComponent;
 
 /**
  * 손에 들 수 있는 모든 도구, 근접 무기, 특수 장비의 공통 부모 액터 추상 클래스
  */
-UCLASS(Abstract)
+UCLASS()
 class R1_API AHeldItemBase : public AActor
 {
 	GENERATED_BODY()
@@ -59,10 +60,10 @@ public:
 
 	// 메시 컴포넌트 접근자
 	UFUNCTION(BlueprintPure, Category = "HeldItem")
-	FORCEINLINE USkeletalMeshComponent* GetItemMesh1P() const { return ItemMesh1P; }
+	FORCEINLINE UStaticMeshComponent* GetItemMesh1P() const { return ItemMesh1P; }
 
 	UFUNCTION(BlueprintPure, Category = "HeldItem")
-	FORCEINLINE USkeletalMeshComponent* GetItemMesh3P() const { return ItemMesh3P; }
+	FORCEINLINE UStaticMeshComponent* GetItemMesh3P() const { return ItemMesh3P; }
 
 protected:
 	UPROPERTY(BlueprintReadOnly, Category = "HeldItem")
@@ -72,9 +73,9 @@ protected:
 	TObjectPtr<UHeldItemData> ItemData;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HeldItem|ItemMesh")
-	TObjectPtr<USkeletalMeshComponent> ItemMesh1P;
+	TObjectPtr<UStaticMeshComponent> ItemMesh1P;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HeldItem|ItemMesh")
-	TObjectPtr<USkeletalMeshComponent> ItemMesh3P;
+	TObjectPtr<UStaticMeshComponent> ItemMesh3P;
 
 };

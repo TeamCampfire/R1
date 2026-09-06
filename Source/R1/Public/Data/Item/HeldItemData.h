@@ -1,4 +1,4 @@
-﻿/// 최초작성 : 2026.09.03
+/// 최초작성 : 2026.09.03
 /// 작 성 자 : 최 요 환
 /// 간단설명 : 손에 드는 무기/도구(HeldItem) 아이템 정의 클래스
 
@@ -80,6 +80,6 @@ public:
 
 	// 손에 장착될 메시
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HeldItem|Mesh")
-	TObjectPtr<USkeletalMesh> WeaponMesh;
+	TObjectPtr<UStaticMesh> WeaponMesh;
 
 };
