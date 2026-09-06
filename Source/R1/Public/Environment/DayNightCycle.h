@@ -18,99 +18,95 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 protected:
-	// 틱 삭제했습니다
 	virtual void BeginPlay() override;
 
 public:
-	// 0-24시 게임 시간으로 변횐한 현재 시간을 갖고 오는 함수
+	// 동기화된 서버 시간을 0~24시 범위의 게임 시각으로 변환
 	UFUNCTION(BlueprintPure, Category = "Day Night")
 	float GetCurrentHour() const;
 
-	// 현재 시간이 낮 시간인지? true : 낮
+	// 현재 게임 시각이 설정된 낮 구간에 포함되는지 반환
 	UFUNCTION(BlueprintPure, Category = "Day Night")
 	bool IsDaytime() const;
 
-	// 서버에서 현재 게임 시각을 변경하는 함수
+	// 서버에서 현재 게임 시각을 변경하고 새 기준 시각을 클라이언트에 복제해요
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Day Night")
 	void SetTime(float NewHour);
 
 protected:
-	// 클라이언트가 서버의 사이클 시작 시각을 받았을 때 언리얼 네트워크 시스템이 자동으로 호출하는 함수
+	// 클라이언트가 서버의 사이클 기준 시각을 수신했을 때 자동 호출
 	UFUNCTION()
-	void OnRep_CycleStartServerTime(); // CycleStartServerTime
+	void OnRep_CycleStartServerTime();
 
-	//! 테스트용 디버그 시간 출력 함수
+	// (테스트용)현재 게임 시각과 동기화 상태를 로그로 출력
 	void PrintDebugTime();
 
-	// 현재 게임 시각에 맞춰 태양을 회전하는 함수
+	// 현재 게임 시각과 Curve에 따라 태양, 밤 보조광, Sky Light 갱신
 	void UpdateEnvironmentVisuals();
 
-private:
-	// =========================================================================
 protected:
-
-	// 시간
 	UPROPERTY(EditAnywhere, Category = "Day Night|Time")
-	float DayStartHour = 6.f; // 게임에서 낮이 시작되는 시각 : 아침 6시
+	float DayStartHour = 6.f; // 게임에서 낮이 시작되는 시각
 
 	UPROPERTY(EditAnywhere, Category = "Day Night|Time")
-	float NightStartHour = 18.f; // 밤이 시작되는 시각 : 저녁 18시
+	float NightStartHour = 18.f; // 게임에서 밤이 시작되는 시각
 
 	UPROPERTY(EditAnywhere, Category = "Day Night|Time", meta = (ClampMin = "1.0"))
-	float DayDurationSeconds = 45.f; //2700.f; // 현실 기준 낮의 길이: 45분
+	float DayDurationSeconds = 45.f; // 낮 구간이 현실에서 지속되는 시간(초). 테스트 기본값은 45초
 
 	UPROPERTY(EditAnywhere, Category = "Day Night|Time", meta = (ClampMin = "1.0"))
-	float NightDurationSeconds = 15.f; //900.f; // 현실 기준 밤의 길이: 15분
+	float NightDurationSeconds = 15.f; // 밤 구간이 현실에서 지속되는 시간(초). 테스트 기본값은 15초
 
-	// 서버의 값이 클라이언트에 도착하면 OnRep_CycleStartServerTime()이 호출됨
 	UPROPERTY(ReplicatedUsing = OnRep_CycleStartServerTime)
-	double CycleStartServerTime = -1.f; // 밤낮 사이클이 서버에서 언제 시작됐는지.. -1은 아직 서버의 시작 시각을 받지 못했다는 뜻
+	double CycleStartServerTime = -1.f; // 서버 월드 시간 기준의 사이클 시작 시각. 변경이 되었을 떄 클라이언트에 복제
 
-	// 서버 기준 시각을 사용할 준비가 됐는지 나타냄
-	bool bIsTimeSynchronized = false; // 동기화 여부 담당
+	bool bIsTimeSynchronized = false; // 서버는 직접 설정하고 클라이언트는 OnRep에서 설정하는 동기화 완료 여부
 
-	FTimerHandle DebugTimerHandle; // 현재 시간을 출력하는 타이머
+	UPROPERTY(EditAnywhere, Category = "Day Night|Debug")
+	bool bEnableDebugLog = true;
 
-	UPROPERTY(EditAnywhere, Category = "Day Night")
-	bool bEnableDebugLog = true; //! 테스트용 / 에디터에서 디버그 로그 사용 여부를 선택
+	UPROPERTY(EditAnywhere, Category = "Day Night|Debug", meta = (ClampMin = "0.1"))
+	float DebugLogInterval = 1.0f;
 
-	UPROPERTY(EditAnywhere, Category = "Day Night", meta = (ClampMin = "0.1"))
-	float DebugLogInterval = 1.0f; //! 테스트용 / 로그를 출력할 시간 간격
-
-	// 태양
 	UPROPERTY(EditInstanceOnly, Category = "Day Night|Lighting")
-	TObjectPtr<class ADirectionalLight> SunLight; // 레벨에서 태양 역할을 하는 Directional Light
-
-	FTimerHandle SunUpdateTimerHandle; // 태양 갱신 타이머
+	TObjectPtr<class ADirectionalLight> SunLight; // 낮의 방향광으로 사용할 레벨의 Directional Light
 
 	UPROPERTY(EditAnywhere, Category = "Day Night|Lighting", meta = (ClampMin = "0.02"))
-	float SunUpdateInterval = 0.1f; // 태양을 갱신하는 현실!! 시간 간격
+	float SunUpdateInterval = 0.1f; // 태양을 업뎃하는 주기
 
 	UPROPERTY(EditAnywhere, Category = "Day Night|Lighting")
-	float SunYaw = 0.0f; // 태양이 동쪽에서 서쪽으로 움직이는? 지나가는? 뜨고 지는? 방향 (에디터에서 세팅)
+	float SunYaw = 0.0f; 	// 태양이 이동하는 수직 궤도의 수평 방향
 
-	float CachedSunIntensity = 0.0f;  // 에디터에서 설정한 태양의 원래 최대 밝기
-
-	UPROPERTY(EditAnywhere, Category = "Day Night|Lighting")
-	FLinearColor DaySunColor = FLinearColor(1.0f, 0.95f, 0.8f); // 태양이 높이 떠 있을 때의 빛 색상
+	float CachedSunIntensity = 0.0f; // BeginPlay에서 저장하는 태양의 에디터 설정 밝기
 
 	UPROPERTY(EditAnywhere, Category = "Day Night|Lighting")
-	FLinearColor HorizonSunColor = FLinearColor(1.0f, 0.25f, 0.05f); // 일출과 일몰 때 빛 색상
+	FLinearColor DaySunColor = FLinearColor(1.0f, 0.95f, 0.8f); // 태양이 충분히 높을 때 사용할 색상
+
+	UPROPERTY(EditAnywhere, Category = "Day Night|Curves")
+	TObjectPtr<UCurveFloat> SunIntensityCurve; //. X축 게임 시각(0~24), Y축 태양 밝기 비율(0~1)
+
+	UPROPERTY(EditAnywhere, Category = "Day Night|Lighting")
+	FLinearColor HorizonSunColor = FLinearColor(1.0f, 0.25f, 0.05f); // 일출과 일몰에 사용할 태양 색상
 	
-	UPROPERTY(EditInstanceOnly, Category = "Day Night|Lighting")
-	TObjectPtr<class ASkyLight> SkyLight; // 하늘에서 들어오는 전체적인 환경광
-
-	float CachedSkyLightIntensity = 0.0f; // 에디터에서 설정한 Sky Light의 원래 최대 밝기
-
-	UPROPERTY(EditAnywhere, Category = "Day Night|Lighting", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-	float NightSkyLightIntensityMultiplier = 0.05f; // 밤에 유지할 Sky Light 밝기의 비율 / 0.05는 낮 밝기의 5%라는 의미
+	UPROPERTY(EditAnywhere, Category = "Day Night|Curves")
+	TObjectPtr<UCurveFloat> SkyLightIntensityCurve; //. X축 게임 시각(0~24), Y축 Sky Light 밝기 비율(0~1)
 
 	UPROPERTY(EditInstanceOnly, Category = "Day Night|Lighting")
-	TObjectPtr<ADirectionalLight> MoonLight; // 밤에 빛을 제공하는 달 Directional Light
+	TObjectPtr<class ASkyLight> SkyLight; 	// 전체 환경광으로 사용할 레벨의 Sky Light
 
+	float CachedSkyLightIntensity = 0.0f; // BeginPlay에서 저장하는 Sky Light의 에디터 설정 밝기
+
+	UPROPERTY(EditInstanceOnly, Category = "Day Night|Lighting")
+	TObjectPtr<ADirectionalLight> MoonLight; // 최소 밤에도 약간은 보여야 하니까.. 필요한 고정 방향인 Directional Light
+
+	// 밤 보조광 Curve에 곱할 최대 밝기
 	UPROPERTY(EditAnywhere, Category = "Day Night|Lighting", meta = (ClampMin = "0.0"))
-	float MaxMoonIntensity = 0.005f; // 밤에 사용할 달 Directional Light 최대 밝기
+	float MaxNightFillIntensity = 0.005f;
 
 	UPROPERTY(EditAnywhere, Category = "Day Night|Lighting")
-	float MoonLightPitch = -45.0f; // 달빛이 지면을 비추는 고정된 높이
+	float MoonLightPitch = -45.0f; // 밤 보조광이 지면을 안정적으로 비추도록 유지할 고정 Pitch
+
+	UPROPERTY(EditAnywhere, Category = "Day Night|Curves")
+	TObjectPtr<UCurveFloat> NightFillIntensityCurve; //. X축 게임 시각(0~24), Y축 밤 보조광 밝기 비율(0~1)
+
 };
