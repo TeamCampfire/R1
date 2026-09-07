@@ -129,6 +129,20 @@ void UInventoryComponent::SetSlot(EInventorySlotCategory Category, int32 Index, 
 		return;
 	}
 
+	// 손에 들고 있는 벨트 슬롯(HeldBeltIndex)의 아이템 종류가 이번 변경으로 바뀌면(다른 슬롯으로
+	// 옮겨져 비워지거나, 다른 아이템으로 교체됨) 인벤토리 데이터와 캐릭터가 실제로 들고 있는 손
+	// 아이템이 어긋나지 않도록 먼저 장착을 해제한다. 같은 아이템의 수량만 바뀌는 경우는 계속
+	// 들고 있어야 하므로 제외한다. SetSlot이 모든 슬롯 변경의 단일 관문이라 여기 한 곳에서만
+	// 처리하면 TransferItem/DropItem 등 어떤 경로로 벨트 슬롯이 바뀌든 빠짐없이 커버된다.
+	if (Category == EInventorySlotCategory::Belt && Index == HeldBeltIndex && Array[Index].ItemData != NewValue.ItemData)
+	{
+		HeldBeltIndex = INDEX_NONE;
+		if (UHeldItemComponent* HeldItemComp = GetOwner()->FindComponentByClass<UHeldItemComponent>())
+		{
+			HeldItemComp->UnequipHeldItem();
+		}
+	}
+
 	Array[Index] = NewValue;
 	OnInventoryChanged.Broadcast();
 
@@ -527,13 +541,8 @@ bool UInventoryComponent::DropItem(FInventorySlotRef Slot, int32 Count, const FT
 	}
 
 	const int32 Remaining = Instance.StackCount - DropCount;
+	// 손에 들고 있던 벨트 슬롯을 통째로 드랍해 비우는 경우의 장착 해제는 SetSlot이 처리한다.
 	SetSlot(Slot.Category, Slot.Index, Remaining > 0 ? FItemInstance(Instance.ItemData, Remaining) : FItemInstance());
-
-	// 손에 들고 있던 벨트 슬롯을 통째로 드랍한 경우 손을 비운다.
-	if (Remaining <= 0 && Slot.Category == EInventorySlotCategory::Belt && HeldBeltIndex == Slot.Index)
-	{
-		HeldBeltIndex = INDEX_NONE;
-	}
 
 	return true;
 }
