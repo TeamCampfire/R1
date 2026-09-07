@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Character/ActionCharacter.h"
@@ -126,6 +126,16 @@ void AActionCharacter::BeginPlay()
 			this,
 			&AActionCharacter::Die
 		);
+	}
+
+	if (DefaultItems.Num() > 0)
+	{
+		int32 remain;
+		for (auto& Item : DefaultItems)
+		{
+			InventoryComponent->AddItem(Item,1, remain);
+		}
+
 	}
 }
 

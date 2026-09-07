@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.25
+﻿/// 최초작성 : 2026.08.25
 /// 작 성 자 : 최 요 환
 
 // Fill out your copyright notice in the Description page of Project Settings.
@@ -330,4 +330,9 @@ protected:
 
 	float DefaultEyeHeight = 0.f;
 	float CurrentWorldEyeHeight = 0.f; // 로컬이 아니라 "월드" 목표 눈높이
+
+
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|DefaultItem")
+	TArray<TObjectPtr<UItemDataBase>> DefaultItems;
 };
