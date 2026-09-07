@@ -86,7 +86,16 @@ void UMainHUDWidget::CheckCampfireAutoClose()
 	if (!IsValid(Campfire) || !IsValid(Pawn)
 		|| !IInteractableInterface::Execute_CanInteract(Campfire, Pawn))
 	{
-		CloseCampfire();
+		if (IsInventoryPanelOpen())
+		{
+			// 인벤토리 닫기 경로에서 모닥불 연결과 선택 상태도 함께 정리한다.
+			ToggleInventoryPanel();
+			if (CachedController) CachedController->SetInventoryInputState(false);
+		}
+		else
+		{
+			CloseCampfire();
+		}
 	}
 }
 
