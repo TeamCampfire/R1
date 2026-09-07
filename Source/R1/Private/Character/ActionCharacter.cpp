@@ -134,7 +134,14 @@ void AActionCharacter::BeginPlay()
 		int32 remain;
 		for (auto& Item : DefaultItems)
 		{
-			InventoryComponent->AddItem(Item,1, remain);
+			//	for debug
+			if (Item->DisplayName.ToString().Contains(TEXT("나무")))
+			{
+				InventoryComponent->AddItem(Item,200, remain);
+
+			}
+			else
+				InventoryComponent->AddItem(Item,1, remain);
 		}
 
 	}
@@ -282,8 +289,8 @@ void AActionCharacter::ProcessAttack()
 	// 여기 들어왔다는건 일단 휘둘렀다는 뜻.
 	// TODO 하드코딩 수정
 	// TODO DrainSurvivalStats 열어줄 수 있는지 물어볼 것
-	ICaloriesInterface::Execute_DecreaseCalories(StatComponent, 10.016f);
-	IHydrationInterface::Execute_DecreaseHydration(StatComponent, 10.0032f);
+	//ICaloriesInterface::Execute_DecreaseCalories(StatComponent, 10.016f);
+	//IHydrationInterface::Execute_DecreaseHydration(StatComponent, 10.0032f);
 
 	if (!IsLocallyControlled()) return;
 	//TODO 무기 타입에 따라서 세분화

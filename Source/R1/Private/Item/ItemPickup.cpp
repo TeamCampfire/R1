@@ -8,6 +8,7 @@
 #include "Components/SphereComponent.h"
 #include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
+#include "R1/R1.h"
 
 // Sets default values
 AItemPickup::AItemPickup()
@@ -56,6 +57,9 @@ AItemPickup::AItemPickup()
 
 	// AutoOnOverlap 아이템의 근접 자동 획득용 — 실제 처리는 OnInteractionSphereBeginOverlap 참고.
 	InteractionSphere->OnComponentBeginOverlap.AddDynamic(this, &AItemPickup::OnInteractionSphereBeginOverlap);
+
+	Mesh->SetCollisionResponseToChannel(ECC_BUILDABLEGROUND, ECR_Block);
+	Mesh->BodyInstance.bUseCCD = true;
 }
 
 void AItemPickup::InitializeFromItem(UItemDataBase* InItemData, int32 InCount)
