@@ -65,11 +65,33 @@ public:
 	UFUNCTION(BlueprintPure, Category = "HeldItem")
 	FORCEINLINE UStaticMeshComponent* GetItemMesh3P() const { return ItemMesh3P; }
 
+	// 아이템 데이터 접근자
+	UFUNCTION(BlueprintPure, Category = "HeldItem")
+	FORCEINLINE UHeldItemData* GetItemData() const { return ItemData; }
+
+protected:
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UFUNCTION()
+	virtual void OnRep_ItemData();
+
+	UFUNCTION(Server, Reliable)
+	void Server_PlayPrimaryActionMontage();
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_PlayPrimaryActionMontage();
+
+	UFUNCTION(Server, Reliable)
+	void Server_PlaySecondaryActionMontage();
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_PlaySecondaryActionMontage();
+
 protected:
 	UPROPERTY(BlueprintReadOnly, Category = "HeldItem")
 	TObjectPtr<AActionCharacter> OwnerCharacter;
 
-	UPROPERTY(BlueprintReadOnly, Category = "HeldItem")
+	UPROPERTY(ReplicatedUsing = OnRep_ItemData, BlueprintReadOnly, Category = "HeldItem")
 	TObjectPtr<UHeldItemData> ItemData;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HeldItem|ItemMesh")

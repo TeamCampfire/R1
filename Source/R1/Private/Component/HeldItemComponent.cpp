@@ -126,29 +126,55 @@ void UHeldItemComponent::OnRep_CurrentHeldItem(AHeldItemBase* PreviousHeldItem)
 		PreviousHeldItem->OnUnequipped();
 	}
 
-	// 2. 새 아이템 장착 및 소켓 부착
-	if (CurrentHeldItem && IsValid(CurrentHeldItem))
+	// 2. 무기가 해제되어 빈 손(nullptr)이 된 경우 -> 클라이언트에서도 애니메이션 레이어 즉시 언링크!
+	if (!CurrentHeldItem)
 	{
-		AttachHeldItemToCharacter(CurrentHeldItem);
-		CurrentHeldItem->OnEquipped(OwnerCharacter);
+		UnlinkItemAnimLayers();
+		return;
+	}
 
-		// 애니메이션 레이어 동적 링크
-		if (CurrentEquippedItemData && CurrentEquippedItemData->AnimLayer && OwnerCharacter)
-		{
-			if (USkeletalMeshComponent* TPMesh = OwnerCharacter->GetMesh())
-			{
-				TPMesh->LinkAnimClassLayers(CurrentEquippedItemData->AnimLayer);
-			}
-		}
+	// 3. 새 아이템 장착 및 소켓 부착
+	AttachHeldItemToCharacter(CurrentHeldItem);
+	CurrentHeldItem->OnEquipped(OwnerCharacter);
 
-		// 로컬 컨트롤러인 경우 입력 컴포넌트 바인딩 전달
-		if (OwnerCharacter && OwnerCharacter->IsLocallyControlled() && OwnerCharacter->InputComponent)
+	// 애니메이션 레이어 동적 링크 (1P 팔과 3P 몸 모두에 연결)
+	if (CurrentEquippedItemData && CurrentEquippedItemData->AnimLayer)
+	{
+		LinkItemAnimLayers(CurrentEquippedItemData->AnimLayer);
+	}
+
+	// 로컬 컨트롤러인 경우 입력 컴포넌트 바인딩 전달
+	if (OwnerCharacter && OwnerCharacter->IsLocallyControlled() && OwnerCharacter->InputComponent)
+	{
+		if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(OwnerCharacter->InputComponent))
 		{
-			if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(OwnerCharacter->InputComponent))
-			{
-				CurrentHeldItem->SetupInputComponent(EIC);
-			}
+			CurrentHeldItem->SetupInputComponent(EIC);
 		}
+	}
+}
+
+void UHeldItemComponent::OnRep_CurrentEquippedItemData()
+{
+	if (!OwnerCharacter)
+	{
+		OwnerCharacter = Cast<AActionCharacter>(GetOwner());
+	}
+
+	if (CurrentEquippedItemData)
+	{
+		if (CurrentHeldItem)
+		{
+			CurrentHeldItem->InitItemVisual(CurrentEquippedItemData);
+		}
+		if (CurrentEquippedItemData->AnimLayer)
+		{
+			LinkItemAnimLayers(CurrentEquippedItemData->AnimLayer);
+		}
+	}
+	else
+	{
+		// 데이터가 null로 비워졌다면 무장 해제 상태 -> 언링크
+		UnlinkItemAnimLayers();
 	}
 }
 
@@ -178,16 +204,14 @@ AHeldItemBase* UHeldItemComponent::EquipHeldItemByData(UHeldItemData* EquipItemD
 	}
 
 	TSubclassOf<AHeldItemBase> ItemClassToSpawn = EquipItemData->HeldItemClass;
-
-
-	if (ItemClassToSpawn)
+	if (!ItemClassToSpawn)
 	{
-		UnequipHeldItem();
-		CurrentEquippedItemData = EquipItemData;
-		return EquipHeldItemByClass(ItemClassToSpawn);
+		ItemClassToSpawn = DefaultHeldItemClass ? DefaultHeldItemClass : TSubclassOf<AHeldItemBase>(AHeldItemBase::StaticClass());
 	}
 
-	return nullptr;
+	UnequipHeldItem();
+	CurrentEquippedItemData = EquipItemData;
+	return EquipHeldItemByClass(ItemClassToSpawn);
 }
 
 AHeldItemBase* UHeldItemComponent::EquipHeldItemByClass(TSubclassOf<AHeldItemBase> ItemClass)
@@ -231,16 +255,9 @@ AHeldItemBase* UHeldItemComponent::EquipHeldItemByClass(TSubclassOf<AHeldItemBas
 		CurrentHeldItem->OnEquipped(OwnerCharacter);
 
 		// 애니메이션 레이어 동적 링크 (서버/호스트: 1인칭 팔 & 3인칭 몸)
-		if (CurrentEquippedItemData && CurrentEquippedItemData->AnimLayer && OwnerCharacter)
+		if (CurrentEquippedItemData && CurrentEquippedItemData->AnimLayer)
 		{
-			if (USkeletalMeshComponent* FPMesh = OwnerCharacter->GetFirstPersonMesh())
-			{
-				FPMesh->LinkAnimClassLayers(CurrentEquippedItemData->AnimLayer);
-			}
-			if (USkeletalMeshComponent* TPMesh = OwnerCharacter->GetMesh())
-			{
-				TPMesh->LinkAnimClassLayers(CurrentEquippedItemData->AnimLayer);
-			}
+			LinkItemAnimLayers(CurrentEquippedItemData->AnimLayer);
 		}
 
 		// 호스트(리슨 서버)의 로컬 캐릭터인 경우 입력 바인딩 설정
@@ -259,18 +276,7 @@ AHeldItemBase* UHeldItemComponent::EquipHeldItemByClass(TSubclassOf<AHeldItemBas
 void UHeldItemComponent::UnequipHeldItem()
 {
 	// 이전 애니메이션 레이어 해제 (1인칭 팔 & 3인칭 몸)
-	if (CurrentEquippedItemData && CurrentEquippedItemData->AnimLayer && OwnerCharacter)
-	{
-		if (USkeletalMeshComponent* FPMesh = OwnerCharacter->GetFirstPersonMesh())
-		{
-			FPMesh->SetRelativeRotation(FRotator(0, -90, 0));
-			FPMesh->UnlinkAnimClassLayers(CurrentEquippedItemData->AnimLayer);
-		}
-		if (USkeletalMeshComponent* TPMesh = OwnerCharacter->GetMesh())
-		{
-			TPMesh->UnlinkAnimClassLayers(CurrentEquippedItemData->AnimLayer);
-		}
-	}
+	UnlinkItemAnimLayers();
 
 	if (CurrentHeldItem)
 	{
@@ -348,4 +354,50 @@ bool UHeldItemComponent::BlocksDefaultAttack() const
 		return CurrentHeldItem->BlocksDefaultAttack();
 	}
 	return false;
+}
+
+void UHeldItemComponent::LinkItemAnimLayers(TSubclassOf<UAnimInstance> LayerClass)
+{
+	if (!LayerClass) return;
+
+	if (!OwnerCharacter)
+	{
+		OwnerCharacter = Cast<AActionCharacter>(GetOwner());
+	}
+	if (!OwnerCharacter) return;
+
+	// 이미 다른 레이어가 링크되어 있다면 먼저 언링크
+	if (LinkedAnimLayerClass && LinkedAnimLayerClass != LayerClass)
+	{
+		UnlinkItemAnimLayers();
+	}
+
+	LinkedAnimLayerClass = LayerClass;
+
+	if (USkeletalMeshComponent* TPMesh = OwnerCharacter->GetMesh())
+	{
+		TPMesh->LinkAnimClassLayers(LayerClass);
+		UE_LOG(LogTemp, Log, TEXT("[UHeldItemComponent::LinkItemAnimLayers] Linked AnimLayer to 3P Mesh: %s"), *LayerClass->GetName());
+	}
+}
+
+void UHeldItemComponent::UnlinkItemAnimLayers()
+{
+	if (!LinkedAnimLayerClass) return;
+
+	if (!OwnerCharacter)
+	{
+		OwnerCharacter = Cast<AActionCharacter>(GetOwner());
+	}
+
+	if (OwnerCharacter)
+	{
+		if (USkeletalMeshComponent* TPMesh = OwnerCharacter->GetMesh())
+		{
+			TPMesh->UnlinkAnimClassLayers(LinkedAnimLayerClass);
+			UE_LOG(LogTemp, Log, TEXT("[UHeldItemComponent::UnlinkItemAnimLayers] Unlinked AnimLayer from 3P Mesh: %s"), *LinkedAnimLayerClass->GetName());
+		}
+	}
+
+	LinkedAnimLayerClass = nullptr;
 }

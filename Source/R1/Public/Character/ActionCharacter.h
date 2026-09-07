@@ -120,14 +120,6 @@ protected:
 
 	UFUNCTION(BlueprintCallable)		// 블루프린트 테스트로 콜러블 설정
 	void OnUseBeltSlotPressed(int32 BeltIndex);	// 벨트슬롯 단축키(1~6, 0-based 인덱스로 받음)
-
-	// 공격 몽타주 재생 RPC (리슨 서버 및 멀티플레이어 동기화)
-	UFUNCTION(Server, Reliable)
-	void Server_PlayAttackMontage();
-
-	UFUNCTION(NetMulticast, Unreliable)
-	void Multicast_PlayAttackMontage();
-
 	// 무브먼트 값 갱신
 	void ApplyMovementSettings();
 
@@ -231,14 +223,6 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
 	TObjectPtr<class UHeldItemComponent> HeldItemComponent;
 
-
-	/*--------------------------------
-	*			AM 변수
-	--------------------------------*/
-#pragma region Anim Montage
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
-	TObjectPtr<UAnimMontage> AM_Attack;
-#pragma endregion
 	
 	/// 카메라
 	// 카메라 컴포넌트

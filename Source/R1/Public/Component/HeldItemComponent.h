@@ -1,4 +1,4 @@
-﻿/// 최초작성 : 2026.08.30
+/// 최초작성 : 2026.08.30
 /// 작 성 자 : 주 형 진
 
 // Fill out your copyright notice in the Description page of Project Settings.
@@ -88,8 +88,16 @@ protected:
 	UFUNCTION()
 	void OnRep_CurrentHeldItem(AHeldItemBase* PreviousHeldItem);
 
+	// [OnRep] 장착된 아이템 데이터 동기화 시 애니메이션 레이어 및 비주얼 갱신
+	UFUNCTION()
+	void OnRep_CurrentEquippedItemData();
+
 	// 캐릭터의 손 소켓(r_handSocket / RightHandSocket)에 도구 액터를 부착하는 헬퍼 함수
 	void AttachHeldItemToCharacter(AHeldItemBase* ItemToAttach);
+
+	// 1P/3P 애니메이션 레이어 동적 링크/해제 헬퍼 함수
+	void LinkItemAnimLayers(TSubclassOf<UAnimInstance> LayerClass);
+	void UnlinkItemAnimLayers();
 
 protected:
 	// 게임 시작 시 컴포넌트에서 자동 장착할 기본 아이템 데이터 (에디터 디테일 패널에서 설정)
@@ -105,8 +113,12 @@ protected:
 	TObjectPtr<AHeldItemBase> CurrentHeldItem;
 
 	// 현재 장착된 아이템의 데이터 에셋 정보 (Replicated)
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "HeldItem|Runtime")
+	UPROPERTY(ReplicatedUsing = OnRep_CurrentEquippedItemData, BlueprintReadOnly, Category = "HeldItem|Runtime")
 	TObjectPtr<UHeldItemData> CurrentEquippedItemData;
+
+	// 현재 링크된 애니메이션 레이어 클래스 캐싱 (해제 시 클라이언트/서버 안전한 Unlink 보장)
+	UPROPERTY()
+	TSubclassOf<UAnimInstance> LinkedAnimLayerClass;
 
 	UPROPERTY()
 	TObjectPtr<AActionCharacter> OwnerCharacter;

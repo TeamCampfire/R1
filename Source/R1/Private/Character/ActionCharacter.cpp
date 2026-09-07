@@ -659,37 +659,19 @@ void AActionCharacter::OnUseBeltSlotPressed(int32 BeltIndex)
 
 void AActionCharacter::OnAttackPressed()
 {
+	// Placeable 아이템 배치중인 경우 좌클릭을 공격 대신 설치 확정으로 처리
+	if (AActionPlayerController* PlayerController = Cast<AActionPlayerController>(GetController()))
+	{
+		if (true == PlayerController->TryConfirmPlacement())
+			return;
+	}
+
 	// 손에 도구/무기가 장착되어 있으면 도구 주 액션(Primary Action) 실행
 	if (HeldItemComponent && HeldItemComponent->GetCurrentHeldItem())
 	{
 		HeldItemComponent->UsePrimaryAction(true);
 		return;
 	}
-
-	//if (!AM_Attack)
-	//{
-	//	UE_LOG(LogTemp, Display, TEXT("AM_Attack was nullptr"));
-	//	return;
-	//}
-
-	//if (UAnimInstance* Instance = GetMesh()->GetAnimInstance())
-	//{
-	//	if (!Instance->IsAnyMontagePlaying())
-	//	{
-	//		// 1) 로컬 클라이언트 선행 재생 (인풋 랙 제거)
-	//		PlayAnimMontage(AM_Attack);
-
-	//		// 2) 리슨 서버 및 다른 클라이언트 동기화
-	//		if (!HasAuthority())
-	//		{
-	//			Server_PlayAttackMontage();
-	//		}
-	//		else
-	//		{
-	//			Multicast_PlayAttackMontage();
-	//		}
-	//	}
-	//}
 }
 
 void AActionCharacter::OnAttackReleased()
@@ -698,22 +680,6 @@ void AActionCharacter::OnAttackReleased()
 	{
 		HeldItemComponent->UsePrimaryAction(false);
 	}
-}
-
-void AActionCharacter::Server_PlayAttackMontage_Implementation()
-{
-	Multicast_PlayAttackMontage();
-}
-
-void AActionCharacter::Multicast_PlayAttackMontage_Implementation()
-{
-	// 이미 로컬에서 선행 재생한 공격자 본인은 중복 재생 방지를 위해 건너뜀
-	if (IsLocallyControlled())
-	{
-		return;
-	}
-
-	PlayAnimMontage(AM_Attack);
 }
 
 

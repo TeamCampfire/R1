@@ -80,32 +80,100 @@ void AHeldItemBase::InitItemVisual(UHeldItemData* InItemData)
 	UE_LOG(LogTemp, Log, TEXT("[AHeldItemBase::InitItemVisual] Successfully set WeaponMesh: %s"), *ItemData->WeaponMesh->GetName());
 }
 
+#include "Net/UnrealNetwork.h"
+
+void AHeldItemBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AHeldItemBase, ItemData);
+}
+
+void AHeldItemBase::OnRep_ItemData()
+{
+	if (ItemData)
+	{
+		InitItemVisual(ItemData);
+	}
+}
+
 void AHeldItemBase::OnPrimaryActionStarted()
+{
+	UE_LOG(LogTemp, Display, TEXT("[AHeldItemBase::OnPrimaryActionStarted] Called. ItemData=%s, Montage=%s"), 
+		ItemData ? *ItemData->GetName() : TEXT("NULL"), 
+		(ItemData && ItemData->PrimaryMontage) ? *ItemData->PrimaryMontage->GetName() : TEXT("NULL"));
+
+	if (!ItemData || !ItemData->PrimaryMontage || !OwnerCharacter) return;
+
+	// 1) 3인칭 전신 몽타주 로컬 선행 재생 (노티파이 발생 및 레이캐스트 공격 트리거)
+	if (UAnimInstance* AnimInst3P = OwnerCharacter->GetMesh() ? OwnerCharacter->GetMesh()->GetAnimInstance() : nullptr)
+	{
+		if (!AnimInst3P->IsAnyMontagePlaying())
+		{
+			OwnerCharacter->PlayAnimMontage(ItemData->PrimaryMontage);
+
+			// 2) 멀티플레이어 동기화 (서버 및 다른 클라이언트)
+			if (!HasAuthority())
+			{
+				Server_PlayPrimaryActionMontage();
+			}
+			else
+			{
+				Multicast_PlayPrimaryActionMontage();
+			}
+		}
+	}
+}
+
+void AHeldItemBase::Server_PlayPrimaryActionMontage_Implementation()
+{
+	Multicast_PlayPrimaryActionMontage();
+}
+
+void AHeldItemBase::Multicast_PlayPrimaryActionMontage_Implementation()
 {
 	if (!ItemData || !ItemData->PrimaryMontage || !OwnerCharacter) return;
 
-	// 좌클릭 기본 동작은 몽타쥬 재생
-	if (USkeletalMeshComponent* TPMesh = OwnerCharacter->GetMesh())
-	{
-		if (UAnimInstance* AnimInst = TPMesh->GetAnimInstance())
-		{
-			if (AnimInst->IsAnyMontagePlaying()) return;
-			AnimInst->Montage_Play(ItemData->PrimaryMontage);
-		}
-	}
+	// 로컬 컨트롤러는 이미 선행 재생했으므로 중복 방지
+	if (OwnerCharacter->IsLocallyControlled()) return;
+
+	OwnerCharacter->PlayAnimMontage(ItemData->PrimaryMontage);
 }
 
 void AHeldItemBase::OnSecondaryActionStarted()
 {
 	if (!ItemData || !ItemData->SecondaryMontage || !OwnerCharacter) return;
 
-
-	//  우클릭 기본 동작은 몽타쥬 재생
-	if (USkeletalMeshComponent* TPMesh = OwnerCharacter->GetMesh())
+	// 1) 3인칭 전신 몽타주 선행 재생
+	if (UAnimInstance* AnimInst3P = OwnerCharacter->GetMesh() ? OwnerCharacter->GetMesh()->GetAnimInstance() : nullptr)
 	{
-		if (UAnimInstance* AnimInst = TPMesh->GetAnimInstance())
+		if (!AnimInst3P->IsAnyMontagePlaying())
 		{
-			AnimInst->Montage_Play(ItemData->SecondaryMontage);
+			OwnerCharacter->PlayAnimMontage(ItemData->SecondaryMontage);
+
+			if (!HasAuthority())
+			{
+				Server_PlaySecondaryActionMontage();
+			}
+			else
+			{
+				Multicast_PlaySecondaryActionMontage();
+			}
 		}
 	}
 }
+
+void AHeldItemBase::Server_PlaySecondaryActionMontage_Implementation()
+{
+	Multicast_PlaySecondaryActionMontage();
+}
+
+void AHeldItemBase::Multicast_PlaySecondaryActionMontage_Implementation()
+{
+	if (!ItemData || !ItemData->SecondaryMontage || !OwnerCharacter) return;
+
+	if (OwnerCharacter->IsLocallyControlled()) return;
+
+	OwnerCharacter->PlayAnimMontage(ItemData->SecondaryMontage);
+}
+
