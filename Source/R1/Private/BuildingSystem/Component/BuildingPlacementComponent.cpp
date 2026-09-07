@@ -7,12 +7,13 @@
 #include "Framework/MainHUD.h"
 #include "Widget/MainHUDWidget.h"
 
+#include "Component/InventoryComponent.h"
 #include "Data/Building/BuildingPartDefinition.h"
 #include "BuildingSystem/BuildingPreviewActor.h"
 #include "BuildingSystem/BuildingActor.h"
 #include "Character/ActionCharacter.h"
-#include "Component/InventoryComponent.h"
-
+#include "Data/Item/PlaceableItemData.h"
+#include "Item/PlaceableItemBase.h"
 
 UBuildingPlacementComponent::UBuildingPlacementComponent()
 {
@@ -62,6 +63,10 @@ void UBuildingPlacementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 		UpdateStructureSnapPreview(PlayerController);
 		break;
 
+	case EBuildingPlacementType::TERRAIN:
+		UpdateTerrainPreview(PlayerController);
+		break;
+
 	case EBuildingPlacementType::SURFACE:
 	case EBuildingPlacementType::ATTACHMENT:
 	default:
@@ -92,8 +97,13 @@ void UBuildingPlacementComponent::StartPlacement(UBuildingPartDefinition* Defini
 	bCanPlace = false;
 	CurrentInvalidReason = EBuildingPlacementInvalidReason::InvalidLocation;
 
+	SelectedPlaceableItem = nullptr;
+	PlaceableSourceSlot = FInventorySlotRef();
+	PlaceableSourceInstanceID.Invalidate();
+
 	CurFoundationLegLength = 0.f;
 	CurSnapYawOffsetIdx = 0;
+	CurrentTerrainYaw = 0.f;
 
 	if (SelectedDefinition->PlacementType == EBuildingPlacementType::FOUNDATION)
 	{
@@ -130,12 +140,65 @@ void UBuildingPlacementComponent::StopPlacement()
 	// 배치 끝냈으니, 값들 리셋
 	bCanPlace = false;
 	CurrentInvalidReason = EBuildingPlacementInvalidReason::InvalidLocation;
+	SelectedPlaceableItem = nullptr;
+	PlaceableSourceSlot = FInventorySlotRef();
+	PlaceableSourceInstanceID.Invalidate();
 	ClearCurrentSnapTarget();
 	bIsPlacing = false;
 	SelectedDefinition = nullptr;
 	CurFoundationLegLength = 0.f;
+	CurrentTerrainYaw = 0.f;
 	if (true == IsValid(PreviewActor))
 		PreviewActor->SetActorHiddenInGame(true); // 화면에서 사라져요
+}
+
+void UBuildingPlacementComponent::StartPlaceablePlacement(UPlaceableItemData* ItemData, const FInventorySlotRef& SourceSlot, const FGuid& SourceInstanceID)
+{
+	if (false == IsLocalPlacementController()) return;
+
+	if (false == IsValid(ItemData) || false == SourceInstanceID.IsValid())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[StartPlaceablePlacement] 유효하지 않은 아이템 또는 InstanceID입니다."));
+		return;
+	}
+
+	// Placeable이 참조하는 파츠정보를 프리뷰 및 배치 규칙으로 사용
+	UBuildingPartDefinition* Definition = ItemData->BuildingPart.LoadSynchronous();
+
+	if (false == IsValid(Definition) || false == IsValid(Definition->PartMesh))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[StartPlaceablePlacement] BuildingPart가 유효하지 않습니다. Item=%s"),
+			*GetNameSafe(ItemData));
+		return;
+	}
+
+	// 자연 지형에 배치되는 Deployable 데이터만 설치 허용!
+	if (Definition->PlacementType != EBuildingPlacementType::TERRAIN || Definition->PartType != EBuildingPartType::DEPLOYABLE)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[StartPlaceablePlacement] Placeable 배치 데이터 설정이 올바르지 않습니다. Item=%s"),
+			*GetNameSafe(ItemData));
+		return;
+	}
+
+	if (nullptr == ItemData->PlaceableActorClass)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[StartPlaceablePlacement] PlaceableActorClass가 설정되지 않았습니다. Item=%s"),
+			*GetNameSafe(ItemData));
+		return;
+	}
+
+	// 같은 아이템과 같은 인스턴스를 다시 선택했다면 프리뷰 위치와 회전 상태를 초기화하지 않아요
+	if (true == bIsPlacing && ItemData == SelectedPlaceableItem && SourceInstanceID == PlaceableSourceInstanceID) return;
+
+	StartPlacement(Definition);
+
+	if (false == bIsPlacing) return;
+
+	// StartPlacement에서 이전 상태를 초기화한 후에
+	// 이번 배치의 원본 아이템 정보를 저장
+	SelectedPlaceableItem = ItemData;
+	PlaceableSourceSlot = SourceSlot;
+	PlaceableSourceInstanceID = SourceInstanceID;
 }
 
 ABuildingPreviewActor* UBuildingPlacementComponent::GetPreviewActor()
@@ -216,6 +279,16 @@ void UBuildingPlacementComponent::ConfirmPlacement()
 
 void UBuildingPlacementComponent::RotateBuildingPart()
 {
+	if (false == bIsPlacing || false == IsValid(SelectedDefinition)) return;
+
+	// TERRAIN 타입은 스냅 회전 대신 지면 노멀을 축으로 일정 각도(TerrainRotationStep)씩 회전해요
+	if (EBuildingPlacementType::TERRAIN == SelectedDefinition->PlacementType)
+	{
+		CurrentTerrainYaw = FMath::Fmod(CurrentTerrainYaw + TerrainRotationStep, 360.f);
+		UE_LOG(LogTemp, Log, TEXT("현재 Terrain Yaw: %.1f"), CurrentTerrainYaw);
+		return;
+	}
+
 	CycleSnapYawOffset();
 	UE_LOG(LogTemp, Log, TEXT("현재 스냅 Yaw Offset: %.1f"), GetCurSnapYawOffset());
 }
@@ -621,6 +694,95 @@ bool UBuildingPlacementComponent::UpdateStructureSnapPreview(APlayerController* 
 	return true;
 }
 
+void UBuildingPlacementComponent::UpdateTerrainPreview(APlayerController* PlayerController)
+{
+	if (false == IsValid(PlayerController) || false == IsValid(SelectedDefinition) || false == IsValid(PreviewActor))
+	{
+		HidePlacementPreview();
+		return;
+	}
+
+	// 스냅 대상 읎음
+	ClearCurrentSnapTarget();
+
+	FVector ViewLocation;
+	FRotator ViewRotation;
+	PlayerController->GetPlayerViewPoint(ViewLocation, ViewRotation);
+
+	const FVector ViewForward = ViewRotation.Vector();
+
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(TerrainPlacementTrace), false);
+
+	if (APawn* ControlledPawn = PlayerController->GetPawn()) // 플레이어 자신은 무시
+		QueryParams.AddIgnoredActor(ControlledPawn);
+
+	QueryParams.AddIgnoredActor(PreviewActor); // 프리뷰도
+
+	const float HorizontalForwardSize = FVector2D(ViewForward.X, ViewForward.Y).Size();
+
+	// 거의 수직으로 아래를 보는 경우에는 카메라 방향으로 바로 탐색
+	if (HorizontalForwardSize <= KINDA_SMALL_NUMBER)
+	{
+		const FVector TraceEnd = ViewLocation + ViewForward * GroundSearchDistance;
+
+		FHitResult HitResult;
+		const bool bHit = GetWorld()->LineTraceSingleByChannel(
+			HitResult,
+			ViewLocation,
+			TraceEnd,
+			ECC_Visibility,
+			QueryParams);
+
+		if (false == bHit)
+		{
+			HidePlacementPreview();
+			return;
+		}
+
+		ShowPreviewAtLocation(HitResult.ImpactPoint, HitResult.ImpactNormal, HitResult.GetComponent());
+		return;
+	}
+
+	// 수평 거리가 MaxPlacementDistance가 되는 카메라 선상의 위치
+	const float ViewRayDistance = MaxPlacementDistance / HorizontalForwardSize;
+	const FVector MaxDistancePoint = ViewLocation + ViewForward * ViewRayDistance;
+
+	FHitResult ForwardHit;
+	const bool bForwardHit = GetWorld()->LineTraceSingleByChannel(
+		ForwardHit,
+		ViewLocation,
+		MaxDistancePoint,
+		ECC_Visibility,
+		QueryParams);
+
+	if (true == bForwardHit)
+	{
+		ShowPreviewAtLocation(ForwardHit.ImpactPoint, ForwardHit.ImpactNormal, ForwardHit.GetComponent());
+		return;
+	}
+
+	// 정면에서 아무것도 맞히지 못했다면 최대 거리 지점 아래의 지형 탐색
+	const FVector GroundTraceStart = MaxDistancePoint + FVector::UpVector * GroundSearchDistance;
+	const FVector GroundTraceEnd = MaxDistancePoint - FVector::UpVector * GroundSearchDistance;
+
+	FHitResult GroundHit;
+	const bool bGroundHit = GetWorld()->LineTraceSingleByChannel(
+		GroundHit,
+		GroundTraceStart,
+		GroundTraceEnd,
+		ECC_Visibility,
+		QueryParams);
+
+	if (false == bGroundHit)
+	{
+		HidePlacementPreview();
+		return;
+	}
+
+	ShowPreviewAtLocation(GroundHit.ImpactPoint, GroundHit.ImpactNormal, GroundHit.GetComponent());
+}
+
+
 void UBuildingPlacementComponent::ClearCurrentSnapTarget()
 {
 	CurrentSnapBuilding.Reset();
@@ -706,6 +868,29 @@ void UBuildingPlacementComponent::ShowCurrentInvalidReasonMessage() const
 	}
 
 	MainHUDWidget->ShowBuildingPlacementMessage(Message);
+}
+
+FQuat UBuildingPlacementComponent::BuildTerrainPlacementRotation(const FVector& InSurfaceNormal) const
+{
+	if (InSurfaceNormal.IsNearlyZero())
+		return FQuat::Identity;
+
+	const FVector SurfaceNormal = InSurfaceNormal.GetSafeNormal();
+
+	// 기본 전방 방향을 지면 평면 위로 투영
+	FVector SurfaceForward = FVector::VectorPlaneProject(FVector::ForwardVector, SurfaceNormal);
+
+	// 극단적인 노멀에서도 회전을 계산할 수 있도록 예비 방향 사용
+	if (SurfaceForward.IsNearlyZero())
+		SurfaceForward = FVector::VectorPlaneProject(FVector::RightVector,SurfaceNormal);
+
+	SurfaceForward.Normalize();
+
+	// 지면 노멀을 회전축으로 사용 (사용자의 휠 입력을 적용)
+	const FQuat TerrainYawRotation(SurfaceNormal, FMath::DegreesToRadians(CurrentTerrainYaw));
+	SurfaceForward = TerrainYawRotation.RotateVector(SurfaceForward);
+
+	return FRotationMatrix::MakeFromXZ(SurfaceForward, SurfaceNormal).ToQuat();
 }
 
 void UBuildingPlacementComponent::ServerPlaceNewBuilding_Implementation(UBuildingPartDefinition* Definition, const FTransform& InPlacementTransform)
@@ -846,6 +1031,10 @@ void UBuildingPlacementComponent::ShowPreviewAtLocation(const FVector& InPreview
 
 	// 프리뷰 액터 위치 변경
 	PreviewActor->SetActorLocation(InPreviewLocation);
+
+	// TERRAIN 타입은 월드 수평이 아니라 맞힌 지면의 경사를 따라 프리뷰를 정렬해요
+	if (true == IsValid(SelectedDefinition) && SelectedDefinition->PlacementType == EBuildingPlacementType::TERRAIN)
+		PreviewActor->SetActorRotation(BuildTerrainPlacementRotation(InSurfaceNormal));
 
 	// 현재 맞힌 곳이 실제 설치 가능한 지면(옵젝타입:BuildableGround)인지 검사해서 결과를 얻어요
 	const bool bIsSurfaceValid = IsBuildableSurface(SelectedDefinition.Get(), SupportingComponent);

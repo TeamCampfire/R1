@@ -35,4 +35,8 @@ public:
 	// UBuildingPartDefinition을 참조해야 한다.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Placeable")
 	TSoftObjectPtr<class UBuildingPartDefinition> BuildingPart;
+
+	// 설치가 확정됐을 때 서버에서 생성할 Placeable 액터 클래스
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Placeable")
+	TSubclassOf<class APlaceableItemBase> PlaceableActorClass;
 };

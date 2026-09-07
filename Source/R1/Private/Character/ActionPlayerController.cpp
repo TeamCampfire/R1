@@ -16,6 +16,8 @@
 
 #include "BuildingSystem/Component/BuildingPlacementComponent.h"
 #include "Data/Building/BuildingPartDefinition.h"
+#include "Data/Item/PlaceableItemData.h"
+#include "Component/InventoryComponent.h"
 
 AActionPlayerController::AActionPlayerController()
 {
@@ -149,6 +151,12 @@ void AActionPlayerController::OnStopPlacement()
 {
 	if (true == IsValid(BuildingPlacementComponent))
 		BuildingPlacementComponent->StopPlacement();
+}
+
+void AActionPlayerController::OnStartPlaceablePlacement(UPlaceableItemData* ItemData, const FInventorySlotRef& SourceSlot, const FGuid& SourceInstanceID)
+{
+	if (true == IsValid(BuildingPlacementComponent))
+		BuildingPlacementComponent->StartPlaceablePlacement(ItemData, SourceSlot, SourceInstanceID);
 }
 
 void AActionPlayerController::SetInventoryInputState(bool bOpen)
