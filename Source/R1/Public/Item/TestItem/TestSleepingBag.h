@@ -5,13 +5,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Actor.h"
+#include "Item/PlaceableItemBase.h"
 
 #include "Interface/RespawnPointInterface.h"
 #include "TestSleepingBag.generated.h"
 
 UCLASS()
-class R1_API ATestSleepingBag : public AActor, public IRespawnPointInterface
+class R1_API ATestSleepingBag : public APlaceableItemBase, public IRespawnPointInterface
 {
 	GENERATED_BODY()
 	
