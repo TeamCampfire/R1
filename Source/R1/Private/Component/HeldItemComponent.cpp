@@ -85,13 +85,32 @@ void UHeldItemComponent::AttachHeldItemToCharacter(AHeldItemBase* ItemToAttach)
 			ItemToAttach->AttachToActor(OwnerCharacter, FAttachmentTransformRules::KeepRelativeTransform);
 			UE_LOG(LogTemp, Warning, TEXT("[UHeldItemComponent::AttachHeldItemToCharacter] 3P Hand socket NOT found, attached to Actor"));
 		}
+
+		// 아이템 변경시에는 모든 몽타주 종료
+		CharacterMesh->GetAnimInstance()->StopAllMontages(0);
 	}
 
 
 	// 3. 1인칭 팔(FirstPersonMesh) 소켓에 ItemMesh1P 분리 부착
 	if (USkeletalMeshComponent* FPMesh = OwnerCharacter->GetFirstPersonMesh())
 	{
-		FPMesh->SetRelativeRotation(FRotator(0, -110, 0));
+
+		if (ItemToAttach->GetItemData())
+		{
+			// 돌의 경우 축이 살짝 틀어져 있어서 보정
+			// 눈물겹지만 어쩔 수 없음
+			if (ItemToAttach->GetItemData()->ItemID.ToString() == TEXT("Item_Held_Rock"))
+			{
+				UE_LOG(LogTemp, Display, TEXT("Testt"));
+				FPMesh->SetRelativeRotation(FRotator(0, -105.f, 0));
+			}
+			else
+			{
+				FPMesh->SetRelativeRotation(FRotator(0, -90.f, 0));
+			}
+		}
+		
+
 		if (UStaticMeshComponent* Mesh1P = ItemToAttach->GetItemMesh1P())
 		{
 			const FName FPSocket = FPMesh->DoesSocketExist(FName(TEXT("r_prop"))) 

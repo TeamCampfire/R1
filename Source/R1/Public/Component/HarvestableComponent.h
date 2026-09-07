@@ -18,6 +18,17 @@ class USoundBase;
 class AItemPickup;
 class FLifetimeProperty;
 
+UENUM()
+enum class EHarvestType
+{
+
+	Tree,
+	Stone,
+	Barrel,
+	Flesh,
+	Hemp,
+};
+
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class R1_API UHarvestableComponent : public UActorComponent, public IHarvestable
 {
@@ -28,7 +39,7 @@ public:
 	UHarvestableComponent();
 
 	// 자원을 획득할 수 있는 대상이 공격 받았을 때 (나무, 돌 등)
-	virtual FHarvestRes OnHitted_Implementation(AActionCharacter* InCharacter, const FVector& HitLocation) override;
+	virtual FHarvestRes OnHitted_Implementation(AActionCharacter* InCharacter, AHeldItemBase* CurrentItem, const FVector& HitLocation) override;
 	// 대상의 체력이 0이되어서 없어질 때 호출될 함수
 	virtual void		OnHarvestEnd_Implementation() override;
 	virtual void		SpawnImpactDecal_Implementation(const FVector SpawnPoint, const FRotator SpawnRotator) override;
@@ -52,6 +63,9 @@ protected:
 	void				OnRep_SweetSpotTransform();
 
 protected:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|type")
+	EHarvestType HarvestType = EHarvestType::Tree;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Item")
 	TObjectPtr<UItemDataBase> DefaultItem;
 
@@ -172,6 +186,10 @@ private:
 
 	// 월드 바닥에 AItemPickup 액터 스폰
 	void SpawnWorldPickups(const TArray<FHarvestItemResult>& ItemsToSpawn);
+
+	bool CompatibleHarvestType(const AHeldItemBase* CurrentItem);
+
+	void SetItemStat(const AHeldItemBase* CurrentItem, float& Damage, float& ItemCnt);
 
 private:
 	// 실제 생성된 SweetSpotDecal

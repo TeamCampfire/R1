@@ -20,6 +20,7 @@
 #include "Character/ActionPlayerController.h"
 #include "Data/Item/ItemDataBase.h"
 #include "Data/Item/PlaceableItemData.h"
+#include "Data/Item/HeldItemData.h"
 
 #include "InputMappingContext.h"
 #include "InputAction.h"
@@ -303,12 +304,6 @@ void AActionCharacter::ProcessAttack()
 		// 서버 권한으로 타격 및 자원 채집 처리 요청
 		Server_ProcessAttackTarget(Target, DetectRes.ImpactPoint);
 	}
-	else
-	{
-		UE_LOG(LogTemp, Display, TEXT("아무도 것도 맞지 않았습니다."));
-	}
-
-
 }
 
 bool AActionCharacter::Server_ProcessAttackTarget_Validate(AActor* TargetActor, const FVector& HitLocation)
@@ -330,7 +325,7 @@ void AActionCharacter::Server_ProcessAttackTarget_Implementation(AActor* TargetA
 		if (IHealth->IsAlive())
 		{
 			//TODO 하드코딩 수정
-			IHealthInterface::Execute_InflictDamage(TargetActor, 50.f);
+			IHealthInterface::Execute_InflictDamage(TargetActor, HeldItemComponent->GetCurrentHeldItem()->GetItemData()->Damage);
 			return;
 		}
 
@@ -340,7 +335,7 @@ void AActionCharacter::Server_ProcessAttackTarget_Implementation(AActor* TargetA
 	if (UHarvestableComponent* HarvestComp = TargetActor->FindComponentByClass<UHarvestableComponent>())
 	{
 		// 서버에서 자원 획득 진행 (OnHitted_Implementation 실행)
-		FHarvestRes HarvRes = IHarvestable::Execute_OnHitted(HarvestComp, this, HitLocation);
+		FHarvestRes HarvRes = IHarvestable::Execute_OnHitted(HarvestComp, this, HeldItemComponent->GetCurrentHeldItem(), HitLocation);
 		if (HarvRes.HarvesResult)
 		{
 			// 서버에서 만들어준 자원을 인벤토리에 넣는다.

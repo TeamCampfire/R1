@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Component/InventoryComponent.h"
@@ -79,7 +79,7 @@ bool UInventoryComponent::AddItem(UItemDataBase* ItemData, int32 Count, int32& O
 	}
 
 	/// Test Call
-	PrintInventoryInfo();
+	//PrintInventoryInfo();
 
 	// 모든 수량이 완전히 들어갔으면 true 리턴
 	// 1개도 추가되지 않았거나 일부만 추가됬으면 false 리턴

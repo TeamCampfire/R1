@@ -16,4 +16,8 @@ class R1_API ABuildingHammer : public AHeldItemBase
 
 public:
 	virtual void OnSecondaryActionStarted() override;
+
+protected:
+	UFUNCTION(Server, Reliable)
+	void Server_ApplyBuildingDamage(ABuildingActor* TargetBuilding, float Damage);
 };

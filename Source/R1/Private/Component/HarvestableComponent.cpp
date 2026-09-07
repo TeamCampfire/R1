@@ -39,15 +39,19 @@ void UHarvestableComponent::BeginPlay()
 	}
 }
 
-FHarvestRes UHarvestableComponent::OnHitted_Implementation(AActionCharacter* InCharacter, const FVector& HitLocation)
+FHarvestRes UHarvestableComponent::OnHitted_Implementation(AActionCharacter* InCharacter, AHeldItemBase* CurrentItem, const FVector& HitLocation)
 {
 	// 서버에서만 채집 로직 및 자원 감소/지급을 수행
 	if (!GetOwner()->HasAuthority()) return FHarvestRes();
+	if (!CurrentItem) return FHarvestRes();
+	// 종류가 다르면 지급을 안하려고 했지만 그럼 뭔가 좀 이상해서 일단 주석처리
+	//if (!CompatibleHarvestType(CurrentItem)) return FHarvestRes();
 
 	FHarvestRes Res;
-	// TODO 기본값 삭제
-	float Damage = 10.0f;
-	float ItemCnt = 10;
+	float Damage;
+	float ItemCnt;
+
+	SetItemStat(CurrentItem, Damage, ItemCnt);
 	if (CurrentHp <= 0 || !InCharacter) return Res;
 
 
@@ -358,6 +362,46 @@ void UHarvestableComponent::SpawnWorldPickups(const TArray<FHarvestItemResult>& 
 		{
 			Pickup->InitializeFromItem(Item.ItemData, Item.Count);
 		}
+	}
+}
+
+bool UHarvestableComponent::CompatibleHarvestType(const AHeldItemBase* CurrentItem)
+{
+
+	switch (HarvestType)
+	{
+		case EHarvestType::Tree:
+			if (CurrentItem->GetItemData()->WoodGathering == 0) return false;
+			break;
+		case EHarvestType::Stone:
+			if (CurrentItem->GetItemData()->OreGathering == 0) return false;
+			break;
+		case EHarvestType::Flesh:
+			if (CurrentItem->GetItemData()->FleshGathering == 0) return false;
+			break;
+	}
+	return true;
+}
+
+void UHarvestableComponent::SetItemStat(const AHeldItemBase* CurrentItem, float& Damage, float& ItemCnt)
+{
+	switch (HarvestType)
+	{
+		case EHarvestType::Tree:
+			Damage = CurrentItem->GetItemData()->Damage == 0 ? 10 : CurrentItem->GetItemData()->Damage;
+			ItemCnt = CurrentItem->GetItemData()->WoodGathering == 0 ? 1 : ItemCnt = CurrentItem->GetItemData()->WoodGathering;
+			break;
+		case EHarvestType::Stone:
+			Damage = CurrentItem->GetItemData()->Damage == 0 ? 10 : CurrentItem->GetItemData()->Damage;
+			ItemCnt = CurrentItem->GetItemData()->OreGathering == 0 ? 1 : ItemCnt = CurrentItem->GetItemData()->OreGathering;
+			break;
+		case EHarvestType::Flesh:
+			Damage = CurrentItem->GetItemData()->Damage == 0 ? 10 : CurrentItem->GetItemData()->Damage;
+			ItemCnt = CurrentItem->GetItemData()->FleshGathering == 0 ? 1 : ItemCnt = CurrentItem->GetItemData()->FleshGathering;
+			break;
+		case EHarvestType::Barrel:
+			Damage = CurrentItem->GetItemData()->Damage == 0 ? 10 : CurrentItem->GetItemData()->Damage;
+			break;
 	}
 }
 

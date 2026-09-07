@@ -31,9 +31,16 @@ void ABuildingHammer::OnSecondaryActionStarted()
 				{
 					// TODO 하드코딩 수정
 					// 건물에 데미지를 준다.
-					BuildingActor->ApplyBuildingDamage(100);
+					Server_ApplyBuildingDamage(BuildingActor, 100);
+					
 				}
 			}
 		}
 	}
+}
+
+void ABuildingHammer::Server_ApplyBuildingDamage_Implementation(ABuildingActor* TargetBuilding, float Damage)
+{
+	if (!TargetBuilding) return;
+	TargetBuilding->ApplyBuildingDamage(100);
 }
