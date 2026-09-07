@@ -53,7 +53,7 @@ public:
 	UPROPERTY(ReplicatedUsing = OnRep_State, BlueprintReadOnly, Category = "Campfire")
 	FItemInstance FuelSlot;
 
-	// 0 = 연료 부산물, 1 = 조리 결과물.
+	// 연료 부산물과 조리 결과물이 공용으로 사용하는 산출 슬롯.
 	UPROPERTY(ReplicatedUsing = OnRep_State, BlueprintReadOnly, Category = "Campfire")
 	TArray<FItemInstance> OutputSlots;
 
@@ -78,8 +78,8 @@ private:
 
 	void TickCampfire();
 	bool ConsumeNextFuel();
-	bool CanStoreOutput(int32 OutputIndex, UItemDataBase* Item, int32 Count = 1) const;
-	bool AddOutput(int32 OutputIndex, UItemDataBase* Item, int32 Count = 1);
+	int32 FindOutputSlot(UItemDataBase* Item) const;
+	bool AddOutput(UItemDataBase* Item);
 	void NotifyStateChanged();
 	FItemInstance* FindMutableSlot(const FCampfireSlotRef& Slot);
 	const FItemInstance* FindSlot(const FCampfireSlotRef& Slot) const;

@@ -79,19 +79,32 @@ float UCampfireComponent::GetFuelProgress() const
 		? FMath::Clamp(RemainingFuelTime / CurrentFuelDuration, 0.f, 1.f) : 0.f;
 }
 
-bool UCampfireComponent::CanStoreOutput(int32 OutputIndex, UItemDataBase* Item, int32 Count) const
+int32 UCampfireComponent::FindOutputSlot(UItemDataBase* Item) const
 {
-	if (!Item || !OutputSlots.IsValidIndex(OutputIndex) || Count <= 0) return false;
-	const FItemInstance& Output = OutputSlots[OutputIndex];
-	return !Output.IsValid() || (Output.ItemData == Item && Output.StackCount + Count <= Item->MaxStackSize);
+	if (!Item || Item->MaxStackSize <= 0) return INDEX_NONE;
+	int32 EmptyIndex = INDEX_NONE;
+	for (int32 Index = 0; Index < OutputSlots.Num(); ++Index)
+	{
+		const FItemInstance& Output = OutputSlots[Index];
+		if (!Output.IsValid())
+		{
+			if (EmptyIndex == INDEX_NONE) EmptyIndex = Index;
+		}
+		else if (Output.ItemData == Item && Output.StackCount < Item->MaxStackSize)
+		{
+			return Index;
+		}
+	}
+	return EmptyIndex;
 }
 
-bool UCampfireComponent::AddOutput(int32 OutputIndex, UItemDataBase* Item, int32 Count)
+bool UCampfireComponent::AddOutput(UItemDataBase* Item)
 {
-	if (!CanStoreOutput(OutputIndex, Item, Count)) return false;
+	const int32 OutputIndex = FindOutputSlot(Item);
+	if (OutputIndex == INDEX_NONE) return false;
 	FItemInstance& Output = OutputSlots[OutputIndex];
-	if (Output.IsValid()) Output.StackCount += Count;
-	else Output = FItemInstance(Item, Count);
+	if (Output.IsValid()) ++Output.StackCount;
+	else Output = FItemInstance(Item, 1);
 	return true;
 }
 
@@ -112,8 +125,7 @@ bool UCampfireComponent::ConsumeNextFuel()
 bool UCampfireComponent::CompleteCurrentFuel()
 {
 	if (!PendingFuelOutputItem) return true;
-	if (!CanStoreOutput(0, PendingFuelOutputItem)) return false;
-	AddOutput(0, PendingFuelOutputItem);
+	if (!AddOutput(PendingFuelOutputItem)) return false;
 	PendingFuelOutputItem = nullptr;
 	return true;
 }
@@ -135,7 +147,7 @@ void UCampfireComponent::TickCampfire()
 	const FCampfireCookingRecipe* CookingRecipe = InputSlot.IsValid()
 		? Config->FindCookingRecipe(InputSlot.ItemData) : nullptr;
 	const bool bCanCook = CookingRecipe && CookingRecipe->AfterItem
-		&& CanStoreOutput(1, CookingRecipe->AfterItem);
+		&& FindOutputSlot(CookingRecipe->AfterItem) != INDEX_NONE;
 
 	if (bCanCook)
 	{
@@ -144,7 +156,7 @@ void UCampfireComponent::TickCampfire()
 		{
 			--InputSlot.StackCount;
 			if (InputSlot.StackCount <= 0) InputSlot = FItemInstance();
-			AddOutput(1, CookingRecipe->AfterItem);
+			AddOutput(CookingRecipe->AfterItem);
 			CurrentCookingTime = 0.f;
 		}
 	}
