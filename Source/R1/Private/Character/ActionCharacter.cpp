@@ -212,8 +212,9 @@ void AActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 			HeldItemComponent->GetCurrentHeldItem()->SetupInputComponent(EIC);
 		}
 
-		if(IA_BuildingPlacement)
-			EIC->BindAction(IA_BuildingPlacement, ETriggerEvent::Started, this, &AActionCharacter::OnBuildingPlacementPressed);
+		// 좌클릭 중복 제거
+		//if(IA_BuildingPlacement)
+			//EIC->BindAction(IA_BuildingPlacement, ETriggerEvent::Started, this, &AActionCharacter::OnBuildingPlacementPressed);
 
 		if (IA_RotateBuildingPart)
 			EIC->BindAction(IA_RotateBuildingPart, ETriggerEvent::Started, this, &AActionCharacter::OnRotateBuildingPartPressed);
@@ -228,10 +229,18 @@ void AActionCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 
 void AActionCharacter::OnSecondaryActionPressed()
 {
+	// 배치 중에는 우클릭을 보조 액션보다 배치 취소로 우선 처리해요
+	if (AActionPlayerController* PlayerController = Cast<AActionPlayerController>(GetController()))
+	{
+		if (true == PlayerController->TryCancelPlacement())
+			return;
+	}
+
 	if (HeldItemComponent)
 	{
 		HeldItemComponent->UseSecondaryAction(true);
 	}
+
 }
 
 void AActionCharacter::OnSecondaryActionReleased()
@@ -643,6 +652,13 @@ void AActionCharacter::OnUseBeltSlotPressed(int32 BeltIndex)
 
 void AActionCharacter::OnAttackPressed()
 {
+	// Placeable 아이템 배치중인 경우 좤늘릭을 공격 대신 설치 확정으로 처리
+	if (AActionPlayerController* PlayerController = Cast<AActionPlayerController>(GetController()))
+	{
+		if (true == PlayerController->TryConfirmPlacement())
+			return;
+	}
+
 	// 손에 도구/무기가 장착되어 있으면 도구 주 액션(Primary Action) 실행
 	if (HeldItemComponent && HeldItemComponent->GetCurrentHeldItem())
 	{

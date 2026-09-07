@@ -635,6 +635,30 @@ bool UInventoryComponent::ConsumeItemCount(const UItemDataBase* ItemData, int32 
 	return true;
 }
 
+bool UInventoryComponent::ConsumeItemInstance(const FInventorySlotRef& SlotRef, const FGuid& ExpectedInstanceID, const UItemDataBase* ExpectedItemData)
+{
+	if (false == ExpectedInstanceID.IsValid() || false == IsValid(ExpectedItemData)) return false;
+
+	// 유효한지 확인
+	TArray<FItemInstance>& SlotArray = GetSlotArray(SlotRef.Category);
+	if (false == SlotArray.IsValidIndex(SlotRef.Index)) return false;
+
+	const FItemInstance& Instance = SlotArray[SlotRef.Index];
+	if (false == Instance.IsValid()) return false;
+
+	// 인스턴스 ID, 아이템 데이터 형식이 맞지 않으면 소비 안 함
+	if (ExpectedInstanceID != Instance.InstanceID) return false;
+	if (ExpectedItemData != Instance.ItemData) return false;
+
+	FItemInstance UpdatedInstance = Instance;
+	--UpdatedInstance.StackCount; // 수량 하나 차감
+
+	SetSlot(SlotRef.Category, SlotRef.Index,
+		UpdatedInstance.StackCount > 0 ? UpdatedInstance : FItemInstance());
+
+	return true;
+}
+
 void UInventoryComponent::PrintInventoryInfo()
 {
 	auto PrintArray = [this](const TCHAR* Label, const TArray<FItemInstance>& Array)

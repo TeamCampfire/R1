@@ -51,6 +51,12 @@ public:
 	// BuildingPlacementComponent의 Placeable 아이템 Start/Stop Placement 래핑 함수
 	void OnStartPlaceablePlacement( class UPlaceableItemData* ItemData,
 		const FInventorySlotRef& SourceSlot, const FGuid& SourceInstanceID);
+
+	// 배치 모드가 활성화되어 있다면 종료하고 true를 반환해요
+	bool TryCancelPlacement();
+
+	// 배치 모드가 활성화 되어 있다면 설치를 요청하고 true를 반환해요
+	bool TryConfirmPlacement();
 	//  ===================================================================================
 public:
 

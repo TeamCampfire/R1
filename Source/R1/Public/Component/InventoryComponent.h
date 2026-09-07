@@ -199,6 +199,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Crafting")
 	bool ConsumeItemCount(const UItemDataBase* ItemData, int32 CountToRemove);
 
+	// 지정한 슬롯의 ItemData와 InstanceID가 모두 일치할 때 해당 아이템(인스턴스)를 1개 소비하는 함수
+	// 일치하지 않거나 소비할 수 없는 상태면 인벤토리를 변경하지 않고 false를 반환
+	// 함수 생성 이유 : Placeable 아이템 배치 사용 과정에서, 배치를 시작한 해당 슬롯의 아이템만 정확히!! 소비하기 위해서.. 그치만 범용적으로 사용 가능
+	bool ConsumeItemInstance(const FInventorySlotRef& SlotRef, const FGuid& ExpectedInstanceID, const UItemDataBase* ExpectedItemData);
+
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;

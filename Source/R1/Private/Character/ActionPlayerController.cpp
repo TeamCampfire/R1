@@ -159,6 +159,24 @@ void AActionPlayerController::OnStartPlaceablePlacement(UPlaceableItemData* Item
 		BuildingPlacementComponent->StartPlaceablePlacement(ItemData, SourceSlot, SourceInstanceID);
 }
 
+bool AActionPlayerController::TryCancelPlacement()
+{
+	if (false == IsValid(BuildingPlacementComponent) || false == BuildingPlacementComponent->IsPlacing())
+		return false;
+
+	BuildingPlacementComponent->StopPlacement();
+	return true;
+}
+
+bool AActionPlayerController::TryConfirmPlacement()
+{
+	if (false == IsValid(BuildingPlacementComponent) || false == BuildingPlacementComponent->IsPlacing())
+		return false;
+
+	BuildingPlacementComponent->ConfirmPlacement();
+	return true;
+}
+
 void AActionPlayerController::SetInventoryInputState(bool bOpen)
 {
 	ApplyUIInputState(bOpen);

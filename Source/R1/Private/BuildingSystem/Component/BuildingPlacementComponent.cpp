@@ -105,6 +105,9 @@ void UBuildingPlacementComponent::StartPlacement(UBuildingPartDefinition* Defini
 	CurSnapYawOffsetIdx = 0;
 	CurrentTerrainYaw = 0.f;
 
+	bPlaceablePlacementRequestPending = false;
+	PendingPlaceablePlacementRequestID.Invalidate();
+
 	if (SelectedDefinition->PlacementType == EBuildingPlacementType::FOUNDATION)
 	{
 		// Foundation 전용 : 메시 피벗 아래쪽으로 내려간 다리기둥 길이 계산
@@ -148,6 +151,8 @@ void UBuildingPlacementComponent::StopPlacement()
 	SelectedDefinition = nullptr;
 	CurFoundationLegLength = 0.f;
 	CurrentTerrainYaw = 0.f;
+	bPlaceablePlacementRequestPending = false;
+	PendingPlaceablePlacementRequestID.Invalidate();
 	if (true == IsValid(PreviewActor))
 		PreviewActor->SetActorHiddenInGame(true); // 화면에서 사라져요
 }
@@ -264,6 +269,28 @@ void UBuildingPlacementComponent::ConfirmPlacement()
 
 		// 실제 건축 파츠 스냅은 서버에 요청해요
 		ServerPlaceSnappedPart(SelectedDefinition.Get(), CurrentSnapBuilding.Get(), CurrentSnapTargetPartID, CurrentSnapSocketName, CurSnapYawOffsetIdx);
+
+		break;
+	}
+	case EBuildingPlacementType::TERRAIN:
+	{
+		// 서버 응답을 기다리는 동안 중복 설치 요청을 보내지 않아요
+		if (true == bPlaceablePlacementRequestPending) return;
+
+		if (false == IsValid(SelectedPlaceableItem) || false == PlaceableSourceInstanceID.IsValid() ||
+			nullptr == SelectedPlaceableItem->PlaceableActorClass)
+		{
+			UE_LOG( LogTemp, Warning, TEXT("[UBuildingPlacementComponent::ConfirmPlacement] : Placeable 배치 정보가 유효하지 않습니다."));
+			return;
+		}
+
+		const FTransform PlacementTransform = PreviewActor->GetActorTransform();
+		PendingPlaceablePlacementRequestID = FGuid::NewGuid();
+		bPlaceablePlacementRequestPending = true;
+
+		// 서버에 설치 요청
+		ServerPlacePlaceable(PendingPlaceablePlacementRequestID, SelectedPlaceableItem.Get(),
+			PlaceableSourceSlot, PlaceableSourceInstanceID, PlacementTransform);
 
 		break;
 	}
@@ -444,6 +471,155 @@ void UBuildingPlacementComponent::ServerPlaceSnappedPart_Implementation(UBuildin
 	TargetBuilding->ForceNetUpdate();
 
 	UE_LOG(LogTemp, Log, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 스냅 파츠 설치 완료. Socket=%s"),*SocketName.ToString());
+}
+
+void UBuildingPlacementComponent::ServerPlacePlaceable_Implementation(FGuid RequestID, UPlaceableItemData* ItemData, FInventorySlotRef SourceSlot, FGuid SourceInstanceID, const FTransform& InPlacementTransform)
+{
+	// 모든 실패 경로에서 클라이언트의 요청 잠금을 해제할 수 있도록 결과를 전달해요
+	auto SendResult = [this, RequestID](bool bSuccess)
+	{
+		ClientPlaceablePlacementResult(RequestID, bSuccess);
+	};
+
+	if (false == RequestID.IsValid() || false == IsValid(ItemData) ||
+		false == SourceInstanceID.IsValid() || nullptr == ItemData->PlaceableActorClass)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ServerPlacePlaceable] : 유효하지 않은 요청 데이터입니다."));
+		SendResult(false);
+		return;
+	}
+
+	UBuildingPartDefinition* Definition = ItemData->BuildingPart.LoadSynchronous();
+
+	if (false == IsValid(Definition) || false == IsValid(Definition->PartMesh) ||
+		Definition->PlacementType != EBuildingPlacementType::TERRAIN ||
+		Definition->PartType != EBuildingPartType::DEPLOYABLE)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ServerPlacePlaceable] : Placeable 배치 데이터 설정이 올바르지 않습니다. Item=%s"),
+			*GetNameSafe(ItemData));
+		SendResult(false);
+		return;
+	}
+
+	if (InPlacementTransform.ContainsNaN())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ServerPlacePlaceable] : 유효하지 않은 Transform입니다."));
+		SendResult(false);
+		return;
+	}
+
+	if (false == IsWithinServerPlacementDistance(InPlacementTransform.GetLocation()))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ServerPlacePlaceable] : 허용 설치 거리를 벗어났습니다."));
+		SendResult(false);
+		return;
+	}
+
+	APlayerController* OwnerController = Cast<APlayerController>(GetOwner());
+	AActionCharacter* OwnerCharacter = true == IsValid(OwnerController) ? Cast<AActionCharacter>(OwnerController->GetPawn()): nullptr;
+	UInventoryComponent* Inventory = true == IsValid(OwnerCharacter) ? OwnerCharacter->GetInventoryComponent(): nullptr;
+
+	if (false == IsValid(Inventory))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ServerPlacePlaceable] : 플레이어 인벤토리를 찾을 수 없습니다."));
+		SendResult(false);
+		return;
+	}
+
+	// 서버가 요청 위치 아래의 실제 자연 지형을 다시 탐색해요
+	FHitResult GroundHit;
+	if (false == FindSupportingGround(Definition, InPlacementTransform.GetLocation(), GroundHit))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ServerPlacePlaceable] : 설치 위치를 지지하는 지형이 없습니다."));
+		SendResult(false);
+		return;
+	}
+
+	if (false == IsBuildableSurface(Definition, GroundHit.GetComponent()))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ServerPlacePlaceable] : BuildableGround가 아닌 표면입니다."));
+		SendResult(false);
+		return;
+	}
+
+	if (false == IsGroundSlopeValid(Definition, GroundHit.ImpactNormal))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ServerPlacePlaceable] : 허용되지 않는 지면 경사입니다."));
+		SendResult(false);
+		return;
+	}
+
+	FQuat SafeRotation = InPlacementTransform.GetRotation();
+	SafeRotation.Normalize();
+
+	// Placeable의 Up 방향이 서버에서 확인한 지면 노멀을 따르는지 검사해요
+	const float SurfaceAlignment = FVector::DotProduct(SafeRotation.GetUpVector(), GroundHit.ImpactNormal.GetSafeNormal());
+
+	if (SurfaceAlignment < 0.98f)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ServerPlacePlaceable] : 요청한 회전이 지면 경사를 따르지 않습니다."));
+		SendResult(false);
+		return;
+	}
+
+	// 위치는 서버가 확인한 지면 충돌 지점으로 보정하고 클라이언트 Scale은 사용하지 않아요
+	const FTransform SafePlacementTransform(SafeRotation, GroundHit.ImpactPoint, FVector::OneVector);
+
+	// 지형 자체는 의도적으로 맞닿으므로 겹침 검사 대상에서 제외해요
+	if (true == HasServerPlacementOverlap(Definition, SafePlacementTransform, GroundHit.GetComponent()))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ServerPlacePlaceable] : 장애물과 겹치는 위치입니다."));
+		SendResult(false);
+		return;
+	}
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Owner = OwnerController;
+	SpawnParameters.Instigator = OwnerCharacter;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	APlaceableItemBase* NewPlaceable = GetWorld()->SpawnActor<APlaceableItemBase>
+		(ItemData->PlaceableActorClass, SafePlacementTransform, SpawnParameters);
+
+	if (false == IsValid(NewPlaceable))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ServerPlacePlaceable] : Placeable 액터 생성에 실패했습니다."));
+		SendResult(false);
+		return;
+	}
+
+	NewPlaceable->InitializePlaceable(ItemData);
+
+	// 설치를 시작했던 정확한 슬롯의 동일 인스턴스만 소비해요
+	if (false == Inventory->ConsumeItemInstance(SourceSlot, SourceInstanceID, ItemData))
+	{
+		// 소비 실패 시 아이템 없이 설치 결과물만 남지 않도록 생성한 액터를 되돌려요
+		NewPlaceable->Destroy();
+
+		UE_LOG(LogTemp, Warning, TEXT("[ServerPlacePlaceable] : 원본 아이템 검증 또는 소비에 실패했습니다."));
+		SendResult(false);
+		return;
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("[ServerPlacePlaceable] : Placeable 설치 완료. Item=%s, Location=%s"),
+		*GetNameSafe(ItemData),
+		*SafePlacementTransform.GetLocation().ToString());
+
+	SendResult(true);
+}
+
+void UBuildingPlacementComponent::ClientPlaceablePlacementResult_Implementation(FGuid RequestID, bool bSuccess)
+{
+	// 이미 취소됐거나 다른 설치 요청으로 전환됐다면 이전 서버 응답을 무시해요
+	if (RequestID != PendingPlaceablePlacementRequestID) return;
+
+	bPlaceablePlacementRequestPending = false;
+	PendingPlaceablePlacementRequestID.Invalidate();
+
+	// Placeable은 1개 설치 후 배치 모드를 종료해요
+	// 왜냐면 Placeable 아이템은 MaxStackSize가 1임
+	if (true == bSuccess)
+		StopPlacement();
 }
 
 void UBuildingPlacementComponent::UpdateFoundationPreview(APlayerController* PlayerController)

@@ -54,6 +54,8 @@ public:
 	// 키를 누를 때 마다 프리뷰 상태에서 데이터에 의해 파츠 회전을 진행하는 함수 
 	void RotateBuildingPart();
 
+	bool IsPlacing() const { return bIsPlacing; }
+
 protected:
 	// 클라이언트가 서버에 새로운 건축물 생성을 요청
 	UFUNCTION(Server, Reliable)
@@ -63,6 +65,15 @@ protected:
 	UFUNCTION(Server, Reliable)
 	void ServerPlaceSnappedPart(UBuildingPartDefinition* Definition, 
 		class ABuildingActor* TargetBuilding, FGuid TargetPartID, FName SocketName, int32 SnapYawwOffsetIdx);
+
+	// Placeable 아이템의 실제 설치를 서버에 요청
+	UFUNCTION(Server, Reliable)
+	void ServerPlacePlaceable(FGuid RequestID, class UPlaceableItemData* ItemData,
+		FInventorySlotRef SourceSlot, FGuid SourceInstanceID, const FTransform& InPlacementTransform);
+
+	// 서버의 Placeable 설치 결과를 요청한 클라이언트에 전달
+	UFUNCTION(Client, Reliable)
+	void ClientPlaceablePlacementResult(FGuid RequestID, bool bSuccess);
 
 	// Foundation Type의 지면 배치 프리뷰를 갱신
 	void UpdateFoundationPreview(APlayerController* PlayerController);
@@ -179,6 +190,10 @@ protected:
 
 	FGuid PlaceableSourceInstanceID; // 슬롯 아이템이 배치를 시작할 동일 인스턴스인지 확인하기 위한 고유 ID
 
+	bool bPlaceablePlacementRequestPending = false; // Placeable 설치 요청 처리 중 좌클릭 연타를 방지해요
+
+	FGuid PendingPlaceablePlacementRequestID; // 서버 응답이 현재 설치 요청에 대한 것인지 구분하기 위한 고유 ID
+
 	// 현재 프리뷰가 설치 불가라면 그 이유를 저장하는 변수
 	UPROPERTY(Transient)
 	EBuildingPlacementInvalidReason CurrentInvalidReason = EBuildingPlacementInvalidReason::InvalidLocation;
@@ -191,6 +206,7 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Building|Snapping", meta = (ClampMin = "0.0"))
 	float SnapPointSearchRadius = 200.f; // 조준 위치에서 이 거리 안에 있는 소켓만 후보로 사용
+
 
 	UPROPERTY(Transient)
 	TWeakObjectPtr<class ABuildingActor> CurrentSnapBuilding; // 현재 프리뷰가 붙어 있는 BuildingActor
