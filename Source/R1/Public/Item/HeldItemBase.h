@@ -1,4 +1,4 @@
-﻿/// 최초작성 : 2026.08.30
+/// 최초작성 : 2026.08.30
 /// 작 성 자 : 주 형 진
 
 // Fill out your copyright notice in the Description page of Project Settings.
@@ -10,11 +10,13 @@
 #include "HeldItemBase.generated.h"
 
 class AActionCharacter;
+class UHeldItemData;
+class UStaticMeshComponent;
 
 /**
  * 손에 들 수 있는 모든 도구, 근접 무기, 특수 장비의 공통 부모 액터 추상 클래스
  */
-UCLASS(Abstract)
+UCLASS()
 class R1_API AHeldItemBase : public AActor
 {
 	GENERATED_BODY()
@@ -28,12 +30,15 @@ public:
 	virtual void OnEquipped(AActionCharacter* InCharacter);
 	virtual void OnUnequipped();
 
+	// 데이터 에셋의 메시 세팅
+	virtual void InitItemVisual(UHeldItemData* InItemData);
+
 	// 좌클릭 액션 (주 액션: 공격, 휘두르기, 캐스팅 등)
-	virtual void OnPrimaryActionStarted() {}
+	virtual void OnPrimaryActionStarted();
 	virtual void OnPrimaryActionCompleted() {}
 
 	// 우클릭 액션 (보조 액션: 조준, 가드, 투척 준비 등)
-	virtual void OnSecondaryActionStarted() {}
+	virtual void OnSecondaryActionStarted();
 	virtual void OnSecondaryActionCompleted() {}
 
 	// 액션 취소 (ESC, 점프 등)
@@ -53,14 +58,46 @@ public:
 	UFUNCTION(BlueprintPure, Category = "HeldItem")
 	AActionCharacter* GetOwnerCharacter() const { return OwnerCharacter; }
 
+	// 메시 컴포넌트 접근자
+	UFUNCTION(BlueprintPure, Category = "HeldItem")
+	FORCEINLINE UStaticMeshComponent* GetItemMesh1P() const { return ItemMesh1P; }
+
+	UFUNCTION(BlueprintPure, Category = "HeldItem")
+	FORCEINLINE UStaticMeshComponent* GetItemMesh3P() const { return ItemMesh3P; }
+
+	// 아이템 데이터 접근자
+	UFUNCTION(BlueprintPure, Category = "HeldItem")
+	FORCEINLINE UHeldItemData* GetItemData() const { return ItemData; }
+
+protected:
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UFUNCTION()
+	virtual void OnRep_ItemData();
+
+	UFUNCTION(Server, Reliable)
+	void Server_PlayPrimaryActionMontage();
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_PlayPrimaryActionMontage();
+
+	UFUNCTION(Server, Reliable)
+	void Server_PlaySecondaryActionMontage();
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_PlaySecondaryActionMontage();
+
 protected:
 	UPROPERTY(BlueprintReadOnly, Category = "HeldItem")
 	TObjectPtr<AActionCharacter> OwnerCharacter;
 
-	UPROPERTY(BlueprintReadOnly, Category = "HeldItem|ItemMesh")
-	TObjectPtr< USkeletalMeshComponent> ItemMesh1P;
+	UPROPERTY(ReplicatedUsing = OnRep_ItemData, BlueprintReadOnly, Category = "HeldItem")
+	TObjectPtr<UHeldItemData> ItemData;
 
-	UPROPERTY(BlueprintReadOnly, Category = "HeldItem|ItemMesh")
-	TObjectPtr< USkeletalMeshComponent> ItemMesh3P;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HeldItem|ItemMesh")
+	TObjectPtr<UStaticMeshComponent> ItemMesh1P;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HeldItem|ItemMesh")
+	TObjectPtr<UStaticMeshComponent> ItemMesh3P;
 
 };

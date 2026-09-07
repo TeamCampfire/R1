@@ -1,13 +1,17 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Component/InventoryComponent.h"
 #include "Data/Item/ItemDataBase.h"
 #include "Data/Item/EquipmentItemData.h"
 #include "Data/Item/HeldItemData.h"
+#include "Data/Item/ConsumableItemData.h"
 #include "Item/ItemPickup.h"
 #include "GameFramework/Character.h"
 #include "Component/HeldItemComponent.h"
+#include "Component/StatComponent.h"
+#include "Component/WarehouseInventoryComponent.h"
+#include "Character/ActionCharacter.h"
 #include "Net/UnrealNetwork.h"   // DOREPLIFETIME 계열 매크로가 여기 정의돼 있음
 
 // Sets default values for this component's properties
@@ -123,6 +127,20 @@ void UInventoryComponent::SetSlot(EInventorySlotCategory Category, int32 Index, 
 	if (!Array.IsValidIndex(Index))
 	{
 		return;
+	}
+
+	// 손에 들고 있는 벨트 슬롯(HeldBeltIndex)의 아이템 종류가 이번 변경으로 바뀌면(다른 슬롯으로
+	// 옮겨져 비워지거나, 다른 아이템으로 교체됨) 인벤토리 데이터와 캐릭터가 실제로 들고 있는 손
+	// 아이템이 어긋나지 않도록 먼저 장착을 해제한다. 같은 아이템의 수량만 바뀌는 경우는 계속
+	// 들고 있어야 하므로 제외한다. SetSlot이 모든 슬롯 변경의 단일 관문이라 여기 한 곳에서만
+	// 처리하면 TransferItem/DropItem 등 어떤 경로로 벨트 슬롯이 바뀌든 빠짐없이 커버된다.
+	if (Category == EInventorySlotCategory::Belt && Index == HeldBeltIndex && Array[Index].ItemData != NewValue.ItemData)
+	{
+		HeldBeltIndex = INDEX_NONE;
+		if (UHeldItemComponent* HeldItemComp = GetOwner()->FindComponentByClass<UHeldItemComponent>())
+		{
+			HeldItemComp->UnequipHeldItem();
+		}
 	}
 
 	Array[Index] = NewValue;
@@ -387,6 +405,18 @@ void UInventoryComponent::UseBeltSlot(int32 BeltIndex)
 
 		case EItemCategory::HeldItem:
 		{
+			// 이미 이 슬롯의 아이템을 들고 있는 경우 -> 손에서 내리기 (토글)
+			if (HeldBeltIndex == BeltIndex)
+			{
+				HeldBeltIndex = INDEX_NONE;
+				if (UHeldItemComponent* HeldItemComp = GetOwner() ? GetOwner()->FindComponentByClass<UHeldItemComponent>() : nullptr)
+				{
+					HeldItemComp->UnequipHeldItem();
+				}
+				OnInventoryChanged.Broadcast();
+				break;
+			}
+
 			// 1. 현재 선택된 벨트 슬롯 갱신
 			HeldBeltIndex = BeltIndex;
 			// 2. HeldItemComponent를 찾아 도구 장착 실행
@@ -398,16 +428,13 @@ void UInventoryComponent::UseBeltSlot(int32 BeltIndex)
 				}
 			}
 			OnInventoryChanged.Broadcast();
-
-			/// 헬드 컴포넌트에 아이템 장착
-
 			break;
 		}
 
 		case EItemCategory::Consumable:
 		{
-			// TODO(UseItem 세부 구현): 실제 효과(Heal/RestoreHunger/RestoreThirst 등) 적용은
-			// StatComponent 연동 작업에서 처리. 지금은 수량 차감만 담당한다.
+			ApplyConsumableEffects(Cast<UConsumableItemData>(Instance.ItemData));
+
 			const int32 Remaining = Instance.StackCount - 1;
 			SetSlot(EInventorySlotCategory::Belt, BeltIndex, Remaining > 0 ? FItemInstance(Instance.ItemData, Remaining) : FItemInstance());
 			break;
@@ -443,11 +470,35 @@ bool UInventoryComponent::UseSelectedItem(const FInventorySlotRef& SlotRef)
 		return false;
 	}
 
-	// TODO(효과 적용): 실제 효과(Heal/RestoreHunger/RestoreThirst 등) 적용은 StatComponent 연동 후 처리.
-	// 지금은 UseBeltSlot의 Consumable 분기와 동일하게 수량 차감만 담당한다.
+	ApplyConsumableEffects(Cast<UConsumableItemData>(Instance.ItemData));
+
 	const int32 Remaining = Instance.StackCount - 1;
 	SetSlot(SlotRef.Category, SlotRef.Index, Remaining > 0 ? FItemInstance(Instance.ItemData, Remaining) : FItemInstance());
 	return true;
+}
+
+void UInventoryComponent::ApplyConsumableEffects(const UConsumableItemData* ConsumableData)
+{
+	if (!ConsumableData)
+	{
+		return;
+	}
+
+	// FindComponentByClass<UStatComponent>()를 쓰면 안 된다 — BP_PlayerV3의 상속 컴포넌트
+	// 템플릿 문제로 실제 게임에 쓰이는 것과 다른(InitializeStat을 거치지 않은) StatComponent
+	// 인스턴스를 찾아오는 게 확인됐다. 코드베이스 전역에서 StatComponent는 항상
+	// AActionCharacter::GetStatComponent()(멤버 포인터 접근자)로만 얻는다 — 그 관례를 따른다.
+	AActionCharacter* OwningCharacter = Cast<AActionCharacter>(GetOwner());
+	UStatComponent* StatComp = OwningCharacter ? OwningCharacter->GetStatComponent() : nullptr;
+	if (!StatComp)
+	{
+		return;
+	}
+
+	for (const FItemEffect& Effect : ConsumableData->Effects)
+	{
+		StatComp->ApplyItemEffect(Effect);
+	}
 }
 
 bool UInventoryComponent::Server_UseSelectedItem_Validate(FInventorySlotRef SlotRef)
@@ -490,13 +541,8 @@ bool UInventoryComponent::DropItem(FInventorySlotRef Slot, int32 Count, const FT
 	}
 
 	const int32 Remaining = Instance.StackCount - DropCount;
+	// 손에 들고 있던 벨트 슬롯을 통째로 드랍해 비우는 경우의 장착 해제는 SetSlot이 처리한다.
 	SetSlot(Slot.Category, Slot.Index, Remaining > 0 ? FItemInstance(Instance.ItemData, Remaining) : FItemInstance());
-
-	// 손에 들고 있던 벨트 슬롯을 통째로 드랍한 경우 손을 비운다.
-	if (Remaining <= 0 && Slot.Category == EInventorySlotCategory::Belt && HeldBeltIndex == Slot.Index)
-	{
-		HeldBeltIndex = INDEX_NONE;
-	}
 
 	return true;
 }
@@ -632,6 +678,220 @@ bool UInventoryComponent::ConsumeItemCount(const UItemDataBase* ItemData, int32 
 
 	RemoveFrom(EInventorySlotCategory::Main);
 	RemoveFrom(EInventorySlotCategory::Belt);
+	return true;
+}
+
+void UInventoryComponent::SetSlotItem(const FInventorySlotRef& SlotRef, const FItemInstance& NewValue)
+{
+	SetSlot(SlotRef.Category, SlotRef.Index, NewValue);
+}
+
+bool UInventoryComponent::TransferWithWarehouse(UWarehouseInventoryComponent* Warehouse, FInventorySlotRef PlayerSlot, int32 WarehouseSlotIndex, int32 Count, bool bToWarehouse)
+{
+	if (!Warehouse || !Warehouse->StorageSlots.IsValidIndex(WarehouseSlotIndex))
+	{
+		return false;
+	}
+
+	TArray<FItemInstance>& PlayerArray = GetSlotArray(PlayerSlot.Category);
+	if (!PlayerArray.IsValidIndex(PlayerSlot.Index))
+	{
+		return false;
+	}
+
+	const FItemInstance& PlayerInstance = PlayerArray[PlayerSlot.Index];
+	const FItemInstance& WarehouseInstance = Warehouse->StorageSlots[WarehouseSlotIndex];
+
+	// bToWarehouse 방향에 따라 Source/Target을 정하면, 아래 이동/병합/교환 로직은
+	// TransferItem과 동일한 모양으로 방향에 무관하게 처리할 수 있다.
+	const FItemInstance SourceInstance = bToWarehouse ? PlayerInstance : WarehouseInstance;
+	const FItemInstance TargetInstance = bToWarehouse ? WarehouseInstance : PlayerInstance;
+
+	if (!SourceInstance.IsValid())
+	{
+		return false;
+	}
+
+	const int32 MoveCount = (Count > 0) ? FMath::Min(Count, SourceInstance.StackCount) : SourceInstance.StackCount;
+
+	FItemInstance NewSource;
+	FItemInstance NewTarget;
+
+	if (!TargetInstance.IsValid())
+	{
+		// 대상이 비어있음 → 그냥 이동.
+		NewTarget = SourceInstance;
+		NewTarget.StackCount = MoveCount;
+
+		const int32 Remaining = SourceInstance.StackCount - MoveCount;
+		NewSource = Remaining > 0 ? FItemInstance(SourceInstance.ItemData, Remaining) : FItemInstance();
+	}
+	else if (TargetInstance.ItemData == SourceInstance.ItemData && TargetInstance.StackCount < TargetInstance.ItemData->MaxStackSize)
+	{
+		// 같은 아이템 + 여유 있음 → 병합.
+		const int32 SpaceInTarget = TargetInstance.ItemData->MaxStackSize - TargetInstance.StackCount;
+		const int32 AmountToMerge = FMath::Min(SpaceInTarget, MoveCount);
+
+		NewTarget = TargetInstance;
+		NewTarget.StackCount += AmountToMerge;
+
+		const int32 Remaining = SourceInstance.StackCount - AmountToMerge;
+		NewSource = Remaining > 0 ? FItemInstance(SourceInstance.ItemData, Remaining) : FItemInstance();
+	}
+	else
+	{
+		// 다른 아이템 → 자리 교환.
+		NewTarget = SourceInstance;
+		NewSource = TargetInstance;
+	}
+
+	if (bToWarehouse)
+	{
+		SetSlotItem(PlayerSlot, NewSource);
+		Warehouse->SetSlotItem(WarehouseSlotIndex, NewTarget);
+	}
+	else
+	{
+		Warehouse->SetSlotItem(WarehouseSlotIndex, NewSource);
+		SetSlotItem(PlayerSlot, NewTarget);
+	}
+
+	return true;
+}
+
+bool UInventoryComponent::Server_TransferWithWarehouse_Validate(UWarehouseInventoryComponent* Warehouse, FInventorySlotRef PlayerSlot, int32 WarehouseSlotIndex, int32 Count, bool bToWarehouse)
+{
+	if (!Warehouse)
+	{
+		return false;
+	}
+
+	// 남의(창고) 컴포넌트를 건드리는 함수라 거리 검증을 반드시 둔다 — 기존 Server_TransferItem류의
+	// _Validate는 자기 자신의 슬롯만 다루므로 비어있어도 큰 문제가 없었지만, 이 함수는 원거리에서
+	// 악의적으로 창고 슬롯을 조작하는 걸 막아야 한다.
+	const AActor* PlayerOwner = GetOwner();
+	const AActor* WarehouseOwner = Warehouse->GetOwner();
+	if (!PlayerOwner || !WarehouseOwner)
+	{
+		return false;
+	}
+
+	const float DistSq = FVector::DistSquared(PlayerOwner->GetActorLocation(), WarehouseOwner->GetActorLocation());
+	return DistSq <= FMath::Square(Warehouse->MaxInteractDistance);
+}
+
+void UInventoryComponent::Server_TransferWithWarehouse_Implementation(UWarehouseInventoryComponent* Warehouse, FInventorySlotRef PlayerSlot, int32 WarehouseSlotIndex, int32 Count, bool bToWarehouse)
+{
+	TransferWithWarehouse(Warehouse, PlayerSlot, WarehouseSlotIndex, Count, bToWarehouse);
+}
+
+bool UInventoryComponent::TransferWithinWarehouse(UWarehouseInventoryComponent* Warehouse, int32 FromIndex, int32 ToIndex, int32 Count, bool bAutoHalfSplitIfTargetEmpty)
+{
+	if (!Warehouse || FromIndex == ToIndex)
+	{
+		return false;
+	}
+
+	if (!Warehouse->StorageSlots.IsValidIndex(FromIndex) || !Warehouse->StorageSlots.IsValidIndex(ToIndex))
+	{
+		return false;
+	}
+
+	const FItemInstance SourceInstance = Warehouse->StorageSlots[FromIndex];
+	const FItemInstance TargetInstance = Warehouse->StorageSlots[ToIndex];
+	if (!SourceInstance.IsValid())
+	{
+		return false;
+	}
+
+	const int32 MoveCount = (Count > 0) ? FMath::Min(Count, SourceInstance.StackCount) : SourceInstance.StackCount;
+
+	// 대상이 비어있음 → 그냥 이동(휠클릭 드래그로 빈 슬롯에 놓았고 Count 미지정이면 절반만).
+	if (!TargetInstance.IsValid())
+	{
+		const int32 ActualMoveCount = (bAutoHalfSplitIfTargetEmpty && Count <= 0 && SourceInstance.StackCount >= 2)
+			? (SourceInstance.StackCount / 2)
+			: MoveCount;
+
+		FItemInstance Moved = SourceInstance;
+		Moved.StackCount = ActualMoveCount;
+		Warehouse->SetSlotItem(ToIndex, Moved);
+
+		const int32 Remaining = SourceInstance.StackCount - ActualMoveCount;
+		Warehouse->SetSlotItem(FromIndex, Remaining > 0 ? FItemInstance(SourceInstance.ItemData, Remaining) : FItemInstance());
+
+		return true;
+	}
+
+	// 대상에 같은 아이템이 있고 여유가 있으면 병합.
+	if (TargetInstance.ItemData == SourceInstance.ItemData && TargetInstance.StackCount < TargetInstance.ItemData->MaxStackSize)
+	{
+		const int32 SpaceInTarget = TargetInstance.ItemData->MaxStackSize - TargetInstance.StackCount;
+		const int32 AmountToMerge = FMath::Min(SpaceInTarget, MoveCount);
+
+		FItemInstance MergedTarget = TargetInstance;
+		MergedTarget.StackCount += AmountToMerge;
+		Warehouse->SetSlotItem(ToIndex, MergedTarget);
+
+		const int32 Remaining = SourceInstance.StackCount - AmountToMerge;
+		Warehouse->SetSlotItem(FromIndex, Remaining > 0 ? FItemInstance(SourceInstance.ItemData, Remaining) : FItemInstance());
+
+		return true;
+	}
+
+	// 대상에 다른 아이템 → 자리 교환.
+	Warehouse->SetSlotItem(ToIndex, SourceInstance);
+	Warehouse->SetSlotItem(FromIndex, TargetInstance);
+
+	return true;
+}
+
+bool UInventoryComponent::Server_TransferWithinWarehouse_Validate(UWarehouseInventoryComponent* Warehouse, int32 FromIndex, int32 ToIndex, int32 Count, bool bAutoHalfSplitIfTargetEmpty)
+{
+	if (!Warehouse)
+	{
+		return false;
+	}
+
+	// Server_TransferWithWarehouse_Validate와 동일한 이유로 거리 검증을 둔다 — 남의(창고)
+	// 컴포넌트를 건드리는 함수라 원거리에서 악의적으로 조작하는 걸 막아야 한다.
+	const AActor* PlayerOwner = GetOwner();
+	const AActor* WarehouseOwner = Warehouse->GetOwner();
+	if (!PlayerOwner || !WarehouseOwner)
+	{
+		return false;
+	}
+
+	const float DistSq = FVector::DistSquared(PlayerOwner->GetActorLocation(), WarehouseOwner->GetActorLocation());
+	return DistSq <= FMath::Square(Warehouse->MaxInteractDistance);
+}
+
+void UInventoryComponent::Server_TransferWithinWarehouse_Implementation(UWarehouseInventoryComponent* Warehouse, int32 FromIndex, int32 ToIndex, int32 Count, bool bAutoHalfSplitIfTargetEmpty)
+{
+	TransferWithinWarehouse(Warehouse, FromIndex, ToIndex, Count, bAutoHalfSplitIfTargetEmpty);
+}
+
+bool UInventoryComponent::ConsumeItemInstance(const FInventorySlotRef& SlotRef, const FGuid& ExpectedInstanceID, const UItemDataBase* ExpectedItemData)
+{
+	if (false == ExpectedInstanceID.IsValid() || false == IsValid(ExpectedItemData)) return false;
+
+	// 유효한지 확인
+	TArray<FItemInstance>& SlotArray = GetSlotArray(SlotRef.Category);
+	if (false == SlotArray.IsValidIndex(SlotRef.Index)) return false;
+
+	const FItemInstance& Instance = SlotArray[SlotRef.Index];
+	if (false == Instance.IsValid()) return false;
+
+	// 인스턴스 ID, 아이템 데이터 형식이 맞지 않으면 소비 안 함
+	if (ExpectedInstanceID != Instance.InstanceID) return false;
+	if (ExpectedItemData != Instance.ItemData) return false;
+
+	FItemInstance UpdatedInstance = Instance;
+	--UpdatedInstance.StackCount; // 수량 하나 차감
+
+	SetSlot(SlotRef.Category, SlotRef.Index,
+		UpdatedInstance.StackCount > 0 ? UpdatedInstance : FItemInstance());
+
 	return true;
 }
 

@@ -4,6 +4,7 @@
 #include "Widget/Inventory/DetailInfoWidget.h"
 #include "Blueprint/WidgetTree.h"
 #include "Widget/Inventory/InventoryDragDropOperation.h"
+#include "Component/WarehouseInventoryComponent.h"
 #include "Components/Widget.h"
 #include "Components/TextBlock.h"
 #include "Components/Image.h"
@@ -47,6 +48,7 @@ void UDetailInfoWidget::NativeOnInitialized()
 void UDetailInfoWidget::NativeDestruct()
 {
 	UnbindInventoryDelegates();
+	UnbindWarehouse();
 
 	if (AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer()))
 	{
@@ -54,6 +56,38 @@ void UDetailInfoWidget::NativeDestruct()
 	}
 
 	Super::NativeDestruct();
+}
+
+void UDetailInfoWidget::BindWarehouse(UWarehouseInventoryComponent* Warehouse)
+{
+	UnbindWarehouse();
+
+	BoundWarehouse = Warehouse;
+
+	if (Warehouse)
+	{
+		Warehouse->OnInventoryChanged.AddDynamic(this, &UDetailInfoWidget::HandleWarehouseChanged);
+		Warehouse->OnSelectionChanged.AddDynamic(this, &UDetailInfoWidget::HandleWarehouseChanged);
+	}
+
+	RefreshDisplay();
+}
+
+void UDetailInfoWidget::UnbindWarehouse()
+{
+	if (UWarehouseInventoryComponent* Warehouse = BoundWarehouse.Get())
+	{
+		Warehouse->OnInventoryChanged.RemoveDynamic(this, &UDetailInfoWidget::HandleWarehouseChanged);
+		Warehouse->OnSelectionChanged.RemoveDynamic(this, &UDetailInfoWidget::HandleWarehouseChanged);
+	}
+
+	BoundWarehouse = nullptr;
+	RefreshDisplay();
+}
+
+void UDetailInfoWidget::HandleWarehouseChanged()
+{
+	RefreshDisplay();
 }
 
 void UDetailInfoWidget::UnbindInventoryDelegates()
@@ -90,8 +124,15 @@ void UDetailInfoWidget::HandleInventoryChanged()
 
 void UDetailInfoWidget::RefreshDisplay()
 {
+	// 창고 쪽 선택이 있으면 그걸 우선 보여준다 — UWarehouseWidget::HandlePlayerSlotClicked가
+	// 플레이어 슬롯을 클릭할 때마다 창고 선택을 지워주므로, 실제로는 둘 중 하나만 선택된 상태다.
+	UWarehouseInventoryComponent* Warehouse = BoundWarehouse.Get();
 	UInventoryComponent* Inventory = BoundInventory.Get();
-	const FItemInstance Selected = Inventory ? Inventory->GetSelectedItemInstance() : FItemInstance();
+
+	const bool bShowingWarehouseItem = Warehouse && Warehouse->bHasSelection;
+	const FItemInstance Selected = bShowingWarehouseItem
+		? Warehouse->GetSelectedItemInstance()
+		: (Inventory ? Inventory->GetSelectedItemInstance() : FItemInstance());
 
 	if (RootPanel)
 	{
@@ -119,7 +160,10 @@ void UDetailInfoWidget::RefreshDisplay()
 	{
 		if (UTexture2D* LoadedIcon = ItemData->Icon.LoadSynchronous())
 		{
-			IconImage->SetBrushFromTexture(LoadedIcon);
+			// bMatchSize=true — SizeBox_1의 슬롯 정렬을 Center로 바꿔 늘어나지 않게 했으므로,
+			// 브러시의 ImageSize도 실제 텍스처 해상도를 반영해야 "원본 크기"로 보인다
+			// (false로 두면 WBP 디자이너의 placeholder 크기가 그대로 남는다).
+			IconImage->SetBrushFromTexture(LoadedIcon, true);
 			IconImage->SetVisibility(ESlateVisibility::Visible);
 		}
 		else
@@ -146,7 +190,9 @@ void UDetailInfoWidget::RefreshDisplay()
 	}
 
 	// 분할 가능 = 스택형 아이템(MaxStackSize > 1)이고 현재 2개 이상 들고 있을 때만.
-	const bool bCanSplit = (ItemData->MaxStackSize > 1) && (Selected.StackCount > 1);
+	// 창고 아이템은 분할 드래그 대상이 아니다(NativeOnDragDetected가 SelectedSlotRef 기준으로
+	// 플레이어 인벤토리에서만 꺼내오므로) — 항상 숨긴다.
+	const bool bCanSplit = !bShowingWarehouseItem && (ItemData->MaxStackSize > 1) && (Selected.StackCount > 1);
 	if (SplitPanel)
 	{
 		SplitPanel->SetVisibility(bCanSplit ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
@@ -166,7 +212,7 @@ void UDetailInfoWidget::RefreshDisplay()
 	}
 
 	RebuildInfoRows(Selected);
-	RebuildActionButtons(Selected);
+	RebuildActionButtons(Selected, bShowingWarehouseItem);
 }
 
 void UDetailInfoWidget::RebuildInfoRows(const FItemInstance& Selected)
@@ -191,6 +237,32 @@ void UDetailInfoWidget::RebuildInfoRows(const FItemInstance& Selected)
 		{
 			AddStatTextRow(Modifier.StatType, Modifier.Value);
 		}
+
+		// Damage/OreGathering/WoodGathering/FleshGathering은 StatModifiers 배열이 아니라
+		// UHeldItemData의 전용 필드라 EEquipmentStatType으로 표현할 수 없다 — 요청된 고정
+		// 순서대로 나열하되, 0은 "이 도구에는 해당 없음"을 뜻하므로(헤더 주석 참고) 건너뛴다.
+		if (HeldData->Damage != 0.f)
+		{
+			AddNamedStatRow(NSLOCTEXT("DetailInfoWidget", "StatDamage", "Damage"), HeldData->Damage);
+		}
+		if (HeldData->OreGathering != 0.f)
+		{
+			AddNamedStatRow(NSLOCTEXT("DetailInfoWidget", "StatOreGathering", "Ore Gathering"), HeldData->OreGathering);
+		}
+		if (HeldData->WoodGathering != 0.f)
+		{
+			AddNamedStatRow(NSLOCTEXT("DetailInfoWidget", "StatWoodGathering", "Wood Gathering"), HeldData->WoodGathering);
+		}
+		if (HeldData->FleshGathering != 0.f)
+		{
+			AddNamedStatRow(NSLOCTEXT("DetailInfoWidget", "StatFleshGathering", "Flesh Gathering"), HeldData->FleshGathering);
+		}
+		/// 최대 내구도는 포함 확정시 주석 해제
+		//if (HeldData->MaxDurability != 0.f)
+		//{
+		//	AddNamedStatRow(NSLOCTEXT("DetailInfoWidget", "MaxDurability", "Max Durability"), HeldData->MaxDurability);
+		//}
+		
 	}
 	else if (const UConsumableItemData* ConsumableData = Cast<UConsumableItemData>(Selected.ItemData))
 	{
@@ -203,6 +275,12 @@ void UDetailInfoWidget::RebuildInfoRows(const FItemInstance& Selected)
 
 void UDetailInfoWidget::AddStatTextRow(EEquipmentStatType StatType, float Value)
 {
+	const FText StatLabel = StaticEnum<EEquipmentStatType>()->GetDisplayNameTextByValue(static_cast<int64>(StatType));
+	AddNamedStatRow(StatLabel, Value);
+}
+
+void UDetailInfoWidget::AddNamedStatRow(const FText& Label, float Value)
+{
 	if (!InfoRowsContainer)
 	{
 		return;
@@ -212,8 +290,7 @@ void UDetailInfoWidget::AddStatTextRow(EEquipmentStatType StatType, float Value)
 	// 구조가 제대로 안 그려지는 문제가 있어(원인 미확정) 포기하고, 소비 효과(AddEffectTextRow)와
 	// 동일한, 이미 검증된 텍스트 방식으로 통일했다.
 	UTextBlock* Row = WidgetTree->ConstructWidget<UTextBlock>();
-	const FText StatLabel = StaticEnum<EEquipmentStatType>()->GetDisplayNameTextByValue(static_cast<int64>(StatType));
-	Row->SetText(FText::Format(NSLOCTEXT("DetailInfoWidget", "StatRowFormat", "{0}: {1}"), StatLabel, FText::AsNumber(Value)));
+	Row->SetText(FText::Format(NSLOCTEXT("DetailInfoWidget", "StatRowFormat", "{0}: {1}"), Label, FText::AsNumber(Value)));
 
 	InfoRowsContainer->AddChild(Row);
 }
@@ -246,14 +323,21 @@ FLinearColor UDetailInfoWidget::GetEffectColor(EItemEffectType EffectType)
 	}
 }
 
-void UDetailInfoWidget::RebuildActionButtons(const FItemInstance& Selected)
+void UDetailInfoWidget::RebuildActionButtons(const FItemInstance& Selected, bool bIsWarehouseItem)
 {
 	// 버튼은 런타임에 만들지 않고 WBP에 미리 배치해둔 걸(UseButton 등) 카테고리에 따라
 	// 보이거나 숨기기만 한다 — 나중에 액션 버튼이 늘어나도 같은 방식으로 추가하면 된다.
 	if (UseButton)
 	{
-		const bool bIsConsumable = Selected.ItemData && Selected.ItemData->Category == EItemCategory::Consumable;
+		const bool bIsConsumable = !bIsWarehouseItem && Selected.ItemData && Selected.ItemData->Category == EItemCategory::Consumable;
 		UseButton->SetVisibility(bIsConsumable ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	}
+
+	// 버리기(ThrowItem)도 SelectedSlotRef 기준으로 플레이어 인벤토리에서만 동작하므로 창고
+	// 아이템을 보고 있을 때는 숨긴다.
+	if (DiscardButton)
+	{
+		DiscardButton->SetVisibility(bIsWarehouseItem ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
 	}
 }
 

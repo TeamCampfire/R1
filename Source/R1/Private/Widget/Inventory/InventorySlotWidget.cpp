@@ -26,7 +26,8 @@ void UInventorySlotWidget::EnsureGridSlots(
 	TFunctionRef<void(UInventorySlotWidget*)> OnSlotCreated,
 	TFunctionRef<bool(const FInventorySlotRef&)> IsSelectedFn,
 	TFunctionRef<bool(const FInventorySlotRef&)> IsHeldFn,
-	TArray<TObjectPtr<UInventorySlotWidget>>& OutWidgets)
+	TArray<TObjectPtr<UInventorySlotWidget>>& OutWidgets,
+	int32 ContainerId)
 {
 	if (!Container || !SlotWidgetClass || !OwningWidget)
 	{
@@ -48,6 +49,7 @@ void UInventorySlotWidget::EnsureGridSlots(
 			}
 
 			SlotWidget->SetSlotRef(FInventorySlotRef{ Category, i });
+			SlotWidget->SetContainerId(ContainerId);
 			OnSlotCreated(SlotWidget);
 
 			UPanelSlot* PanelSlot = Container->AddChild(SlotWidget);
@@ -241,6 +243,7 @@ void UInventorySlotWidget::NativeOnDragDetected(const FGeometry& InGeometry, con
 	DragOp->SourceSlotRef = SlotRef;
 	DragOp->DraggedItemData = CachedInstance.ItemData;
 	DragOp->SourceWidget = this;
+	DragOp->SourceContainerId = ContainerId;
 	DragOp->bAutoHalfSplitOnEmptyTarget = bPendingMiddleButtonDrag;
 	DragOp->Pivot = EDragPivot::CenterCenter;
 
@@ -287,12 +290,18 @@ bool UInventorySlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDrag
 	{
 		if (DragOp->SourceType == EItemDragSourceType::Campfire)
 		{
-			OnCampfireItemDropped.Broadcast(DragOp->SourceCampfire.Get(), DragOp->CampfireSourceSlot,
-				SlotRef, DragOp->Count, DragOp->bAutoHalfSplitOnEmptyTarget);
+			// 모닥불 -> 인벤토리
+			OnCampfireItemDropped.Broadcast(DragOp->SourceCampfire.Get(), DragOp->CampfireSourceSlot, SlotRef, DragOp->Count, DragOp->bAutoHalfSplitOnEmptyTarget);
+		}
+		else if (DragOp->SourceContainerId == ContainerId)
+		{
+			// 같은 컨테이너 내부 이동
+			OnSlotDropped.Broadcast(DragOp->SourceSlotRef, SlotRef, DragOp->Count, DragOp->bAutoHalfSplitOnEmptyTarget);
 		}
 		else
 		{
-			OnSlotDropped.Broadcast(DragOp->SourceSlotRef, SlotRef, DragOp->Count, DragOp->bAutoHalfSplitOnEmptyTarget);
+			// 창고<-> 플레이어 인벤토리 
+			OnSlotDroppedCross.Broadcast(DragOp->SourceContainerId, DragOp->SourceSlotRef, ContainerId, SlotRef, DragOp->Count);
 		}
 		return true;
 	}

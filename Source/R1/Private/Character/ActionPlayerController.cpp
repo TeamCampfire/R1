@@ -13,9 +13,12 @@
 #include "Framework/MainHUD.h"
 #include "Framework/GameMode/TestGameMode.h"
 #include "Widget/Multiplayer/MultiplayerMenuWidget.h"
+#include "Widget/MainHUDWidget.h"
 
 #include "BuildingSystem/Component/BuildingPlacementComponent.h"
 #include "Data/Building/BuildingPartDefinition.h"
+#include "Data/Item/PlaceableItemData.h"
+#include "Component/InventoryComponent.h"
 #include "Campfire/CampfireActor.h"
 #include "Campfire/CampfireComponent.h"
 #include "Component/InventoryComponent.h"
@@ -144,6 +147,10 @@ void AActionPlayerController::SetupInputComponent()
 	{
 		// Esc: 게임 메뉴 토글
 		EIC->BindAction(IA_GameMenuToggle, ETriggerEvent::Started, this, &AActionPlayerController::OnGameMenuTogglePressed);
+
+		// 인벤토리 토글 — 컨트롤러에 바인딩해서 어떤 폰을 조종 중이든(캐릭터든 나중의 탈것이든)
+		// 항상 눌리게 한다(IA_InventoryToggle 선언부 주석 참고).
+		EIC->BindAction(IA_InventoryToggle, ETriggerEvent::Started, this, &AActionPlayerController::OnInventoryTogglePressed);
 	}
 }
 
@@ -202,6 +209,30 @@ void AActionPlayerController::OnStopPlacement()
 		BuildingPlacementComponent->StopPlacement();
 }
 
+void AActionPlayerController::OnStartPlaceablePlacement(UPlaceableItemData* ItemData, const FInventorySlotRef& SourceSlot, const FGuid& SourceInstanceID)
+{
+	if (true == IsValid(BuildingPlacementComponent))
+		BuildingPlacementComponent->StartPlaceablePlacement(ItemData, SourceSlot, SourceInstanceID);
+}
+
+bool AActionPlayerController::TryCancelPlacement()
+{
+	if (false == IsValid(BuildingPlacementComponent) || false == BuildingPlacementComponent->IsPlacing())
+		return false;
+
+	BuildingPlacementComponent->StopPlacement();
+	return true;
+}
+
+bool AActionPlayerController::TryConfirmPlacement()
+{
+	if (false == IsValid(BuildingPlacementComponent) || false == BuildingPlacementComponent->IsPlacing())
+		return false;
+
+	BuildingPlacementComponent->ConfirmPlacement();
+	return true;
+}
+
 void AActionPlayerController::SetInventoryInputState(bool bOpen)
 {
 	ApplyUIInputState(bOpen);
@@ -217,6 +248,38 @@ void AActionPlayerController::SetGameMenuInputState(bool bOpen)
 	ApplyUIInputState(bOpen);
 }
 
+void AActionPlayerController::SetWarehouseInputState(bool bOpen)
+{
+	ApplyUIInputState(bOpen);
+}
+
+void AActionPlayerController::Client_OpenWarehouse_Implementation(UWarehouseInventoryComponent* Warehouse)
+{
+	if (!Warehouse)
+	{
+		return;
+	}
+
+	AMainHUD* HUD = GetHUD<AMainHUD>();
+	UMainHUDWidget* MainHudWidget = HUD ? HUD->GetMainHudWidget() : nullptr;
+	if (!MainHudWidget)
+	{
+		return;
+	}
+
+	// 같은 창고를 조준한 채 상호작용 키를 다시 누르면(닫기 버튼 없이) UI를 닫는다 — Interact
+	// 자체는 서버 권위라 서버는 클라이언트의 UI 상태를 모르므로, 열지/닫을지는 여기 클라이언트
+	// 쪽에서만 판단한다.
+	if (MainHudWidget->GetOpenWarehouse() == Warehouse)
+	{
+		MainHudWidget->CloseWarehousePanel();
+		return;
+	}
+
+	MainHudWidget->OpenWarehousePanel(Warehouse);
+	SetWarehouseInputState(true);
+}
+
 void AActionPlayerController::ApplyUIInputState(bool bOpen)
 {
 	FlushPressedKeys();	// UI 토글 순간 눌려있던 키가 계속 적용되는 것 방지
@@ -229,21 +292,10 @@ void AActionPlayerController::ApplyUIInputState(bool bOpen)
 
 	SetShowMouseCursor(bAnyPanelOpen);
 
-	if (UEnhancedInputLocalPlayerSubsystem* SubSystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
-	{
-		if (DefaultMappingContext)
-		{
-			if (bAnyPanelOpen)
-			{
-				// UI 패널이 하나라도 열려있는 동안엔 이동/시점/공격 등 게임플레이 입력을 완전히 끊는다.
-				SubSystem->RemoveMappingContext(DefaultMappingContext);
-			}
-			else
-			{
-				SubSystem->AddMappingContext(DefaultMappingContext, GameInputPriority);
-			}
-		}
-	}
+	// DefaultMappingContext는 UI가 열려도 더 이상 통째로 빼지 않는다 — WASD 이동
+	// (AActionCharacter::OnMoveAction)은 UI가 열려있는 동안에도 계속 받아야 하기 때문이다.
+	// 시야 회전/점프/스프린트/크라우치/공격/보조 액션/건축/벨트단축키는 대신 각 핸들러가
+	// IsAnyUIPanelOpen()을 직접 확인해서 걸러낸다(ActionCharacter::IsUIBlockingGameplayInput 참고).
 
 	if (bAnyPanelOpen)
 	{
@@ -412,6 +464,29 @@ void AActionPlayerController::OnGameMenuTogglePressed()
 
 	SetGameMenuInputState(bOpen);	// Temp
 	// ApplyUIInpuState(bOpen);
+}
+
+void AActionPlayerController::OnInventoryTogglePressed()
+{
+	// 캐릭터가 죽은 동안(사망 직후 UnPossess ~ 부활 전, 또는 살아있어도 bAlive=false인 짧은
+	// 순간)엔 인벤토리 토글을 무시한다 — 죽은 화면에서 인벤토리 패널을 열어봐야 HUDPanel 자체가
+	// Collapsed라 보이지도 않으면서 OpenUIPanelCount/커서 상태만 어긋나게 된다.
+	AActionCharacter* PossessedCharacter = Cast<AActionCharacter>(GetPawn());
+	const IHealthInterface* HealthInterface = PossessedCharacter ? Cast<IHealthInterface>(PossessedCharacter->GetStatComponent()) : nullptr;
+	if (!PossessedCharacter || !HealthInterface || !HealthInterface->IsAlive())
+	{
+		return;
+	}
+
+	AMainHUD* HUD = GetHUD<AMainHUD>();
+	UMainHUDWidget* MainHudWidget = HUD ? HUD->GetMainHudWidget() : nullptr;
+	if (!MainHudWidget)
+	{
+		return;
+	}
+
+	const bool bIsOpen = MainHudWidget->ToggleInventoryPanel();
+	SetInventoryInputState(bIsOpen);
 }
 
 void AActionPlayerController::ServerTestInflictDamage_Implementation()

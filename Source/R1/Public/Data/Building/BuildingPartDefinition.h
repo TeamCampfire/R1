@@ -14,7 +14,8 @@ enum class EBuildingPlacementType : uint8
 	FOUNDATION,		// 지면 자유 배치 또는 다른 Foundation에 스냅
 	STRUCTURE_SNAP, // 기존 구조물의 지정된 스냅 포인트에 설치
 	SURFACE,		// Foundation이나 Floor의 표면 위에 자유 배치
-	ATTACHMENT		// 문틀처럼 특정 파츠의 전용 슬롯에 부착
+	ATTACHMENT,		// 문틀처럼 특정 파츠의 전용 슬롯에 부착
+	TERRAIN			// 모닥불, 침낭 등 Placeable 의 자연 지형 자유 배치
 };
 
 // 건축 파츠 타입 Enum

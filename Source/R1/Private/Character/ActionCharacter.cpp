@@ -18,9 +18,8 @@
 #include "Components/CapsuleComponent.h"
 #include "EnhancedInputComponent.h"
 #include "Character/ActionPlayerController.h"
-#include "Framework/MainHUD.h"
-#include "Widget/MainHUDWidget.h"
 #include "Data/Item/ItemDataBase.h"
+#include "Data/Item/PlaceableItemData.h"
 
 #include "InputMappingContext.h"
 #include "InputAction.h"
@@ -129,6 +128,16 @@ void AActionCharacter::BeginPlay()
 			&AActionCharacter::Die
 		);
 	}
+
+	if (DefaultItems.Num() > 0)
+	{
+		int32 remain;
+		for (auto& Item : DefaultItems)
+		{
+			InventoryComponent->AddItem(Item,1, remain);
+		}
+
+	}
 }
 
 // Called every frame
@@ -179,24 +188,19 @@ void AActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EIC->BindAction(IA_Interact, ETriggerEvent::Started, this, &AActionCharacter::OnInteractPressed);
 
 		EIC->BindAction(IA_Attack, ETriggerEvent::Started, this, &AActionCharacter::OnAttackPressed);
+		EIC->BindAction(IA_Attack, ETriggerEvent::Completed, this, &AActionCharacter::OnAttackReleased);
 
-		// 인벤토리 토글
-		EIC->BindAction(IA_InventoryToggle, ETriggerEvent::Started, this, &AActionCharacter::OnInventoryTogglePressed);
+		// 인벤토리 토글은 AActionPlayerController::SetupInputComponent에 바인딩된다(폰이 바뀌어도
+		// 유지돼야 하는 컨트롤러 레벨 UI 액션이라 캐릭터 쪽에 안 둠).
 
-		// 벨트슬롯 단축키(1~6) — 인벤토리가 열려있는 동안엔 DefaultMappingContext 자체가 빠져있어서
-		// 이 액션들도 같이 안 눌린다(ActionPlayerController::SetInventoryInputState 참고).
+		// 벨트슬롯 단축키(1~6) — 창고/인벤토리 UI가 열려있는 동안엔 각 핸들러가
+		// IsUIBlockingGameplayInput()으로 직접 걸러낸다(OnUseBeltSlotPressed 참고).
 		EIC->BindAction(IA_Use_BeltSlot_1, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 0);
 		EIC->BindAction(IA_Use_BeltSlot_2, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 1);
 		EIC->BindAction(IA_Use_BeltSlot_3, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 2);
 		EIC->BindAction(IA_Use_BeltSlot_4, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 3);
 		EIC->BindAction(IA_Use_BeltSlot_5, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 4);
 		EIC->BindAction(IA_Use_BeltSlot_6, ETriggerEvent::Started, this, &AActionCharacter::OnUseBeltSlotPressed, 5);
-
-		// 공격 (좌클릭 / 도구 주 액션)
-		if (IA_Attack)
-		{
-			//EIC->BindAction(IA_Attack, ETriggerEvent::Started, this, &AActionCharacter::OnAttackPressed);
-		}
 
 		// 보조 액션 (우클릭 / 도구 보조 기능 / 조준 등)
 		if (IA_SecondaryAction)
@@ -211,8 +215,9 @@ void AActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 			HeldItemComponent->GetCurrentHeldItem()->SetupInputComponent(EIC);
 		}
 
-		if(IA_BuildingPlacement)
-			EIC->BindAction(IA_BuildingPlacement, ETriggerEvent::Started, this, &AActionCharacter::OnBuildingPlacementPressed);
+		// 좌클릭 중복 제거
+		//if(IA_BuildingPlacement)
+			//EIC->BindAction(IA_BuildingPlacement, ETriggerEvent::Started, this, &AActionCharacter::OnBuildingPlacementPressed);
 
 		if (IA_RotateBuildingPart)
 			EIC->BindAction(IA_RotateBuildingPart, ETriggerEvent::Started, this, &AActionCharacter::OnRotateBuildingPartPressed);
@@ -227,10 +232,20 @@ void AActionCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 
 void AActionCharacter::OnSecondaryActionPressed()
 {
+	if (IsUIBlockingGameplayInput()) return;
+
+	// 배치 중에는 우클릭을 보조 액션보다 배치 취소로 우선 처리해요
+	if (AActionPlayerController* PlayerController = Cast<AActionPlayerController>(GetController()))
+	{
+		if (true == PlayerController->TryCancelPlacement())
+			return;
+	}
+
 	if (HeldItemComponent)
 	{
 		HeldItemComponent->UseSecondaryAction(true);
 	}
+
 }
 
 void AActionCharacter::OnSecondaryActionReleased()
@@ -429,6 +444,12 @@ UStatComponent* AActionCharacter::GetStatComponent() const
 	return StatComponent;
 }
 
+bool AActionCharacter::IsUIBlockingGameplayInput() const
+{
+	const AActionPlayerController* PC = Cast<AActionPlayerController>(GetController());
+	return PC && PC->IsAnyUIPanelOpen();
+}
+
 void AActionCharacter::OnMoveAction(const FInputActionValue& InValue)
 {
 	const FVector2D MoveValue = InValue.Get<FVector2D>();
@@ -457,6 +478,13 @@ void AActionCharacter::OnMoveCompleted(const FInputActionValue& InValue)
 
 void AActionCharacter::OnLookInput(const FInputActionValue& InValue)
 {
+	// UI가 열려있는 동안엔 마우스가 커서 조작용이라 시야 회전에 쓰면 안 된다(이동은 계속 받되
+	// 카메라만 막는다) — IsUIBlockingGameplayInput 참고.
+	if (IsUIBlockingGameplayInput())
+	{
+		return;
+	}
+
 	const FVector2D LookValue = InValue.Get<FVector2D>();
 	AddControllerYawInput(LookValue.X);
 	AddControllerPitchInput(LookValue.Y);
@@ -466,6 +494,8 @@ void AActionCharacter::OnLookInput(const FInputActionValue& InValue)
 
 void AActionCharacter::OnSprintPressed()
 {
+	if (IsUIBlockingGameplayInput()) return;
+
 	// 도구 액션 중이거나 크라우치 모드에는 스프린트 안함
 	if (bIsCrouched || (HeldItemComponent && HeldItemComponent->BlocksCharacterMovement())) return;
 
@@ -508,6 +538,7 @@ void AActionCharacter::OnSprintReleased()
 
 void AActionCharacter::OnCrouchPressed()
 {
+	if (IsUIBlockingGameplayInput()) return;
 	if (HeldItemComponent && HeldItemComponent->BlocksCharacterMovement()) return;
 
 	if (CrouchInputMode == ECrouchInputMode::Toggle)
@@ -545,12 +576,14 @@ void AActionCharacter::OnCrouchReleased()
 
 void AActionCharacter::OnJumpPressed()
 {
+	if (IsUIBlockingGameplayInput()) return;
 	if (HeldItemComponent && HeldItemComponent->BlocksCharacterMovement()) return;
 	Jump();
 }
 
 void AActionCharacter::OnBuildingPlacementPressed()
 {
+	if (IsUIBlockingGameplayInput()) return;
 
 	// 플레이어 컨트롤러에게 건축 배치를 맡김
 	if (AActionPlayerController* PlayerController = Cast<AActionPlayerController>(GetController()))
@@ -559,6 +592,8 @@ void AActionCharacter::OnBuildingPlacementPressed()
 
 void AActionCharacter::OnRotateBuildingPartPressed()
 {
+	if (IsUIBlockingGameplayInput()) return;
+
 	if (AActionPlayerController* PlayerController = Cast<AActionPlayerController>(GetController()))
 		PlayerController->OnRotateBuildingPart();
 }
@@ -570,30 +605,12 @@ void AActionCharacter::OnInteractPressed()
 	//UE_LOG(LogTemp, Log, TEXT("TryInteract()"));
 }
 
-void AActionCharacter::OnInventoryTogglePressed()
-{
-	AActionPlayerController* PC = Cast<AActionPlayerController>(GetController());
-	UE_LOG(LogTemp, Warning, TEXT("[InvToggle] OnInventoryTogglePressed. PC=%s"), *GetNameSafe(PC));
-	if (!PC)
-	{
-		return;
-	}
-
-	AMainHUD* HUD = PC->GetHUD<AMainHUD>();
-	UMainHUDWidget* MainHudWidget = HUD ? HUD->GetMainHudWidget() : nullptr;
-	UE_LOG(LogTemp, Warning, TEXT("[InvToggle] HUD=%s, MainHudWidget=%s"), *GetNameSafe(HUD), *GetNameSafe(MainHudWidget));
-	if (!MainHudWidget)
-	{
-		return;
-	}
-
-	const bool bIsOpen = MainHudWidget->ToggleInventoryPanel();
-	UE_LOG(LogTemp, Warning, TEXT("[InvToggle] ToggleInventoryPanel returned bIsOpen=%d"), bIsOpen);
-	PC->SetInventoryInputState(bIsOpen);
-}
-
 void AActionCharacter::OnUseBeltSlotPressed(int32 BeltIndex)
 {
+	// 인벤토리/창고 UI가 열려있는 동안엔 예전처럼 DefaultMappingContext 제거로 이 액션이 아예
+	// 안 눌렸는데, 이제 DefaultMappingContext는 이동을 위해 항상 켜져있으므로 여기서 직접 막는다.
+	if (IsUIBlockingGameplayInput()) return;
+
 	/// 임시 코드
 	// InventoryComponent 멤버 대신 FindComponentByClass로 찾는다 — BP_PlayerCharacter의
 	// 상속 컴포넌트 템플릿이 깨져서 멤버 포인터가 널로 읽히는 환경 문제가 있어(원인 조사 중),
@@ -603,6 +620,37 @@ void AActionCharacter::OnUseBeltSlotPressed(int32 BeltIndex)
 	//	Inventory->UseBeltSlot(BeltIndex);
 	//}
 
+	if (false == IsValid(InventoryComponent)) return;
+
+	if (InventoryComponent->BeltSlots.IsValidIndex(BeltIndex))
+	{
+		const FItemInstance& Instance = InventoryComponent->BeltSlots[BeltIndex];
+
+		// Placeable 아이템은 즉시 소비하지 않고 로컬 설치 프리뷰를 시작해요
+		if (Instance.IsValid() && EItemCategory::Placeable == Instance.ItemData->Category)
+		{
+			UPlaceableItemData* PlaceableData = Cast<UPlaceableItemData>(Instance.ItemData);
+			AActionPlayerController* PlayerController = Cast<AActionPlayerController>(GetController());
+
+			if (true == IsValid(PlaceableData) && true == IsValid(PlayerController))
+			{
+				// 설치 확정 시에 동일한 원본 아이템을 검증해야 하기 떄문에
+				// 슬롯 위치랑 InstanceID를 전달해요
+				const FInventorySlotRef SourceSlot{EInventorySlotCategory::Belt, BeltIndex};
+				PlayerController->OnStartPlaceablePlacement(PlaceableData, SourceSlot, Instance.InstanceID);
+			}
+			return; // Placeable은 선택 시점에 아이템을 소비하지 않아요
+		}
+
+		// 다른 아이템을 선택하면 진행중이던 Placeable 설치 모드 종료
+		if (true == Instance.IsValid())
+		{
+			if (AActionPlayerController* PlayerController = Cast<AActionPlayerController>(GetController()))
+				PlayerController->OnStopPlacement();
+		}
+	}
+
+	// 기존 HeldItem·Equipment·Consumable 사용은 서버에서 처리해요
 	if (InventoryComponent)
 	{
 		InventoryComponent->Server_UseBeltSlot(BeltIndex);
@@ -611,53 +659,27 @@ void AActionCharacter::OnUseBeltSlotPressed(int32 BeltIndex)
 
 void AActionCharacter::OnAttackPressed()
 {
+	// Placeable 아이템 배치중인 경우 좌클릭을 공격 대신 설치 확정으로 처리
+	if (AActionPlayerController* PlayerController = Cast<AActionPlayerController>(GetController()))
+	{
+		if (true == PlayerController->TryConfirmPlacement())
+			return;
+	}
+
 	// 손에 도구/무기가 장착되어 있으면 도구 주 액션(Primary Action) 실행
 	if (HeldItemComponent && HeldItemComponent->GetCurrentHeldItem())
 	{
 		HeldItemComponent->UsePrimaryAction(true);
 		return;
 	}
-
-	//if (!AM_Attack)
-	//{
-	//	UE_LOG(LogTemp, Display, TEXT("AM_Attack was nullptr"));
-	//	return;
-	//}
-
-	//if (UAnimInstance* Instance = GetMesh()->GetAnimInstance())
-	//{
-	//	if (!Instance->IsAnyMontagePlaying())
-	//	{
-	//		// 1) 로컬 클라이언트 선행 재생 (인풋 랙 제거)
-	//		PlayAnimMontage(AM_Attack);
-
-	//		// 2) 리슨 서버 및 다른 클라이언트 동기화
-	//		if (!HasAuthority())
-	//		{
-	//			Server_PlayAttackMontage();
-	//		}
-	//		else
-	//		{
-	//			Multicast_PlayAttackMontage();
-	//		}
-	//	}
-	//}
 }
 
-void AActionCharacter::Server_PlayAttackMontage_Implementation()
+void AActionCharacter::OnAttackReleased()
 {
-	Multicast_PlayAttackMontage();
-}
-
-void AActionCharacter::Multicast_PlayAttackMontage_Implementation()
-{
-	// 이미 로컬에서 선행 재생한 공격자 본인은 중복 재생 방지를 위해 건너뜀
-	if (IsLocallyControlled())
+	if (HeldItemComponent && HeldItemComponent->GetCurrentHeldItem())
 	{
-		return;
+		HeldItemComponent->UsePrimaryAction(false);
 	}
-
-	PlayAnimMontage(AM_Attack);
 }
 
 

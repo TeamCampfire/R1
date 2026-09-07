@@ -1,7 +1,4 @@
-﻿
-
-
-#include "Item/TestItem/TestSleepingBag.h"
+﻿#include "Item/TestItem/TestSleepingBag.h"
 
 // Sets default values
 ATestSleepingBag::ATestSleepingBag()

@@ -116,22 +116,19 @@ protected:
 	void OnRotateBuildingPartPressed();
 
 	void OnInteractPressed();			// 상호작용 시도
-	void OnInventoryTogglePressed();	// 인벤토리 패널 토글
+	// 인벤토리 토글은 AActionPlayerController로 이전됨(폰과 무관하게 항상 눌려야 해서) — 여기 없음.
 
 	UFUNCTION(BlueprintCallable)		// 블루프린트 테스트로 콜러블 설정
 	void OnUseBeltSlotPressed(int32 BeltIndex);	// 벨트슬롯 단축키(1~6, 0-based 인덱스로 받음)
-
-	// 공격 몽타주 재생 RPC (리슨 서버 및 멀티플레이어 동기화)
-	UFUNCTION(Server, Reliable)
-	void Server_PlayAttackMontage();
-
-	UFUNCTION(NetMulticast, Unreliable)
-	void Multicast_PlayAttackMontage();
-
 	// 무브먼트 값 갱신
 	void ApplyMovementSettings();
 
-	USkeletalMeshComponent* GetFirstPersonMesh() const { return FirstPersonMesh; }
+	// 인벤토리/창고 등 UI 패널이 하나라도 열려있는지 — 이동(OnMoveAction)과 상호작용
+	// (OnInteractPressed, 창고를 재상호작용으로 닫는 데 필요)만 예외로 두고, 그 외 시야 회전/점프/
+	// 스프린트/크라우치/공격/보조 액션/건축/벨트단축키는 UI가 열려있는 동안 이 값을 확인해 무시한다.
+	// AActionPlayerController::DefaultMappingContext는 이제 UI가 열려도 제거되지 않으므로
+	// (이동을 계속 받기 위함) 나머지 액션은 각 핸들러에서 직접 걸러야 한다.
+	bool IsUIBlockingGameplayInput() const;
 
 private:
 	// 공격 범위안에 있는 액터를 반환하는 함수
@@ -176,10 +173,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UInputAction> IA_Interact;
 
-	// 인벤토리 토글
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
-	TObjectPtr<UInputAction> IA_InventoryToggle;
-
 	/// 벨트슬롯 단축키
 	// 1
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
@@ -223,18 +216,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Component")
 	class UInventoryComponent* GetInventoryComponent() const;
 
+	UFUNCTION(BlueprintPure, Category = "Mesh")
+	FORCEINLINE USkeletalMeshComponent* GetFirstPersonMesh() const { return FirstPersonMesh; }
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
 	TObjectPtr<class UHeldItemComponent> HeldItemComponent;
 
-
-	/*--------------------------------
-	*			AM 변수
-	--------------------------------*/
-#pragma region Anim Montage
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
-	TObjectPtr<UAnimMontage> AM_Attack;
-#pragma endregion
 	
 	/// 카메라
 	// 카메라 컴포넌트
@@ -326,4 +314,9 @@ protected:
 
 	float DefaultEyeHeight = 0.f;
 	float CurrentWorldEyeHeight = 0.f; // 로컬이 아니라 "월드" 목표 눈높이
+
+
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|DefaultItem")
+	TArray<TObjectPtr<UItemDataBase>> DefaultItems;
 };
