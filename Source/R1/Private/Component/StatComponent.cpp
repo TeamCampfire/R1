@@ -5,7 +5,9 @@
 
 UStatComponent::UStatComponent()
 {
-	PrimaryComponentTick.bCanEverTick = false;
+	// 지속형 소비 아이템 효과(ActiveItemEffects)를 매 프레임 진행시키려면 틱이 필요하다.
+	// 목록이 비어있을 땐 TickComponent 맨 앞에서 바로 빠져나가므로 평소 비용은 거의 없다.
+	PrimaryComponentTick.bCanEverTick = true;
 	SetIsReplicatedByDefault(true);
 }
 
@@ -541,6 +543,77 @@ void UStatComponent::BeginPlay()
 void UStatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	if (ActiveItemEffects.Num() == 0 || !GetOwner() || !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
+	for (int32 Index = ActiveItemEffects.Num() - 1; Index >= 0; --Index)
+	{
+		FActiveItemEffect& Active = ActiveItemEffects[Index];
+
+		Active.TimeSinceLastTick += DeltaTime;
+		while (Active.RemainingTime > 0.f && Active.TimeSinceLastTick >= Active.TickInterval)
+		{
+			ApplyItemEffectMagnitude(Active.EffectType, Active.Magnitude);
+			Active.TimeSinceLastTick -= Active.TickInterval;
+			Active.RemainingTime -= Active.TickInterval;
+		}
+
+		if (Active.RemainingTime <= 0.f)
+		{
+			ActiveItemEffects.RemoveAtSwap(Index);
+		}
+	}
+}
+
+void UStatComponent::ApplyItemEffect(const FItemEffect& Effect)
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
+	if (Effect.Duration <= 0.f)
+	{
+		ApplyItemEffectMagnitude(Effect.EffectType, Effect.Magnitude);
+		return;
+	}
+
+	// 지속형 — 같은 종류를 다시 사용해도 기존 항목을 갱신하지 않고 별도로 쌓는다(스택).
+	FActiveItemEffect& Active = ActiveItemEffects.AddDefaulted_GetRef();
+	Active.EffectType = Effect.EffectType;
+	Active.Magnitude = Effect.Magnitude;
+	Active.TickInterval = FMath::Max(Effect.TickInterval, KINDA_SMALL_NUMBER);
+	Active.RemainingTime = Effect.Duration;
+	Active.TimeSinceLastTick = 0.f;
+}
+
+void UStatComponent::ApplyItemEffectMagnitude(EItemEffectType EffectType, float Magnitude)
+{
+	switch (EffectType)
+	{
+	case EItemEffectType::Heal:
+		IncreaseParameter(EParameterType::Health, Magnitude);
+		break;
+
+	case EItemEffectType::RestoreHunger:
+		IncreaseParameter(EParameterType::Calories, Magnitude);
+		break;
+
+	case EItemEffectType::RestoreThirst:
+		IncreaseParameter(EParameterType::Hydration, Magnitude);
+		break;
+
+	case EItemEffectType::Poison:
+		DecreaseParameter(EParameterType::Health, Magnitude);
+		break;
+
+	case EItemEffectType::BleedReduction:
+		// TODO: 출혈 상태이상이 아직 없음 — 생기면 여기서 처리.
+		break;
+	}
 }
 
 

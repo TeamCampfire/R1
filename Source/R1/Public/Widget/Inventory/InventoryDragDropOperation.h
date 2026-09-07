@@ -43,6 +43,14 @@ public:
 	UPROPERTY()
 	TWeakObjectPtr<UInventorySlotWidget> SourceWidget;
 
+	// 드래그를 시작한 슬롯이 속한 컨테이너 식별자(UInventorySlotWidget::ContainerId 그대로 복사).
+	// 같은 화면에 서로 다른 인벤토리(예: 플레이어 인벤토리 vs 창고)를 동시에 표시할 때, 드롭된
+	// 슬롯의 ContainerId와 비교해서 같은 컨테이너 내부 이동인지 컨테이너를 넘나드는 이동인지
+	// 구분하는 용도 — 기본값 0은 항상 "일반 인벤토리 화면"을 뜻하므로 창고가 없는 기존 위젯
+	// (WBP_Inventory, WBP_BeltBar 등)은 전부 0끼리만 비교되어 동작이 그대로 유지된다.
+	UPROPERTY(BlueprintReadWrite, Category = "Inventory")
+	int32 SourceContainerId = 0;
+
 protected:
 	//~ Begin UDragDropOperation Interface
 	virtual void DragCancelled_Implementation(const FPointerEvent& PointerEvent) override;

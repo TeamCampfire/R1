@@ -12,6 +12,7 @@
 #include "Interface/TemperatureInterface.h"
 #include "Interface/HydrationInterface.h"
 #include "Character/ActionCharacter.h"
+#include "Data/Item/ItemTypes.h"
 #include "StatComponent.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStatEmpty);
@@ -26,6 +27,21 @@ enum class EParameterType : uint8
 	Calories,
 	CaloriesDropRate,
 	Temperature
+};
+
+// 소비 아이템의 지속형 효과(FItemEffect::Duration > 0) 하나가 진행 중인 상태 — 서버에서만
+// 시뮬레이션하는 순수 로컬 상태라 리플리케이트하지 않는다(결과인 CurrentHealth 등만 리플리케이트).
+// 같은 종류를 또 사용하면 기존 걸 대체하지 않고 별도 항목으로 쌓인다(스택).
+USTRUCT()
+struct FActiveItemEffect
+{
+	GENERATED_BODY()
+
+	EItemEffectType EffectType = EItemEffectType::Heal;
+	float Magnitude = 0.f;
+	float TickInterval = 1.f;
+	float RemainingTime = 0.f;
+	float TimeSinceLastTick = 0.f;
 };
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
@@ -75,6 +91,13 @@ public:
 	virtual void RemoveStatusEffect_Implementation(EStatusEffect InStatusEffectType) override;
 	virtual void SetStatusEffect_Implementation(EStatusEffect InStatusEffectType) override;
 
+	// 소비 아이템 효과 하나를 적용한다(UInventoryComponent::UseBeltSlot/UseSelectedItem이 호출).
+	// Duration <= 0(즉발)이면 즉시 한 번 적용하고, Duration > 0이면 ActiveItemEffects에 새
+	// 항목으로 추가해 TickComponent가 TickInterval마다 반복 적용하게 한다 — 같은 종류를 다시
+	// 써도 기존 걸 갱신하지 않고 별도로 쌓인다(스택).
+	UFUNCTION(BlueprintCallable, Category = "Stat|Item")
+	void ApplyItemEffect(const FItemEffect& Effect);
+
 protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	// 파라미터 감소 내부처리 함수
@@ -90,6 +113,10 @@ protected:
 
 	void ApplyStarvationDamage();
 	void ApplyDehydrationDamage();
+
+	// FActiveItemEffect/즉발 양쪽이 공유하는 실제 스탯 반영 지점 — EffectType을 스위치해서
+	// 해당 파라미터에 IncreaseParameter/DecreaseParameter로 꽂아준다.
+	void ApplyItemEffectMagnitude(EItemEffectType EffectType, float Magnitude);
 
 	// Owner캐릭터 캐시용
 	UPROPERTY()
@@ -182,6 +209,10 @@ protected:
 	FTimerHandle DehydrationDamageTimerHandle;
 
 	float SurvivalStatUpdateInterval = 1.0f;
+
+	// 진행 중인 지속형 소비 아이템 효과 목록 — TickComponent가 매 프레임 훑으면서 처리한다.
+	// 리플리케이트 안 함(서버 전용 시뮬레이션 상태, 결과는 CurrentHealth 등을 통해 이미 전파됨).
+	TArray<FActiveItemEffect> ActiveItemEffects;
 
 
 	// Debug

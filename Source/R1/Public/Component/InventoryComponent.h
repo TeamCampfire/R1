@@ -25,6 +25,7 @@
 
 class UItemDataBase;
 class AItemPickup;
+class UWarehouseInventoryComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryChanged);
 
@@ -199,6 +200,38 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Crafting")
 	bool ConsumeItemCount(const UItemDataBase* ItemData, int32 CountToRemove);
 
+	// 외부(다른 액터/컴포넌트, 예: 창고)가 서버 권위 하에 이 인벤토리의 슬롯 하나를 직접
+	// 갱신할 때 쓰는 공개 진입점. 내부적으로 private SetSlot을 그대로 호출하므로 동일하게
+	// GetOwner()->HasAuthority()가 아니면 무시된다.
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void SetSlotItem(const FInventorySlotRef& SlotRef, const FItemInstance& NewValue);
+
+	// 창고와의 교환 — 이 인벤토리(플레이어) 쪽 PlayerSlot과 Warehouse의 WarehouseSlotIndex
+	// 사이에서 아이템을 이동한다. bToWarehouse가 true면 PlayerSlot → Warehouse, false면 그
+	// 반대 방향. TransferItem과 동일하게 대상이 비어있으면 이동, 같은 아이템이면 병합, 다른
+	// 아이템이면 자리 교환을 수행한다. Count가 0 이하이면 슬롯 전체를 이동시킨다.
+	//
+	// 이 함수의 실제 이동 로직은 여기(플레이어의 UInventoryComponent)에 있지만 Warehouse 쪽
+	// 슬롯도 함께 갱신한다 — Server RPC(Server_TransferWithWarehouse)가 "요청한 플레이어가
+	// 실제로 소유한" 컴포넌트에서 호출되어야 서버로 전달되기 때문에(창고 액터는 네트워크
+	// Owner가 없어 그쪽에 RPC를 두면 아무도 호출할 수 없음), 창고 슬롯 갱신도 편의상 이
+	// 함수가 대신 처리한다.
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	bool TransferWithWarehouse(UWarehouseInventoryComponent* Warehouse, FInventorySlotRef PlayerSlot, int32 WarehouseSlotIndex, int32 Count, bool bToWarehouse);
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_TransferWithWarehouse(UWarehouseInventoryComponent* Warehouse, FInventorySlotRef PlayerSlot, int32 WarehouseSlotIndex, int32 Count, bool bToWarehouse);
+
+	// 창고 내부 슬롯끼리 재정렬 — 같은 창고 안에서 FromIndex의 아이템을 ToIndex로 옮긴다(이동/병합/
+	// 교환). 이동 로직은 순전히 창고(Warehouse) 쪽 데이터만 다루지만, Server RPC는 "요청한 플레이어가
+	// 실제로 소유한" 컴포넌트에서만 호출 가능해서(TransferWithWarehouse와 동일한 이유 — 창고 액터는
+	// 네트워크 Owner가 없음) 편의상 여기 둔다.
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	bool TransferWithinWarehouse(UWarehouseInventoryComponent* Warehouse, int32 FromIndex, int32 ToIndex, int32 Count, bool bAutoHalfSplitIfTargetEmpty = false);
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_TransferWithinWarehouse(UWarehouseInventoryComponent* Warehouse, int32 FromIndex, int32 ToIndex, int32 Count, bool bAutoHalfSplitIfTargetEmpty);
+
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
@@ -218,6 +251,11 @@ private:
 
 	// TransferItem의 대상이 장비슬롯일 때 처리하는 부분만 분리 — 부위 일치 검사 + 스왑 로직.
 	EMoveSlotResult EquipToSlot(const FInventorySlotRef& From, const FItemInstance& SourceInstance);
+
+	// UseBeltSlot/UseSelectedItem의 Consumable 분기가 공유하는 처리 — 소유 액터의 StatComponent를
+	// 찾아 ConsumableData->Effects를 전부 UStatComponent::ApplyItemEffect에 넘긴다(즉발/지속형
+	// 판단은 그쪽에서 Effect.Duration을 보고 처리).
+	void ApplyConsumableEffects(const class UConsumableItemData* ConsumableData);
 
 	// Ingredients에 명시된 재료가 전부 충분한지 확인한다. CanCraftItem 내부 전용 —
 	// 크래프팅은 별도 컴포넌트로 분리될 예정이라, 외부에서는 이 목록형 대신

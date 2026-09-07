@@ -26,7 +26,8 @@ void UInventorySlotWidget::EnsureGridSlots(
 	TFunctionRef<void(UInventorySlotWidget*)> OnSlotCreated,
 	TFunctionRef<bool(const FInventorySlotRef&)> IsSelectedFn,
 	TFunctionRef<bool(const FInventorySlotRef&)> IsHeldFn,
-	TArray<TObjectPtr<UInventorySlotWidget>>& OutWidgets)
+	TArray<TObjectPtr<UInventorySlotWidget>>& OutWidgets,
+	int32 ContainerId)
 {
 	if (!Container || !SlotWidgetClass || !OwningWidget)
 	{
@@ -48,6 +49,7 @@ void UInventorySlotWidget::EnsureGridSlots(
 			}
 
 			SlotWidget->SetSlotRef(FInventorySlotRef{ Category, i });
+			SlotWidget->SetContainerId(ContainerId);
 			OnSlotCreated(SlotWidget);
 
 			UPanelSlot* PanelSlot = Container->AddChild(SlotWidget);
@@ -240,6 +242,7 @@ void UInventorySlotWidget::NativeOnDragDetected(const FGeometry& InGeometry, con
 	UInventoryDragDropOperation* DragOp = NewObject<UInventoryDragDropOperation>(this);
 	DragOp->SourceSlotRef = SlotRef;
 	DragOp->SourceWidget = this;
+	DragOp->SourceContainerId = ContainerId;
 	DragOp->bAutoHalfSplitOnEmptyTarget = bPendingMiddleButtonDrag;
 	DragOp->Pivot = EDragPivot::CenterCenter;
 
@@ -284,7 +287,14 @@ bool UInventorySlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDrag
 
 	if (UInventoryDragDropOperation* DragOp = Cast<UInventoryDragDropOperation>(InOperation))
 	{
-		OnSlotDropped.Broadcast(DragOp->SourceSlotRef, SlotRef, DragOp->Count, DragOp->bAutoHalfSplitOnEmptyTarget);
+		if (DragOp->SourceContainerId == ContainerId)
+		{
+			OnSlotDropped.Broadcast(DragOp->SourceSlotRef, SlotRef, DragOp->Count, DragOp->bAutoHalfSplitOnEmptyTarget);
+		}
+		else
+		{
+			OnSlotDroppedCross.Broadcast(DragOp->SourceContainerId, DragOp->SourceSlotRef, ContainerId, SlotRef, DragOp->Count);
+		}
 		return true;
 	}
 

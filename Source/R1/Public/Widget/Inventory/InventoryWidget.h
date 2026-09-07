@@ -15,6 +15,7 @@ class UInventoryComponent;
 class UTextBlock;
 class UPanelWidget;
 class UInventorySlotWidget;
+class UDetailInfoWidget;
 
 /**
  * 인벤토리 패널(장비+메인) 위젯의 C++ 베이스.
@@ -46,6 +47,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	void ClearSelection();
 
+	// 창고 UI가 열려있는 동안 메인 슬롯과 창고 슬롯 사이의 크로스 드래그를 받으려면
+	// UWarehouseWidget이 이 슬롯 위젯들에 직접 OnSlotDroppedCross를 추가로 바인딩해야 한다 —
+	// EnsureGridSlots가 최초 생성 후엔 같은 위젯 인스턴스를 재사용하므로 이 배열도 안정적이다.
+	const TArray<TObjectPtr<UInventorySlotWidget>>& GetMainSlotWidgets() const { return MainSlotWidgets; }
+
+	// 창고 UI가 열려있는 동안 UWarehouseWidget이 창고 선택도 같이 구독시키기 위해 필요하다
+	// (UDetailInfoWidget::BindWarehouse/UnbindWarehouse 참고).
+	UDetailInfoWidget* GetDetailInfoWidget() const { return DetailInfoWidget; }
+
 protected:
 	//~ Begin UUserWidget Interface
 	// WBP 디자이너 프리뷰 전용 — PIE 밖에서는 BoundInventory가 없어 그리드가 비어 보이므로,
@@ -63,6 +73,13 @@ protected:
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UPanelWidget> MainSlotContainer;
+
+	// 선택된 슬롯의 상세 정보를 보여주는 패널 — WBP_Inventory에 이미 배치돼 있다. 이 위젯 자체는
+	// 자기 소유 폰의 UInventoryComponent에 스스로 바인딩하는 자족적인 위젯이라 평소엔 이 포인터를
+	// 쓸 일이 없지만, 창고가 열려있는 동안엔 UWarehouseWidget이 이 getter로 찾아가 창고 선택도
+	// 같이 보여주도록 추가로 바인딩시킨다.
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UDetailInfoWidget> DetailInfoWidget;
 
 	// 슬롯 하나를 표현할 위젯 클래스. WBP 디폴트에서 UInventorySlotWidget 부모 WBP로 지정.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory")

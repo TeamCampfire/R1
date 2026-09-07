@@ -29,6 +29,11 @@ class R1_API UBeltBarWidget : public UUserWidget
 {
 	GENERATED_BODY()
 
+public:
+	// 창고 UI가 열려있는 동안 벨트 슬롯과 창고 슬롯 사이의 크로스 드래그를 받으려면
+	// UWarehouseWidget이 이 슬롯 위젯들에 직접 OnSlotDroppedCross를 추가로 바인딩해야 한다.
+	const TArray<TObjectPtr<UInventorySlotWidget>>& GetBeltSlotWidgets() const { return BeltSlotWidgets; }
+
 protected:
 	//~ Begin UUserWidget Interface
 	// WBP 디자이너 프리뷰 전용 — InventoryWidget과 동일한 이유(아래 NativePreConstruct 참고).

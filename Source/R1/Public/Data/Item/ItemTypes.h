@@ -130,6 +130,11 @@ struct FItemEffect
 	// 즉발 효과면 0, 도트/버프처럼 시간에 걸쳐 적용되는 효과면 초 단위 지속시간.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Consumable")
 	float Duration = 0.f;
+
+	// Duration > 0일 때만 의미 있음 — 몇 초마다 Magnitude를 다시 적용할지(예: 5초짜리 효과를
+	// 1초 간격으로 5번 적용). Duration <= 0(즉발)이면 무시된다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Consumable", meta = (EditCondition = "Duration > 0", ClampMin = "0.01"))
+	float TickInterval = 1.f;
 };
 
 // 제작 재료 하나(재료 아이템 + 수량). UItemDataBase::CraftingCost 배열의 원소로 쓴다.

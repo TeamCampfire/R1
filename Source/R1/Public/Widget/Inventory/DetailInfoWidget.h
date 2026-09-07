@@ -10,6 +10,7 @@
 #include "DetailInfoWidget.generated.h"
 
 class UInventoryComponent;
+class UWarehouseInventoryComponent;
 class UTextBlock;
 class UImage;
 class UButton;
@@ -53,6 +54,16 @@ class R1_API UDetailInfoWidget : public UUserWidget
 {
 	GENERATED_BODY()
 
+public:
+	// 창고가 열려있는 동안 창고 쪽 선택도 같이 보여주기 위해 UWarehouseWidget이 호출한다.
+	// 창고 슬롯이 선택되면(Warehouse->bHasSelection) 플레이어 인벤토리 선택보다 우선해서 보여준다
+	// — WarehouseWidget이 플레이어 슬롯을 클릭할 때마다 창고 선택을 지워주므로(HandlePlayerSlotClicked)
+	// 실제로는 둘 중 하나만 항상 선택된 상태다.
+	void BindWarehouse(UWarehouseInventoryComponent* Warehouse);
+
+	// 창고를 닫을 때 호출 — 구독 해제 후 표시를 갱신한다(창고 아이템을 보고 있었다면 사라짐).
+	void UnbindWarehouse();
+
 protected:
 	//~ Begin UUserWidget Interface
 	virtual void NativeOnInitialized() override;
@@ -74,7 +85,13 @@ private:
 	UFUNCTION()
 	void HandleInventoryChanged();
 
+	// Warehouse->OnInventoryChanged/OnSelectionChanged 공용 핸들러.
+	UFUNCTION()
+	void HandleWarehouseChanged();
+
 	// Title/Description/Icon/Split 슬라이더 범위 등 전체 갱신. 선택 없음이면 RootPanel만 Collapsed.
+	// 창고 쪽이 선택돼 있으면 그 아이템을 보여주고, 사용/버리기/분할처럼 플레이어 인벤토리 전용
+	// 액션들은 창고 아이템에는 적용되지 않으므로 숨긴다.
 	void RefreshDisplay();
 
 	// "정보" 섹션 스탯 행 재생성. 장비(UEquipmentItemData::StatModifiers), 무기/도구
@@ -95,8 +112,10 @@ private:
 	static FLinearColor GetEffectColor(EItemEffectType EffectType);
 
 	// 조건부 액션 버튼("사용" 등) 표시/숨김 갱신 — 버튼은 WBP에 미리 배치돼 있고 여기서는
-	// 카테고리에 맞는 것만 Visibility를 켜고 나머지는 Collapsed로 둔다.
-	void RebuildActionButtons(const FItemInstance& Selected);
+	// 카테고리에 맞는 것만 Visibility를 켜고 나머지는 Collapsed로 둔다. bIsWarehouseItem이면
+	// 전부 숨긴다 — 사용/버리기/분할은 SelectedSlotRef 기준으로 플레이어 인벤토리에만 동작하는
+	// 액션이라 창고 아이템에는 적용할 수 없다(창고 슬롯은 UInventoryComponent 슬롯이 아님).
+	void RebuildActionButtons(const FItemInstance& Selected, bool bIsWarehouseItem);
 
 	UFUNCTION()
 	void HandleDiscardClicked();
@@ -147,6 +166,7 @@ protected:
 
 private:
 	TWeakObjectPtr<UInventoryComponent> BoundInventory;
+	TWeakObjectPtr<UWarehouseInventoryComponent> BoundWarehouse;
 
 	// 분할 슬라이더가 현재 가리키는 수량 — 선택이 바뀌어도(슬라이더가 새 범위로 재설정돼도)
 	// 이전에 고르던 값을 최대한 유지하기 위해 기억해둔다.
