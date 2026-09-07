@@ -104,6 +104,11 @@ private:
 	// 스탯 하나를 "라벨: 값" 텍스트 한 줄로 만들어 InfoRowsContainer에 추가.
 	void AddStatTextRow(EEquipmentStatType StatType, float Value);
 
+	// AddStatTextRow와 같은 "라벨: 값" 포맷이지만, enum 없이 라벨을 직접 받는다 — HeldItemData의
+	// Damage/OreGathering/WoodGathering/FleshGathering처럼 EEquipmentStatType에 없는 전용
+	// 필드를 고정된 표시 순서로 나열할 때 쓴다.
+	void AddNamedStatRow(const FText& Label, float Value);
+
 	// 소비 효과 하나를 색상 있는 텍스트 한 줄로 만들어 InfoRowsContainer에 추가.
 	void AddEffectTextRow(const FItemEffect& Effect);
 
