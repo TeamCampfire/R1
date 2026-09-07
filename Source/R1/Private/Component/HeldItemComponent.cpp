@@ -91,6 +91,7 @@ void UHeldItemComponent::AttachHeldItemToCharacter(AHeldItemBase* ItemToAttach)
 	// 3. 1인칭 팔(FirstPersonMesh) 소켓에 ItemMesh1P 분리 부착
 	if (USkeletalMeshComponent* FPMesh = OwnerCharacter->GetFirstPersonMesh())
 	{
+		FPMesh->SetRelativeRotation(FRotator(0, -120, 0));
 		if (UStaticMeshComponent* Mesh1P = ItemToAttach->GetItemMesh1P())
 		{
 			const FName FPSocket = FPMesh->DoesSocketExist(FName(TEXT("r_prop"))) 
@@ -262,6 +263,7 @@ void UHeldItemComponent::UnequipHeldItem()
 	{
 		if (USkeletalMeshComponent* FPMesh = OwnerCharacter->GetFirstPersonMesh())
 		{
+			FPMesh->SetRelativeRotation(FRotator(0, -90, 0));
 			FPMesh->UnlinkAnimClassLayers(CurrentEquippedItemData->AnimLayer);
 		}
 		if (USkeletalMeshComponent* TPMesh = OwnerCharacter->GetMesh())

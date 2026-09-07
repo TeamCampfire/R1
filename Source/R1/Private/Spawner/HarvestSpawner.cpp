@@ -1,5 +1,6 @@
 ﻿#include "Spawner/HarvestSpawner.h"
 #include "Engine/AssetManager.h"
+#include "R1/R1.h"
 
 // Sets default values
 AHarvestSpawner::AHarvestSpawner()
@@ -52,8 +53,7 @@ AActor* AHarvestSpawner::SpawnHarvestableObject(TSubclassOf<AActor> TargetClass)
 
 		//1-2. ECC_WorldStatic,ECC_WorldDynamic만 감지
 		FCollisionObjectQueryParams ObjectQueryParams;
-		ObjectQueryParams.AddObjectTypesToQuery(ECC_WorldStatic);
-		ObjectQueryParams.AddObjectTypesToQuery(ECC_WorldDynamic);
+		ObjectQueryParams.AddObjectTypesToQuery(ECC_BUILDABLEGROUND);
 
 		//1-3. 추가 파라미터 (자신 제외, 복잡한 충돌 여부 등)
 		FCollisionQueryParams QueryParams;
@@ -71,7 +71,9 @@ AActor* AHarvestSpawner::SpawnHarvestableObject(TSubclassOf<AActor> TargetClass)
 		//2. 충돌시 해당 지점에 소환
 		if (bHit)
 		{
+			
 			SpawnedActor = GetWorld()->SpawnActor<AActor>(TargetClass, HitRes.ImpactPoint, FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f));
+			if (!SpawnedActor) return SpawnedActor;
 			//3. 소환한 액터의 OnDestroy에 SpawnHarvestableObject 달아놓기
 			SpawnedActor->OnDestroyed.AddDynamic(this, &AHarvestSpawner::OnActorDepleted);
 			break;
