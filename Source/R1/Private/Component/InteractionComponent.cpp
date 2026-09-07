@@ -6,7 +6,7 @@
 #include "GameFramework/Pawn.h"
 #include "Camera/CameraComponent.h"
 #include "Components/PrimitiveComponent.h"
-#include "Campfire/CampfireActor.h"
+#include "Item/PlaceableItem/Campfire/Campfire.h"
 
 // Sets default values for this component's properties
 UInteractionComponent::UInteractionComponent()
@@ -19,12 +19,12 @@ UInteractionComponent::UInteractionComponent()
 	SetIsReplicatedByDefault(true);
 }
 
-void UInteractionComponent::SetActiveCampfire(ACampfireActor* Campfire)
+void UInteractionComponent::SetActiveCampfire(ACampfire* Campfire)
 {
 	ActiveCampfire = Campfire;
 }
 
-ACampfireActor* UInteractionComponent::GetActiveCampfire() const
+ACampfire* UInteractionComponent::GetActiveCampfire() const
 {
 	return ActiveCampfire.Get();
 }

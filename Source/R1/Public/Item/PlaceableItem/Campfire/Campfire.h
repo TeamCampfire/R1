@@ -1,23 +1,22 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
-#include "BuildingSystem/BuildingActor.h"
+#include "Item/PlaceableItemBase.h"
 #include "Interface/InteractableInterface.h"
-#include "CampfireActor.generated.h"
+#include "Campfire.generated.h"
 
 
 class UCampfireComponent;
 class UParticleSystemComponent;
 class UAudioComponent;
-class UStaticMeshComponent;
 
 UCLASS()
-class R1_API ACampfireActor : public ABuildingActor, public IInteractableInterface
+class R1_API ACampfire : public APlaceableItemBase, public IInteractableInterface
 {
 	GENERATED_BODY()
 
 public:
-	ACampfireActor();
+	ACampfire();
 
 	virtual FText GetInteractionDisplayName_Implementation() const override;
 	virtual bool CanInteract_Implementation(APawn* Interactor) const override;
@@ -31,9 +30,6 @@ protected:
 
 	UFUNCTION()
 	void HandleCampfireStateChanged();
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Campfire|Mesh")
-	TObjectPtr<UStaticMeshComponent> Mesh;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Campfire|FX")
 	TObjectPtr<UAudioComponent> FireAudio;

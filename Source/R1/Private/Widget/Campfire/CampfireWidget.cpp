@@ -1,7 +1,7 @@
 ﻿#include "Widget/Campfire/CampfireWidget.h"
 
-#include "Campfire/CampfireActor.h"
-#include "Campfire/CampfireComponent.h"
+#include "Item/PlaceableItem/Campfire/Campfire.h"
+#include "Item/PlaceableItem/Campfire/CampfireComponent.h"
 #include "Character/ActionPlayerController.h"
 #include "Widget/Campfire/CampfireSlotWidget.h"
 #include "Components/ProgressBar.h"
@@ -20,7 +20,7 @@ void UCampfireWidget::NativeDestruct()
 	Super::NativeDestruct();
 }
 
-void UCampfireWidget::BindCampfire(ACampfireActor* InCampfire)
+void UCampfireWidget::BindCampfire(ACampfire* InCampfire)
 {
 	UnbindCampfire();
 	BoundCampfire = InCampfire;
@@ -77,17 +77,17 @@ void UCampfireWidget::HandleToggleFire()
 		PC->Server_SetCampfireLit(BoundCampfire.Get(), !(BoundCampfire.IsValid() && BoundCampfire->GetCampfireComponent()->bIsLit));
 }
 
-void UCampfireWidget::HandleSlotRightClicked(ACampfireActor* Campfire, FCampfireSlotRef CampfireSlotRef)
+void UCampfireWidget::HandleSlotRightClicked(ACampfire* Campfire, FCampfireSlotRef CampfireSlotRef)
 {
 	if (AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer())) PC->Server_QuickMoveCampfireToInventory(Campfire, CampfireSlotRef);
 }
 
-void UCampfireWidget::HandleInventoryDropped(ACampfireActor* Campfire, FInventorySlotRef From, FCampfireSlotRef To, int32 Count, bool bHalfSplit)
+void UCampfireWidget::HandleInventoryDropped(ACampfire* Campfire, FInventorySlotRef From, FCampfireSlotRef To, int32 Count, bool bHalfSplit)
 {
 	if (AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer())) PC->Server_MoveInventoryToCampfire(Campfire, From, To, Count, bHalfSplit);
 }
 
-void UCampfireWidget::HandleCampfireDropped(ACampfireActor*, FCampfireSlotRef, FCampfireSlotRef, int32, bool)
+void UCampfireWidget::HandleCampfireDropped(ACampfire*, FCampfireSlotRef, FCampfireSlotRef, int32, bool)
 {
 	// 입력/연료의 허용 아이템이 서로 다르고 슬롯도 각 1개이므로 내부 슬롯 간 이동은 의도적으로 거절한다.
 }

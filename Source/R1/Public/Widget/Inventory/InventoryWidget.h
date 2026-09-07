@@ -9,7 +9,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Component/InventoryComponent.h"
-#include "Campfire/CampfireTypes.h"
+#include "Item/PlaceableItem/Campfire/CampfireTypes.h"
 #include "InventoryWidget.generated.h"
 
 class UInventoryComponent;
@@ -17,7 +17,7 @@ class UTextBlock;
 class UPanelWidget;
 class UInventorySlotWidget;
 class UDetailInfoWidget;
-class ACampfireActor;
+class ACampfire;
 
 /**
  * 인벤토리 패널(장비+메인) 위젯의 C++ 베이스.
@@ -59,7 +59,7 @@ public:
 	UDetailInfoWidget* GetDetailInfoWidget() const { return DetailInfoWidget; }
 
 	// 모닥불 활성 관련 함수
-	void SetActiveCampfire(ACampfireActor* Campfire) { ActiveCampfire = Campfire; }
+	void SetActiveCampfire(ACampfire* Campfire);
 	void ClearActiveCampfire() { ActiveCampfire.Reset(); }
 
 protected:
@@ -128,12 +128,12 @@ private:
 
 	// 모닥불에 있는 아이템 버리기
 	UFUNCTION()
-	void HandleCampfireItemDropped(ACampfireActor* Campfire, FCampfireSlotRef FromSlot,
+	void HandleCampfireItemDropped(ACampfire* Campfire, FCampfireSlotRef FromSlot,
 		FInventorySlotRef ToSlot, int32 Count, bool bAutoHalfSplitOnEmptyTarget);
 
 	// 언바인딩용으로 보관. 소유 폰이 사라지는 경우도 있어 약한 참조로 들고 있는다.
 	TWeakObjectPtr<UInventoryComponent> BoundInventory;
-	TWeakObjectPtr<ACampfireActor> ActiveCampfire;
+	TWeakObjectPtr<ACampfire> ActiveCampfire;
 
 	TArray<TObjectPtr<UInventorySlotWidget>> EquipmentSlotWidgets;
 	TArray<TObjectPtr<UInventorySlotWidget>> MainSlotWidgets;

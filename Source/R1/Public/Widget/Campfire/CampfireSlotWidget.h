@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "Campfire/CampfireTypes.h"
+#include "Item/PlaceableItem/Campfire/CampfireTypes.h"
 #include "Component/InventoryComponent.h"
 #include "Item/ItemInstance.h"
 #include "CampfireSlotWidget.generated.h"
@@ -12,12 +12,12 @@ class UImage;
 class UTextBlock;
 class UWidget;
 class UTexture2D;
-class ACampfireActor;
+class ACampfire;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnCampfireSlotRightClicked, ACampfireActor*, Campfire, FCampfireSlotRef, CampfireSlotRef);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(FOnInventoryDroppedOnCampfire, ACampfireActor*, Campfire,
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnCampfireSlotRightClicked, ACampfire*, Campfire, FCampfireSlotRef, CampfireSlotRef);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(FOnInventoryDroppedOnCampfire, ACampfire*, Campfire,
 	FInventorySlotRef, From, FCampfireSlotRef, To, int32, Count, bool, bHalfSplit);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(FOnCampfireSlotDropped, ACampfireActor*, Campfire,
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(FOnCampfireSlotDropped, ACampfire*, Campfire,
 	FCampfireSlotRef, From, FCampfireSlotRef, To, int32, Count, bool, bHalfSplit);
 
 UCLASS()
@@ -33,7 +33,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Campfire|Appearance")
 	TObjectPtr<UTexture2D> SlotTypeTexture;
 
-	void InitializeSlot(ACampfireActor* InCampfire, const FCampfireSlotRef& InSlot);
+	void InitializeSlot(ACampfire* InCampfire, const FCampfireSlotRef& InSlot);
 	void Refresh(const FItemInstance& Instance);
 	const FCampfireSlotRef& GetSlotRef() const { return SlotRef; }
 
@@ -61,7 +61,7 @@ protected:
 
 private:
 	void UpdateHoverVisual(bool bHover, bool bAllowed);
-	TWeakObjectPtr<ACampfireActor> Campfire;
+	TWeakObjectPtr<ACampfire> Campfire;
 	FCampfireSlotRef SlotRef;
 	FItemInstance CachedInstance;
 	bool bMiddleDrag = false;

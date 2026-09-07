@@ -16,7 +16,7 @@
 // — TSoftObjectPtr을 그대로 넘기면 UI(WBP) 쪽에서 매번 로드 처리를 해야 해서 델리게이트 소비 쪽이 번거로워진다.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnInteractableTargetChanged, AActor*, NewTarget, const FText&, DisplayName, UTexture2D*, Icon);
 
-class ACampfireActor;
+class ACampfire;
 
 /**
  * 캐릭터에 붙는 상호작용 컴포넌트.
@@ -51,8 +51,8 @@ public:
 	void Server_TryInteract(AActor* Target);
 
 	// 현재 UI로 열어 둔 모닥불. 조준 대상(CurrentTarget)과는 별개의 상호작용 세션이다.
-	void SetActiveCampfire(ACampfireActor* Campfire);
-	ACampfireActor* GetActiveCampfire() const;
+	void SetActiveCampfire(ACampfire* Campfire);
+	ACampfire* GetActiveCampfire() const;
 
 protected:
 	// Called when the game starts
@@ -94,5 +94,5 @@ private:
 	UPROPERTY()
 	TObjectPtr<AActor> CurrentTarget;
 
-	TWeakObjectPtr<ACampfireActor> ActiveCampfire;
+	TWeakObjectPtr<ACampfire> ActiveCampfire;
 };

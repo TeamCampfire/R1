@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.30
+﻿/// 최초작성 : 2026.08.30
 /// 작 성 자 : 최 요 환
 /// 간단설명 : 인벤토리 슬롯 드래그앤드롭 시 어느 슬롯에서 시작됐는지 들고 다니는 페이로드
 
@@ -9,11 +9,11 @@
 #include "CoreMinimal.h"
 #include "Blueprint/DragDropOperation.h"
 #include "Component/InventoryComponent.h"
-#include "Campfire/CampfireTypes.h"
+#include "Item/PlaceableItem/Campfire/CampfireTypes.h"
 #include "InventoryDragDropOperation.generated.h"
 
 class UInventorySlotWidget;
-class ACampfireActor;
+class ACampfire;
 class UItemDataBase;
 
 /**
@@ -66,7 +66,7 @@ public:
 	FCampfireSlotRef CampfireSourceSlot;
 
 	UPROPERTY()
-	TWeakObjectPtr<ACampfireActor> SourceCampfire;
+	TWeakObjectPtr<ACampfire> SourceCampfire;
 
 protected:
 	//~ Begin UDragDropOperation Interface

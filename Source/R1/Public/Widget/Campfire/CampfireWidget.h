@@ -2,10 +2,10 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "Campfire/CampfireTypes.h"
+#include "Item/PlaceableItem/Campfire/CampfireTypes.h"
 #include "CampfireWidget.generated.h"
 
-class ACampfireActor;
+class ACampfire;
 class UCampfireComponent;
 class UCampfireSlotWidget;
 class UProgressBar;
@@ -19,7 +19,7 @@ class R1_API UCampfireWidget : public UUserWidget
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "Campfire")
-	void BindCampfire(ACampfireActor* InCampfire);
+	void BindCampfire(ACampfire* InCampfire);
 
 	UFUNCTION(BlueprintCallable, Category = "Campfire")
 	void UnbindCampfire();
@@ -61,15 +61,15 @@ private:
 	void HandleToggleFire();
 
 	UFUNCTION()
-	void HandleSlotRightClicked(ACampfireActor* Campfire, FCampfireSlotRef CampfireSlotRef);
+	void HandleSlotRightClicked(ACampfire* Campfire, FCampfireSlotRef CampfireSlotRef);
 
 	UFUNCTION()
-	void HandleInventoryDropped(ACampfireActor* Campfire, FInventorySlotRef From,FCampfireSlotRef To, int32 Count, bool bHalfSplit);
+	void HandleInventoryDropped(ACampfire* Campfire, FInventorySlotRef From,FCampfireSlotRef To, int32 Count, bool bHalfSplit);
 
 	UFUNCTION()
-	void HandleCampfireDropped(ACampfireActor* Campfire, FCampfireSlotRef From, FCampfireSlotRef To, int32 Count, bool bHalfSplit);
+	void HandleCampfireDropped(ACampfire* Campfire, FCampfireSlotRef From, FCampfireSlotRef To, int32 Count, bool bHalfSplit);
 
 	void InitializeSlots();
 
-	TWeakObjectPtr<ACampfireActor> BoundCampfire;
+	TWeakObjectPtr<ACampfire> BoundCampfire;
 };

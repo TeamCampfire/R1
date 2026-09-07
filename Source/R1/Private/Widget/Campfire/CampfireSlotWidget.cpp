@@ -1,7 +1,7 @@
 ﻿#include "Widget/Campfire/CampfireSlotWidget.h"
 
-#include "Campfire/CampfireActor.h"
-#include "Campfire/CampfireComponent.h"
+#include "Item/PlaceableItem/Campfire/Campfire.h"
+#include "Item/PlaceableItem/Campfire/CampfireComponent.h"
 #include "Widget/Inventory/InventoryDragDropOperation.h"
 #include "Components/Border.h"
 #include "Components/Image.h"
@@ -20,7 +20,7 @@ void UCampfireSlotWidget::SynchronizeProperties()
 	}
 }
 
-void UCampfireSlotWidget::InitializeSlot(ACampfireActor* InCampfire, const FCampfireSlotRef& InSlot)
+void UCampfireSlotWidget::InitializeSlot(ACampfire* InCampfire, const FCampfireSlotRef& InSlot)
 {
 	Campfire = InCampfire;
 	SlotRef = InSlot;

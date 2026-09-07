@@ -139,7 +139,7 @@ void UBeltBarWidget::HandleSlotRightClicked(FInventorySlotRef SlotRef)
 	{
 		UInteractionComponent* Interaction = PC->GetPawn()
 			? PC->GetPawn()->FindComponentByClass<UInteractionComponent>() : nullptr;
-		if (ACampfireActor* Campfire = Interaction ? Interaction->GetActiveCampfire() : nullptr)
+		if (ACampfire* Campfire = Interaction ? Interaction->GetActiveCampfire() : nullptr)
 		{
 			PC->Server_QuickMoveInventoryToCampfire(Campfire, SlotRef);
 			return;
@@ -151,7 +151,7 @@ void UBeltBarWidget::HandleSlotRightClicked(FInventorySlotRef SlotRef)
 	}
 }
 
-void UBeltBarWidget::HandleCampfireItemDropped(ACampfireActor* Campfire, FCampfireSlotRef FromSlot,
+void UBeltBarWidget::HandleCampfireItemDropped(ACampfire* Campfire, FCampfireSlotRef FromSlot,
 	FInventorySlotRef ToSlot, int32 Count, bool bAutoHalfSplitOnEmptyTarget)
 {
 	if (AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer()))

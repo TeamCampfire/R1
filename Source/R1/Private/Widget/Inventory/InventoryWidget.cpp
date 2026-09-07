@@ -10,7 +10,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Blueprint/UserWidget.h"
 #include "Character/ActionPlayerController.h"
-#include "Campfire/CampfireActor.h"
+#include "Item/PlaceableItem/Campfire/Campfire.h"
 
 UInventoryWidget* UInventoryWidget::ShowInventoryTestWidget(UObject* WorldContextObject, TSubclassOf<UInventoryWidget> WidgetClass)
 {
@@ -48,6 +48,11 @@ void UInventoryWidget::ClearSelection()
 	{
 		Inventory->ClearSelection();
 	}
+}
+
+void UInventoryWidget::SetActiveCampfire(ACampfire* Campfire)
+{
+	ActiveCampfire = Campfire;
 }
 
 void UInventoryWidget::NativePreConstruct()
@@ -243,7 +248,7 @@ void UInventoryWidget::HandleSlotRightClicked(FInventorySlotRef SlotRef)
 	}
 }
 
-void UInventoryWidget::HandleCampfireItemDropped(ACampfireActor* Campfire, FCampfireSlotRef FromSlot,
+void UInventoryWidget::HandleCampfireItemDropped(ACampfire* Campfire, FCampfireSlotRef FromSlot,
 	FInventorySlotRef ToSlot, int32 Count, bool bAutoHalfSplitOnEmptyTarget)
 {
 	if (AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer()))

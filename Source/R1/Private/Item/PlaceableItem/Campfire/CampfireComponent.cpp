@@ -1,4 +1,4 @@
-#include "Campfire/CampfireComponent.h"
+﻿#include "Item/PlaceableItem/Campfire/CampfireComponent.h"
 
 #include "Component/InventoryComponent.h"
 #include "Data/Campfire/CampfireConfigDataAsset.h"

@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.31
+﻿/// 최초작성 : 2026.08.31
 /// 작 성 자 : 최 요 환
 /// 간단설명 : 벨트(퀵슬롯) 바 위젯 — 인벤토리 패널을 열고 닫는 것과 무관하게 항상 HUD에 떠있다.
 
@@ -9,13 +9,13 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Component/InventoryComponent.h"
-#include "Campfire/CampfireTypes.h"
+#include "Item/PlaceableItem/Campfire/CampfireTypes.h"
 #include "BeltBarWidget.generated.h"
 
 class UInventoryComponent;
 class UPanelWidget;
 class UInventorySlotWidget;
-class ACampfireActor;
+class ACampfire;
 
 /**
  * 벨트(퀵슬롯) 바의 C++ 베이스. AMainHUD가 BeginPlay에서 생성해 상시 뷰포트에 띄운다 —
@@ -80,7 +80,7 @@ private:
 	void HandleSlotDragCancelled(FInventorySlotRef SlotRef);
 
 	UFUNCTION()
-	void HandleCampfireItemDropped(ACampfireActor* Campfire, FCampfireSlotRef FromSlot,
+	void HandleCampfireItemDropped(ACampfire* Campfire, FCampfireSlotRef FromSlot,
 		FInventorySlotRef ToSlot, int32 Count, bool bAutoHalfSplitOnEmptyTarget);
 
 	// 언바인딩용으로 보관. 소유 폰이 사라지는 경우도 있어 약한 참조로 들고 있는다.

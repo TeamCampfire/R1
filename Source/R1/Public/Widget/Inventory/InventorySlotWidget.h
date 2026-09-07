@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.30
+﻿/// 최초작성 : 2026.08.30
 /// 작 성 자 : 최 요 환
 /// 간단설명 : 인벤토리 슬롯 하나를 표현하는 재사용 위젯
 
@@ -9,7 +9,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Component/InventoryComponent.h"
-#include "Campfire/CampfireTypes.h"
+#include "Item/PlaceableItem/Campfire/CampfireTypes.h"
 #include "Item/ItemInstance.h"
 #include "InventorySlotWidget.generated.h"
 
@@ -18,7 +18,7 @@ class UImage;
 class UTextBlock;
 class UWidget;
 class UPanelWidget;
-class ACampfireActor;
+class ACampfire;
 
 // Count/bAutoHalfSplitOnEmptyTarget은 UInventoryDragDropOperation의 동명 필드를 그대로 전달한
 // 것 — Count가 0 이하면 슬롯 전체 이동, 양수면 그만큼만(DetailInfoWidget의 분할 드래그).
@@ -27,7 +27,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnInventorySlotDropped, FInventor
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotClicked, FInventorySlotRef, SlotRef);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotRightClicked, FInventorySlotRef, SlotRef);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotDragCancelled, FInventorySlotRef, SlotRef);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(FOnCampfireItemDroppedToInventory, ACampfireActor*, Campfire,
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(FOnCampfireItemDroppedToInventory, ACampfire*, Campfire,
 	FCampfireSlotRef, FromSlot, FInventorySlotRef, ToSlot, int32, Count, bool, bAutoHalfSplitOnEmptyTarget);
 
 // 드래그 시작 슬롯과 드롭된 슬롯의 ContainerId가 서로 다를 때만 발생한다(같으면 기존

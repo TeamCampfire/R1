@@ -19,7 +19,7 @@ class UWarehouseWidget;
 class UWarehouseInventoryComponent;
 class AActionPlayerController;
 class UCampfireWidget;
-class ACampfireActor;
+class ACampfire;
 /**
  * 
  */
@@ -58,7 +58,7 @@ public:
 
 	// 모닥불 열기
 	UFUNCTION(BlueprintCallable, Category = "Campfire")
-	void OpenCampfire(ACampfireActor* Campfire);
+	void OpenCampfire(ACampfire* Campfire);
 
 	// 모닥불 닫기
 	UFUNCTION(BlueprintCallable, Category = "Campfire")

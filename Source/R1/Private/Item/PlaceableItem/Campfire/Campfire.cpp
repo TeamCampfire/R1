@@ -1,18 +1,14 @@
-﻿#include "Campfire/CampfireActor.h"
+﻿#include "Item/PlaceableItem/Campfire/Campfire.h"
 
-#include "Campfire/CampfireComponent.h"
+#include "Item/PlaceableItem/Campfire/CampfireComponent.h"
 #include "Character/ActionPlayerController.h"
 #include "Components/AudioComponent.h"
 #include "Particles/ParticleSystemComponent.h"
-#include "Components/StaticMeshComponent.h"
 #include "GameFramework/Pawn.h"
 
-ACampfireActor::ACampfireActor()
+ACampfire::ACampfire()
 {
 	bReplicates = true;
-
-	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("FireMesh"));
-	Mesh->SetupAttachment(GetRootComponent());
 
 	FireAudio = CreateDefaultSubobject<UAudioComponent>(TEXT("FireAudio"));
 	FireAudio->SetupAttachment(GetRootComponent());
@@ -21,25 +17,25 @@ ACampfireActor::ACampfireActor()
 	CampfireComponent = CreateDefaultSubobject<UCampfireComponent>(TEXT("CampfireComponent"));
 }
 
-void ACampfireActor::BeginPlay()
+void ACampfire::BeginPlay()
 {
 	Super::BeginPlay();
 	if (CampfireComponent)
 	{
-		CampfireComponent->OnCampfireStateChanged.AddDynamic(this, &ACampfireActor::HandleCampfireStateChanged);
+		CampfireComponent->OnCampfireStateChanged.AddDynamic(this, &ACampfire::HandleCampfireStateChanged);
 		HandleCampfireStateChanged();
 	}
 }
 
-FText ACampfireActor::GetInteractionDisplayName_Implementation() const { return InteractionName; }
+FText ACampfire::GetInteractionDisplayName_Implementation() const { return InteractionName; }
 
-bool ACampfireActor::CanInteract_Implementation(APawn* Interactor) const
+bool ACampfire::CanInteract_Implementation(APawn* Interactor) const
 {
 	return IsValid(Interactor) && FVector::DistSquared(Interactor->GetActorLocation(), GetActorLocation())
 		<= FMath::Square(InteractionDistance);
 }
 
-void ACampfireActor::Interact_Implementation(APawn* Interactor)
+void ACampfire::Interact_Implementation(APawn* Interactor)
 {
 	if (!HasAuthority() || !CanInteract_Implementation(Interactor)) return;
 	if (AActionPlayerController* PC = Cast<AActionPlayerController>(Interactor->GetController()))
@@ -48,7 +44,7 @@ void ACampfireActor::Interact_Implementation(APawn* Interactor)
 	}
 }
 
-void ACampfireActor::HandleCampfireStateChanged()
+void ACampfire::HandleCampfireStateChanged()
 {
 	const bool bLit = CampfireComponent && CampfireComponent->bIsLit;
 	if (FireAudio) FireAudio->SetActive(bLit);

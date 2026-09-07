@@ -16,7 +16,7 @@
 #include "Component/StatComponent.h"
 #include "Widget/BuildingSystem/BuildingDurabilityWidget.h"
 #include "Widget/Campfire/CampfireWidget.h"
-#include "Campfire/CampfireActor.h"
+#include "Item/PlaceableItem/Campfire/Campfire.h"
 #include "Component/InteractionComponent.h"
 #include "GameFramework/Pawn.h"
 
@@ -205,7 +205,7 @@ bool UMainHUDWidget::ToggleInventoryPanel()
 	return bNewOpenState;
 }
 
-void UMainHUDWidget::OpenCampfire(ACampfireActor* Campfire)
+void UMainHUDWidget::OpenCampfire(ACampfire* Campfire)
 {
 	if (!IsValid(Campfire) || !InventoryWidget || !CampfireWidget) return;
 	const bool bInventoryWasOpen = IsInventoryPanelOpen();
