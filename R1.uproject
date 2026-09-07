@@ -10,7 +10,8 @@
 			"LoadingPhase": "Default",
 			"AdditionalDependencies": [
 				"Engine",
-				"UMG"
+				"UMG",
+				"ChaosVehicles"
 			]
 		}
 	],
@@ -36,6 +37,10 @@
 		},
 		{
 			"Name": "OnlineSubsystemNull",
+			"Enabled": true
+		},
+		{
+			"Name": "ChaosVehiclesPlugin",
 			"Enabled": true
 		}
 	]

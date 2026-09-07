@@ -16,34 +16,31 @@ AVehicleBase::AVehicleBase()
 	SetReplicateMovement(true);
 }
 
+void AVehicleBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	DOREPLIFETIME(AVehicleBase, DriverCharacter);
+}
+
 void AVehicleBase::RequestMountVehicle_Implementation(ACharacter* VehicleCharacter)
 {
 }
 
 void AVehicleBase::EnterVehicle_Implementation(APawn* VehicleCharacter, int32 InSeatIndex)
 {
+
 	AActionCharacter* VehicleChar = Cast<AActionCharacter>(VehicleCharacter);
 	AActionPlayerController* PC = Cast<AActionPlayerController>(VehicleChar->GetController());
 	bool bIsDriver = (InSeatIndex == 0);
+
 	// 운전석
 	if (InSeatIndex == 0)
 	{
 		DriverCharacter = VehicleChar;
-		UE_LOG(LogTemp, Warning,
-			TEXT("[BEFORE POSSESS] Car=%s Owner=%s"),
-			*GetNameSafe(this),
-			*GetNameSafe(GetOwner()));
-		PC->Possess(this);
-		UE_LOG(LogTemp, Warning,
-			TEXT("[AFTER POSSESS] Car=%s Owner=%s"),
-			*GetNameSafe(this),
-			*GetNameSafe(GetOwner()));
 	}
 
 	if (!SeatPoints.IsValidIndex(InSeatIndex)) return;
 
 	VehicleChar->SetIsInVehicle(true, bIsDriver);
-
 	USceneComponent* SeatScene = SeatPoints[InSeatIndex];
 
 	if (!SeatScene) return;
@@ -52,47 +49,27 @@ void AVehicleBase::EnterVehicle_Implementation(APawn* VehicleCharacter, int32 In
 		SeatScene,
 		FAttachmentTransformRules::SnapToTargetNotIncludingScale
 	);
-	TArray<AActor*> AttachedActors;
-	GetAttachedActors(AttachedActors);
-
-	/*for (AActor* Actor : AttachedActors)
-	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("[CLIENT] Attached Actor = %s"),
-			*GetNameSafe(Actor));
-		if (Actor && Actor->GetRootComponent())
-		{
-			UE_LOG(LogTemp, Warning,
-				TEXT("[CLIENT] Character Loc=%s Rot=%s"),
-				*Actor->GetActorLocation().ToString(),
-				*Actor->GetActorRotation().ToString());
-
-			UE_LOG(LogTemp, Warning,
-				TEXT("[CLIENT] Root Loc=%s Rot=%s"),
-				*Actor->GetRootComponent()->GetComponentLocation().ToString(),
-				*Actor->GetRootComponent()->GetComponentRotation().ToString());
-
-			UE_LOG(LogTemp, Warning,
-				TEXT("[CLIENT] Parent=%s"),
-				*GetNameSafe(Actor->GetRootComponent()->GetAttachParent()));
-		}
-	}
 	UE_LOG(LogTemp, Warning,
-		TEXT("[ATTACH] Vehicle=%s Seat=%s SeatLoc=%s CharacterLoc=%s"),
+		TEXT("[ENTER VEHICLE] Vehicle=%s Char=%s Authority=%d Local=%d PC=%s"),
 		*GetNameSafe(this),
-		*GetNameSafe(SeatScene),
-		*SeatScene->GetComponentLocation().ToString(),
-		*VehicleChar->GetActorLocation().ToString());*/
-	/*UE_LOG(LogTemp, Warning,
-		TEXT("[%s] After Attach: Parent=%s AttachSocket=%s"),
-		GetNetMode() == NM_Client ? TEXT("CLIENT") : TEXT("SERVER"),
-		*GetNameSafe(VehicleChar->GetRootComponent()->GetAttachParent()),
-		*VehicleChar->GetRootComponent()->GetAttachSocketName().ToString());*/
+		*GetNameSafe(VehicleChar),
+		HasAuthority(),
+		VehicleChar->IsLocallyControlled(),
+		*GetNameSafe(PC)
+	);
+
+	if (InSeatIndex == 0)
+		PC->Possess(this);
 
 }
 
 void AVehicleBase::ExitVehicle_Implementation(APawn* VehicleCharacter)
 {
+}
+
+AActionCharacter* AVehicleBase::GetDriverCharacter() const
+{
+	return DriverCharacter;
 }
 
 void AVehicleBase::InitializeSeatPoints()

@@ -6,6 +6,8 @@
 #include "UObject/Interface.h"
 #include "VehicleInterface.generated.h"
 
+class AActionCharacter;
+
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
 class UVehicleInterface : public UInterface
@@ -28,6 +30,8 @@ public:
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Vehicle")
 	  void ExitVehicle(APawn* VehicleCharacter);
+
+	virtual AActionCharacter* GetDriverCharacter() const = 0;
 
 public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Vehicle")

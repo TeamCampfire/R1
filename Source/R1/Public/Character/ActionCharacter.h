@@ -63,6 +63,9 @@ public:
 
 	void SetIsInVehicle(bool bIsInVehicleNew, bool bIsDriver);
 
+	UFUNCTION()
+	void OnRep_IsSitting();
+
 	FORCEINLINE bool IsSprinting() const { return bIsSprinting; }
 
 	FORCEINLINE bool IsSitting() const { return bIsSitting; }
@@ -327,8 +330,12 @@ protected:
 	ECrouchInputMode CrouchInputMode = ECrouchInputMode::Hold; // 기본 Hold
 
 	// 탈것 탑승 중
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(ReplicatedUsing = OnRep_IsSitting)
 	bool bIsSitting = false;
+
+	//// 운전자인가?
+	//UPROPERTY(Replicated)
+	//bool bIsDriver = false;
 
 	// 스탯 컴포넌트
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)

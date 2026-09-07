@@ -24,11 +24,15 @@ public:
 
 public:
 	// Implement the RequestMountVehicle function from the IVehicleInterface
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 	virtual void RequestMountVehicle_Implementation(ACharacter* VehicleCharacter) override;
 
 	virtual void EnterVehicle_Implementation(APawn* VehicleCharacter, int32 InSeatIndex) override;
 
 	virtual void ExitVehicle_Implementation(APawn* VehicleCharacter) override;
+
+	virtual AActionCharacter* GetDriverCharacter() const override;
 
 protected:
 	void InitializeSeatPoints();
@@ -46,7 +50,7 @@ protected:
 	TArray<TObjectPtr<USceneComponent>> SeatPoints;
 
 	// 운전자
-	UPROPERTY()
+	UPROPERTY(Replicated)
 	TObjectPtr<AActionCharacter> DriverCharacter;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")

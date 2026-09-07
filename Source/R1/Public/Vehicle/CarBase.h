@@ -37,7 +37,7 @@ protected:
 	TObjectPtr<UInputAction> IA_Move;
 
 
-	// 회전
+	// 카메라 회전
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UInputAction> IA_Look;
 

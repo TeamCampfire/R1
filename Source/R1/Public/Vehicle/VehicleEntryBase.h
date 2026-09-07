@@ -11,6 +11,7 @@
 #include "VehicleEntryBase.generated.h"
 
 class AVehicleBase;
+class AWheeledVehicleBase;
 
 UCLASS()
 class R1_API AVehicleEntryBase : public AActor, public IVehicleEntryInterface, public IInteractableInterface
@@ -32,7 +33,7 @@ public:
 protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Vehicle")
-	TObjectPtr<AVehicleBase> Vehicle;
+	TObjectPtr<AWheeledVehicleBase> Vehicle;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vehicle")
 	int32 SeatIndex = 0;

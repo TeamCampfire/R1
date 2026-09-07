@@ -1,5 +1,6 @@
 ﻿#include "Vehicle/VehicleEntryBase.h"
 #include "Vehicle/VehicleBase.h"
+#include "Vehicle/WheeledVehicleBase.h"
 #include "Character/ActionPlayerController.h"
 #include "Character/ActionCharacter.h"
 
@@ -27,7 +28,7 @@ void AVehicleEntryBase::Interact_Implementation(APawn* Interactor)
 void AVehicleEntryBase::BeginPlay()
 {
 	Super::BeginPlay();
-	Vehicle = Cast<AVehicleBase>(GetAttachParentActor());
+	Vehicle = Cast<AWheeledVehicleBase>(GetAttachParentActor());
 }
 
 // Called every frame

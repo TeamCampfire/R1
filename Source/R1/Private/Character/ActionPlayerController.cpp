@@ -13,6 +13,7 @@
 #include "Framework/MainHUD.h"
 #include "Framework/GameMode/TestGameMode.h"
 #include "Widget/Multiplayer/MultiplayerMenuWidget.h"
+#include "Vehicle/WheeledVehicleBase.h"
 
 #include "BuildingSystem/Component/BuildingPlacementComponent.h"
 #include "Data/Building/BuildingPartDefinition.h"
@@ -244,17 +245,22 @@ void AActionPlayerController::OnRep_Pawn()
 		*GetNameSafe(GetPawn()),
 		IsLocalController() ? TEXT("TRUE") : TEXT("FALSE"));
 
-	AActionCharacter* NewCharacter = Cast<AActionCharacter>(GetPawn());
+	// 차량으로 Possess된 경우
+    if (AWheeledVehicleBase* Vehicle =
+        Cast<AWheeledVehicleBase>(GetPawn()))
+    {
+        Vehicle->AddVehicleInputMapping();
+        return;
+    }
 
-	// 차량 등 Character가 아닌 Pawn으로 Possess된 경우
-	// Character 변경으로 취급하지 않는다.
-	if (!NewCharacter) return;
+    // 기존 Character 처리
+    AActionCharacter* NewCharacter =
+        Cast<AActionCharacter>(GetPawn());
 
-	if (!IsLocalController()) return;
+    if (!NewCharacter)
+        return;
 
-	if (!GetPawn()) return;
-	
-	OnPossessedCharChange.Broadcast();
+    OnPossessedCharChange.Broadcast();
 }
 
 

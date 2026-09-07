@@ -81,10 +81,6 @@ void ACarBase::OnMoveInput(const FInputActionValue& InValue)
 void ACarBase::OnRep_ReplicatedMovement()
 {
 	Super::OnRep_ReplicatedMovement();
-
-	UE_LOG(LogTemp, Warning,
-		TEXT("[CAR REP] Loc=%s"),
-		*GetActorLocation().ToString());
 }
 
 void ACarBase::BeginPlay()
@@ -100,9 +96,6 @@ void ACarBase::BeginPlay()
 void ACarBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	UE_LOG(LogTemp, Warning,
-		TEXT("[CAR TICK] Loc=%s"),
-		*GetActorLocation().ToString());
 }
 
 void ACarBase::ServerMove_Implementation(const FVector2D& MoveValue)
