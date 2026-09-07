@@ -99,9 +99,9 @@ void AHeldItemBase::OnRep_ItemData()
 
 void AHeldItemBase::OnPrimaryActionStarted()
 {
-	UE_LOG(LogTemp, Display, TEXT("[AHeldItemBase::OnPrimaryActionStarted] Called. ItemData=%s, Montage=%s"), 
-		ItemData ? *ItemData->GetName() : TEXT("NULL"), 
-		(ItemData && ItemData->PrimaryMontage) ? *ItemData->PrimaryMontage->GetName() : TEXT("NULL"));
+	//UE_LOG(LogTemp, Display, TEXT("[AHeldItemBase::OnPrimaryActionStarted] Called. ItemData=%s, Montage=%s"), 
+	//	ItemData ? *ItemData->GetName() : TEXT("NULL"), 
+	//	(ItemData && ItemData->PrimaryMontage) ? *ItemData->PrimaryMontage->GetName() : TEXT("NULL"));
 
 	if (!ItemData || !ItemData->PrimaryMontage || !OwnerCharacter) return;
 
