@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.30
+﻿/// 최초작성 : 2026.08.30
 /// 작 성 자 : 최 요 환
 /// 간단설명 : 인벤토리 슬롯 드래그앤드롭 시 어느 슬롯에서 시작됐는지 들고 다니는 페이로드
 
@@ -9,9 +9,12 @@
 #include "CoreMinimal.h"
 #include "Blueprint/DragDropOperation.h"
 #include "Component/InventoryComponent.h"
+#include "Item/PlaceableItem/Campfire/CampfireTypes.h"
 #include "InventoryDragDropOperation.generated.h"
 
 class UInventorySlotWidget;
+class ACampfire;
+class UItemDataBase;
 
 /**
  * 인벤토리 슬롯 드래그 시작 지점을 들고 다니는 페이로드.
@@ -24,6 +27,12 @@ class R1_API UInventoryDragDropOperation : public UDragDropOperation
 	GENERATED_BODY()
 
 public:
+	UPROPERTY(BlueprintReadWrite, Category = "Inventory")
+	EItemDragSourceType SourceType = EItemDragSourceType::PlayerInventory;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Inventory")
+	TObjectPtr<UItemDataBase> DraggedItemData;
+
 	UPROPERTY(BlueprintReadWrite, Category = "Inventory")
 	FInventorySlotRef SourceSlotRef;
 
@@ -50,6 +59,14 @@ public:
 	// (WBP_Inventory, WBP_BeltBar 등)은 전부 0끼리만 비교되어 동작이 그대로 유지된다.
 	UPROPERTY(BlueprintReadWrite, Category = "Inventory")
 	int32 SourceContainerId = 0;
+
+	// 모닥불 구분
+
+	UPROPERTY(BlueprintReadWrite, Category = "Campfire")
+	FCampfireSlotRef CampfireSourceSlot;
+
+	UPROPERTY()
+	TWeakObjectPtr<ACampfire> SourceCampfire;
 
 protected:
 	//~ Begin UDragDropOperation Interface

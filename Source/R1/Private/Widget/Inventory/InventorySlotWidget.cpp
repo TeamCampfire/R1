@@ -241,6 +241,7 @@ void UInventorySlotWidget::NativeOnDragDetected(const FGeometry& InGeometry, con
 
 	UInventoryDragDropOperation* DragOp = NewObject<UInventoryDragDropOperation>(this);
 	DragOp->SourceSlotRef = SlotRef;
+	DragOp->DraggedItemData = CachedInstance.ItemData;
 	DragOp->SourceWidget = this;
 	DragOp->SourceContainerId = ContainerId;
 	DragOp->bAutoHalfSplitOnEmptyTarget = bPendingMiddleButtonDrag;
@@ -287,12 +288,19 @@ bool UInventorySlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDrag
 
 	if (UInventoryDragDropOperation* DragOp = Cast<UInventoryDragDropOperation>(InOperation))
 	{
-		if (DragOp->SourceContainerId == ContainerId)
+		if (DragOp->SourceType == EItemDragSourceType::Campfire)
 		{
+			// 모닥불 -> 인벤토리
+			OnCampfireItemDropped.Broadcast(DragOp->SourceCampfire.Get(), DragOp->CampfireSourceSlot, SlotRef, DragOp->Count, DragOp->bAutoHalfSplitOnEmptyTarget);
+		}
+		else if (DragOp->SourceContainerId == ContainerId)
+		{
+			// 같은 컨테이너 내부 이동
 			OnSlotDropped.Broadcast(DragOp->SourceSlotRef, SlotRef, DragOp->Count, DragOp->bAutoHalfSplitOnEmptyTarget);
 		}
 		else
 		{
+			// 창고<-> 플레이어 인벤토리 
 			OnSlotDroppedCross.Broadcast(DragOp->SourceContainerId, DragOp->SourceSlotRef, ContainerId, SlotRef, DragOp->Count);
 		}
 		return true;

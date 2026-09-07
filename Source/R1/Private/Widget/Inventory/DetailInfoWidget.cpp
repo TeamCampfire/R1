@@ -402,6 +402,8 @@ void UDetailInfoWidget::NativeOnDragDetected(const FGeometry& InGeometry, const 
 	}
 
 	UInventoryDragDropOperation* DragOp = NewObject<UInventoryDragDropOperation>(this);
+	DragOp->SourceType = EItemDragSourceType::PlayerInventory;
+	DragOp->DraggedItemData = Selected.ItemData;
 	DragOp->SourceSlotRef = Inventory->SelectedSlotRef;
 	DragOp->Count = CurrentSplitCount;
 	DragOp->Pivot = EDragPivot::CenterCenter;

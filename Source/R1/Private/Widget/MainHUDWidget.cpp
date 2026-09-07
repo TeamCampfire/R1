@@ -15,6 +15,10 @@
 #include "Character/ActionCharacter.h"
 #include "Component/StatComponent.h"
 #include "Widget/BuildingSystem/BuildingDurabilityWidget.h"
+#include "Widget/Campfire/CampfireWidget.h"
+#include "Item/PlaceableItem/Campfire/Campfire.h"
+#include "Component/InteractionComponent.h"
+#include "GameFramework/Pawn.h"
 
 void UMainHUDWidget::NativeOnInitialized()
 {
@@ -42,6 +46,7 @@ void UMainHUDWidget::NativeOnInitialized()
 	{
 		InventoryWidget->SetVisibility(ESlateVisibility::Collapsed);
 	}
+	if (CampfireWidget) CampfireWidget->SetVisibility(ESlateVisibility::Collapsed);
 
 	// 게임을 시작했을 때 이전 디자인용 테스트 문구가 화면에 표시되지 않도록 숨겨요
 	if (true == IsValid(Border_BuildingPlacementMessage))
@@ -50,6 +55,7 @@ void UMainHUDWidget::NativeOnInitialized()
 
 void UMainHUDWidget::NativeDestruct()
 {
+	CloseCampfire();
 	// 위젯이 제거될 때 예약된 타이머가 남아 제거된 위젯을 다시 호출하지 않도록 정리해줍니다
 	if (UWorld* World = GetWorld())
 		World->GetTimerManager().ClearTimer(BuildingPlacementMessageTimerHandle);
@@ -66,6 +72,22 @@ void UMainHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
 	CheckWarehouseAutoClose();
+	CheckCampfireAutoClose();
+}
+
+void UMainHUDWidget::CheckCampfireAutoClose()
+{
+	if (!bCampfireSessionOpen) return;
+
+	ACampfire* Campfire = OpenCampfireActor.Get();
+	APawn* Pawn = GetOwningPlayerPawn();
+
+	// 서버의 상호작용 허용 조건과 같은 기준으로 검사
+	if (!IsValid(Campfire) || !IsValid(Pawn)
+		|| !IInteractableInterface::Execute_CanInteract(Campfire, Pawn))
+	{
+		CloseCampfire();
+	}
 }
 
 void UMainHUDWidget::CheckWarehouseAutoClose()
@@ -115,6 +137,9 @@ void UMainHUDWidget::HideDeathScreen()
 
 void UMainHUDWidget::OnPossessedCharChange()
 {
+	// 조종 대상 바뀌면 모닥불 UI 무조건 닫기
+	CloseCampfire();
+
 	// 조종 대상이 바뀌면(부활로 새 캐릭터를 빙의하는 경우 등) 열려있던 창고 세션은 무조건 끊는다 —
 	// UWarehouseWidget은 InventoryWidget/BeltBarWidget과 달리 OnPossessedCharChange를 직접
 	// 구독하지 않고 OpenWarehouse가 호출된 시점의 폰에서만 BoundPlayerInventory를 찾아두므로,
@@ -180,6 +205,8 @@ bool UMainHUDWidget::ToggleInventoryPanel()
 
 	if (!bNewOpenState)
 	{
+		CloseCampfire();
+
 		// 닫을 때는 선택 상태(파란 테두리)도 같이 초기화 — 다음에 열었을 때 예전 선택이 남아있지 않게.
 		InventoryWidget->ClearSelection();
 
@@ -196,6 +223,51 @@ bool UMainHUDWidget::ToggleInventoryPanel()
 	//	bNewOpenState, (int32)InventoryWidget->GetVisibility());
 
 	return bNewOpenState;
+}
+
+void UMainHUDWidget::OpenCampfire(ACampfire* Campfire)
+{
+	if (!IsValid(Campfire) || !InventoryWidget || !CampfireWidget) return;
+	const bool bInventoryWasOpen = IsInventoryPanelOpen();
+	InventoryWidget->SetVisibility(ESlateVisibility::Visible);
+	InventoryWidget->SetActiveCampfire(Campfire);
+	CampfireWidget->BindCampfire(Campfire);
+	CampfireWidget->SetVisibility(ESlateVisibility::Visible);
+	OpenCampfireActor = Campfire;
+	bCampfireSessionOpen = true;
+	if (CachedController)
+	{
+		if (APawn* Pawn = CachedController->GetPawn())
+		{
+			if (UInteractionComponent* Interaction = Pawn->FindComponentByClass<UInteractionComponent>())
+			{
+				Interaction->SetActiveCampfire(Campfire);
+			}
+		}
+		if (!bInventoryWasOpen) CachedController->SetInventoryInputState(true);
+	}
+}
+
+void UMainHUDWidget::CloseCampfire()
+{
+	if (InventoryWidget) InventoryWidget->ClearActiveCampfire();
+	if (CampfireWidget)
+	{
+		CampfireWidget->UnbindCampfire();
+		CampfireWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	if (CachedController)
+	{
+		if (APawn* Pawn = CachedController->GetPawn())
+		{
+			if (UInteractionComponent* Interaction = Pawn->FindComponentByClass<UInteractionComponent>())
+			{
+				Interaction->SetActiveCampfire(nullptr);
+			}
+		}
+	}
+	bCampfireSessionOpen = false;
+	OpenCampfireActor.Reset();
 }
 
 bool UMainHUDWidget::IsInventoryPanelOpen() const

@@ -19,11 +19,62 @@
 #include "Data/Building/BuildingPartDefinition.h"
 #include "Data/Item/PlaceableItemData.h"
 #include "Component/InventoryComponent.h"
+#include "Item/PlaceableItem/Campfire/Campfire.h"
+#include "Item/PlaceableItem/Campfire/CampfireComponent.h"
+#include "Component/InventoryComponent.h"
+#include "Widget/MainHUDWidget.h"
+#include "Interface/InteractableInterface.h"
 
 AActionPlayerController::AActionPlayerController()
 {
 	// 빌딩 배치 컴포넌트 생성
 	BuildingPlacementComponent = CreateDefaultSubobject<UBuildingPlacementComponent>(TEXT("BuildingPlacementComp"));
+}
+
+UInventoryComponent* AActionPlayerController::GetPlayerInventory() const
+{
+	return GetPawn() ? GetPawn()->FindComponentByClass<UInventoryComponent>() : nullptr;
+}
+
+bool AActionPlayerController::CanUseCampfire(ACampfire* Campfire) const
+{
+	return GetPawn() && IsValid(Campfire)
+		&& IInteractableInterface::Execute_CanInteract(Campfire, GetPawn());
+}
+
+void AActionPlayerController::Client_OpenCampfire_Implementation(ACampfire* Campfire)
+{
+	if (AMainHUD* MainHUD = GetHUD<AMainHUD>())
+	{
+		if (UMainHUDWidget* Widget = MainHUD->GetMainHudWidget()) Widget->OpenCampfire(Campfire);
+	}
+}
+
+void AActionPlayerController::Server_MoveInventoryToCampfire_Implementation(ACampfire* Campfire,
+	FInventorySlotRef From, FCampfireSlotRef To, int32 Count, bool bHalfSplit)
+{
+	if (CanUseCampfire(Campfire)) Campfire->GetCampfireComponent()->MoveFromInventory(GetPlayerInventory(), From, To, Count, bHalfSplit);
+}
+
+void AActionPlayerController::Server_MoveCampfireToInventory_Implementation(ACampfire* Campfire,
+	FCampfireSlotRef From, FInventorySlotRef To, int32 Count, bool bHalfSplit)
+{
+	if (CanUseCampfire(Campfire)) Campfire->GetCampfireComponent()->MoveToInventory(GetPlayerInventory(), From, To, Count, bHalfSplit);
+}
+
+void AActionPlayerController::Server_QuickMoveInventoryToCampfire_Implementation(ACampfire* Campfire, FInventorySlotRef From)
+{
+	if (CanUseCampfire(Campfire)) Campfire->GetCampfireComponent()->QuickMoveFromInventory(GetPlayerInventory(), From);
+}
+
+void AActionPlayerController::Server_QuickMoveCampfireToInventory_Implementation(ACampfire* Campfire, FCampfireSlotRef From)
+{
+	if (CanUseCampfire(Campfire)) Campfire->GetCampfireComponent()->QuickMoveToInventory(GetPlayerInventory(), From);
+}
+
+void AActionPlayerController::Server_SetCampfireLit_Implementation(ACampfire* Campfire, bool bLit)
+{
+	if (CanUseCampfire(Campfire)) Campfire->GetCampfireComponent()->SetLit(bLit);
 }
 
 void AActionPlayerController::BeginPlay()

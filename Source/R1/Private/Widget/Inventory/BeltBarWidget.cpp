@@ -5,6 +5,7 @@
 #include "Widget/Inventory/InventorySlotWidget.h"
 #include "GameFramework/Pawn.h"
 #include "Character/ActionPlayerController.h"
+#include "Component/InteractionComponent.h"
 
 void UBeltBarWidget::NativePreConstruct()
 {
@@ -93,6 +94,7 @@ void UBeltBarWidget::HandleInventoryChanged()
 			SlotWidget->OnSlotClicked.AddDynamic(this, &UBeltBarWidget::HandleSlotClicked);
 			SlotWidget->OnSlotRightClicked.AddDynamic(this, &UBeltBarWidget::HandleSlotRightClicked);
 			SlotWidget->OnSlotDragCancelled.AddDynamic(this, &UBeltBarWidget::HandleSlotDragCancelled);
+			SlotWidget->OnCampfireItemDropped.AddDynamic(this, &UBeltBarWidget::HandleCampfireItemDropped);
 		},
 		[Inventory](const FInventorySlotRef& SlotRef)
 		{
@@ -133,9 +135,28 @@ void UBeltBarWidget::HandleSlotClicked(FInventorySlotRef SlotRef)
 
 void UBeltBarWidget::HandleSlotRightClicked(FInventorySlotRef SlotRef)
 {
+	if (AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer()))
+	{
+		UInteractionComponent* Interaction = PC->GetPawn()
+			? PC->GetPawn()->FindComponentByClass<UInteractionComponent>() : nullptr;
+		if (ACampfire* Campfire = Interaction ? Interaction->GetActiveCampfire() : nullptr)
+		{
+			PC->Server_QuickMoveInventoryToCampfire(Campfire, SlotRef);
+			return;
+		}
+	}
 	if (UInventoryComponent* Inventory = BoundInventory.Get())
 	{
 		Inventory->Server_QuickMoveItem(SlotRef);
+	}
+}
+
+void UBeltBarWidget::HandleCampfireItemDropped(ACampfire* Campfire, FCampfireSlotRef FromSlot,
+	FInventorySlotRef ToSlot, int32 Count, bool bAutoHalfSplitOnEmptyTarget)
+{
+	if (AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer()))
+	{
+		PC->Server_MoveCampfireToInventory(Campfire, FromSlot, ToSlot, Count, bAutoHalfSplitOnEmptyTarget);
 	}
 }
 
