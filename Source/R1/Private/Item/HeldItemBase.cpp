@@ -89,7 +89,7 @@ void AHeldItemBase::OnPrimaryActionStarted()
 	{
 		if (UAnimInstance* AnimInst = TPMesh->GetAnimInstance())
 		{
-			if (!AnimInst->IsAnyMontagePlaying()) return;
+			if (AnimInst->IsAnyMontagePlaying()) return;
 			AnimInst->Montage_Play(ItemData->PrimaryMontage);
 		}
 	}
