@@ -108,25 +108,40 @@ bool UCampfireComponent::AddOutput(UItemDataBase* Item)
 	return true;
 }
 
-bool UCampfireComponent::ConsumeNextFuel()
+void UCampfireComponent::SyncProgressItems()
 {
+	if (!InputSlot.IsValid() || ProgressCookingItem != InputSlot.ItemData)
+	{
+		ProgressCookingItem = InputSlot.IsValid() ? InputSlot.ItemData : nullptr;
+		CurrentCookingTime = 0.f;
+	}
+}
+
+bool UCampfireComponent::PrepareFuel()
+{
+	SyncProgressItems();
+	// 시작 시 이미 차감한 연료는 슬롯의 남은 연료와 독립적으로 연소한다.
+	// 0초까지 탄 채 Output 공간을 기다리는 경우에도 추가 연료를 소비하지 않는다.
+	if (CurrentFuelDuration > 0.f) return true;
 	if (!Config || !FuelSlot.IsValid()) return false;
 	const FCampfireFuelRecipe* FuelRecipe = Config->FindFuelRecipe(FuelSlot.ItemData);
 	if (!FuelRecipe) return false;
 
-	--FuelSlot.StackCount;
-	if (FuelSlot.StackCount <= 0) FuelSlot = FItemInstance();
 	PendingFuelOutputItem = FuelRecipe->AfterItem;
 	CurrentFuelDuration = FMath::Max(0.1f, Config->BurningTime);
 	RemainingFuelTime = CurrentFuelDuration;
+	--FuelSlot.StackCount;
+	if (FuelSlot.StackCount <= 0) FuelSlot = FItemInstance();
 	return true;
 }
 
 bool UCampfireComponent::CompleteCurrentFuel()
 {
-	if (!PendingFuelOutputItem) return true;
-	if (!AddOutput(PendingFuelOutputItem)) return false;
+	if (CurrentFuelDuration <= 0.f || RemainingFuelTime > 0.f) return false;
+	if (PendingFuelOutputItem && !AddOutput(PendingFuelOutputItem)) return false;
 	PendingFuelOutputItem = nullptr;
+	CurrentFuelDuration = 0.f;
+	RemainingFuelTime = 0.f;
 	return true;
 }
 
@@ -134,15 +149,15 @@ void UCampfireComponent::TickCampfire()
 {
 	if (!GetOwner() || !GetOwner()->HasAuthority() || !bIsLit || !Config) return;
 
-	if (RemainingFuelTime <= 0.f && (!CompleteCurrentFuel() || !ConsumeNextFuel()))
+	if (!PrepareFuel())
 	{
 		bIsLit = false;
-		CurrentCookingTime = 0.f;
 		NotifyStateChanged();
 		return;
 	}
 
-	RemainingFuelTime = FMath::Max(0.f, RemainingFuelTime - UpdateInterval);
+	const float BurningDelta = FMath::Min(RemainingFuelTime, UpdateInterval);
+	RemainingFuelTime = FMath::Max(0.f, RemainingFuelTime - BurningDelta);
 
 	const FCampfireCookingRecipe* CookingRecipe = InputSlot.IsValid()
 		? Config->FindCookingRecipe(InputSlot.ItemData) : nullptr;
@@ -151,18 +166,22 @@ void UCampfireComponent::TickCampfire()
 
 	if (bCanCook)
 	{
-		CurrentCookingTime += UpdateInterval;
+		CurrentCookingTime += BurningDelta;
 		if (CurrentCookingTime >= FMath::Max(0.1f, Config->CookingTime))
 		{
-			--InputSlot.StackCount;
-			if (InputSlot.StackCount <= 0) InputSlot = FItemInstance();
-			AddOutput(CookingRecipe->AfterItem);
-			CurrentCookingTime = 0.f;
+			if (AddOutput(CookingRecipe->AfterItem))
+			{
+				--InputSlot.StackCount;
+				if (InputSlot.StackCount <= 0) InputSlot = FItemInstance();
+				CurrentCookingTime = 0.f;
+			}
 		}
 	}
-	else
+
+	// Output 포화 시 결과물을 보류한다. Input이 비면 굽기 진행도만 초기화한다.
+	if (RemainingFuelTime <= 0.f)
 	{
-		CurrentCookingTime = 0.f;
+		if (!CompleteCurrentFuel() || !FuelSlot.IsValid()) bIsLit = false;
 	}
 
 	NotifyStateChanged();
@@ -171,17 +190,19 @@ void UCampfireComponent::TickCampfire()
 void UCampfireComponent::SetLit(bool bNewLit)
 {
 	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
-	if (bNewLit && RemainingFuelTime <= 0.f)
+	if (bNewLit && !PrepareFuel())
 	{
-		if (!CompleteCurrentFuel() || !ConsumeNextFuel()) return;
+		bIsLit = false;
+		NotifyStateChanged();
+		return;
 	}
 	bIsLit = bNewLit;
-	if (!bIsLit) CurrentCookingTime = 0.f;
 	NotifyStateChanged();
 }
 
 void UCampfireComponent::NotifyStateChanged()
 {
+	SyncProgressItems();
 	OnCampfireStateChanged.Broadcast();
 	if (AActor* Owner = GetOwner()) Owner->ForceNetUpdate();
 }

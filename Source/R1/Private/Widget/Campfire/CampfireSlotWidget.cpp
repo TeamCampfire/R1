@@ -1,4 +1,4 @@
-#include "Widget/Campfire/CampfireSlotWidget.h"
+﻿#include "Widget/Campfire/CampfireSlotWidget.h"
 
 #include "Campfire/CampfireActor.h"
 #include "Campfire/CampfireComponent.h"
@@ -8,6 +8,17 @@
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
 #include "Data/Item/ItemDataBase.h"
+
+void UCampfireSlotWidget::SynchronizeProperties()
+{
+	Super::SynchronizeProperties();
+	if (SlotTypeIcon)
+	{
+		SlotTypeIcon->SetBrushFromTexture(SlotTypeTexture);
+		SlotTypeIcon->SetVisibility(SlotTypeTexture
+			? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	}
+}
 
 void UCampfireSlotWidget::InitializeSlot(ACampfireActor* InCampfire, const FCampfireSlotRef& InSlot)
 {

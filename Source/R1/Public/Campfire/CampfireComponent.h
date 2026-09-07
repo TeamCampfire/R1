@@ -77,7 +77,8 @@ private:
 	void OnRep_State();
 
 	void TickCampfire();
-	bool ConsumeNextFuel();
+	bool PrepareFuel();
+	void SyncProgressItems();
 	int32 FindOutputSlot(UItemDataBase* Item) const;
 	bool AddOutput(UItemDataBase* Item);
 	void NotifyStateChanged();
@@ -85,7 +86,12 @@ private:
 	const FItemInstance* FindSlot(const FCampfireSlotRef& Slot) const;
 	bool CompleteCurrentFuel();
 
-	// 서버에서 현재 타고 있는 연료가 완료됐을 때 만들 부산물. nullptr이면 소비만 한다.
+	// 굽기 진행도는 불을 꺼도 유지하며, Input이 비거나 종류가 바뀌면 초기화한다.
+	UPROPERTY(Transient)
+	TObjectPtr<UItemDataBase> ProgressCookingItem;
+
+	// 시작 시 이미 차감한 연료의 완료 결과물. 슬롯에서 연료를 빼거나 바꿔도 보존한다.
+	// nullptr이면 연소 완료 시 부산물을 생성하지 않는다.
 	UPROPERTY(Transient)
 	TObjectPtr<UItemDataBase> PendingFuelOutputItem;
 
