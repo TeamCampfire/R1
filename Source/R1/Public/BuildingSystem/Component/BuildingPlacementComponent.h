@@ -4,8 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Component/InventoryComponent.h"
 #include "BuildingPlacementComponent.generated.h"
-
 
 
  // 현재 건축 파츠를 설치할 수 없는 이유.
@@ -42,6 +42,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Building|Placement")
 	void StopPlacement(); // 건축물 짓는 거 마무리 지을 때
 
+	// Placeable 아이템 사용으로 지형 배치를 시작
+	void StartPlaceablePlacement(class UPlaceableItemData* ItemData, const FInventorySlotRef& SourceSlot, const FGuid& SourceInstanceID);
+
 	UFUNCTION(BlueprintCallable)
 	class ABuildingPreviewActor* GetPreviewActor(); // Getter함수_PreviewActor
 
@@ -50,6 +53,8 @@ public:
 
 	// 키를 누를 때 마다 프리뷰 상태에서 데이터에 의해 파츠 회전을 진행하는 함수 
 	void RotateBuildingPart();
+
+	bool IsPlacing() const { return bIsPlacing; }
 
 protected:
 	// 클라이언트가 서버에 새로운 건축물 생성을 요청
@@ -61,11 +66,23 @@ protected:
 	void ServerPlaceSnappedPart(UBuildingPartDefinition* Definition, 
 		class ABuildingActor* TargetBuilding, FGuid TargetPartID, FName SocketName, int32 SnapYawwOffsetIdx);
 
+	// Placeable 아이템의 실제 설치를 서버에 요청
+	UFUNCTION(Server, Reliable)
+	void ServerPlacePlaceable(FGuid RequestID, class UPlaceableItemData* ItemData,
+		FInventorySlotRef SourceSlot, FGuid SourceInstanceID, const FTransform& InPlacementTransform);
+
+	// 서버의 Placeable 설치 결과를 요청한 클라이언트에 전달
+	UFUNCTION(Client, Reliable)
+	void ClientPlaceablePlacementResult(FGuid RequestID, bool bSuccess);
+
 	// Foundation Type의 지면 배치 프리뷰를 갱신
 	void UpdateFoundationPreview(APlayerController* PlayerController);
 
 	// Structure_Snap Type의 지면 배치 프리뷰를 갱신
 	bool UpdateStructureSnapPreview(APlayerController* PlayerController);
+
+	// Terrain Type Placeable의 지면 배치 프리뷰를 갱신
+	void UpdateTerrainPreview(APlayerController* PlayerController);
 
 	// Structure_Snap 대상 초기화 함수
 	void ClearCurrentSnapTarget();
@@ -130,6 +147,9 @@ private:
 	// CurrentInvalidReason을 현재 플레이어의 메인 HUD에 표시하는 함수
 	void ShowCurrentInvalidReasonMessage() const;
 
+	// 지면 노멀과 현재 회전값을 이용해 Placeable의 회전을 계산
+	FQuat BuildTerrainPlacementRotation(const FVector& InSurfaceNormal) const;
+
 	//  ===================================================================================
 private:
 	// 최대 건축 지점 거리
@@ -140,6 +160,12 @@ private:
 
 	// Foundation 전용 : 현재 Foundation의 피벗부터 가장 낮은 지점까지의 길이
 	float CurFoundationLegLength = 0.f;
+
+	// Placeable 지형 배치에서 지면 노멀을 축으로 적용할 누적 회전값
+	float CurrentTerrainYaw = 0.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Building|Terrain", meta = (ClampMin = "1.0", ClampMax = "180.0"))
+	float TerrainRotationStep = 15.f; // 휠 입력 한 번에 회전할 각도
 
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Building|Placement")
@@ -157,6 +183,17 @@ protected:
 	UPROPERTY(Transient)
 	bool bCanPlace = false; // 현재 프리뷰 위치에 실제 파츠를 설치할 수 있는지요?
 
+	UPROPERTY(Transient)
+	TObjectPtr<class UPlaceableItemData> SelectedPlaceableItem; // Placeable 전용 선택된 아이템 데이터
+
+	FInventorySlotRef PlaceableSourceSlot; // 설치 확정 시 원본 아이템을 검증하고 소비하기 위한 인벤토리 위치
+
+	FGuid PlaceableSourceInstanceID; // 슬롯 아이템이 배치를 시작할 동일 인스턴스인지 확인하기 위한 고유 ID
+
+	bool bPlaceablePlacementRequestPending = false; // Placeable 설치 요청 처리 중 좌클릭 연타를 방지해요
+
+	FGuid PendingPlaceablePlacementRequestID; // 서버 응답이 현재 설치 요청에 대한 것인지 구분하기 위한 고유 ID
+
 	// 현재 프리뷰가 설치 불가라면 그 이유를 저장하는 변수
 	UPROPERTY(Transient)
 	EBuildingPlacementInvalidReason CurrentInvalidReason = EBuildingPlacementInvalidReason::InvalidLocation;
@@ -169,6 +206,7 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Building|Snapping", meta = (ClampMin = "0.0"))
 	float SnapPointSearchRadius = 200.f; // 조준 위치에서 이 거리 안에 있는 소켓만 후보로 사용
+
 
 	UPROPERTY(Transient)
 	TWeakObjectPtr<class ABuildingActor> CurrentSnapBuilding; // 현재 프리뷰가 붙어 있는 BuildingActor
@@ -185,6 +223,7 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Building|Snapping", meta = (ClampMin = "0.0"))
 	float FoundationConnectionAnchorTolerance = 15.f; // Foundation 고리가 닫힐 때 발생할 수 있는 연결 앵커 사이의 작은 배치 오차를 허용해요
+
 private:
 	bool bIsPlacing = false; // 현재 건축물 배치중인가요?
 

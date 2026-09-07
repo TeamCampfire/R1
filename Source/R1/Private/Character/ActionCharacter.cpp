@@ -19,6 +19,7 @@
 #include "EnhancedInputComponent.h"
 #include "Character/ActionPlayerController.h"
 #include "Data/Item/ItemDataBase.h"
+#include "Data/Item/PlaceableItemData.h"
 
 #include "InputMappingContext.h"
 #include "InputAction.h"
@@ -214,8 +215,9 @@ void AActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 			HeldItemComponent->GetCurrentHeldItem()->SetupInputComponent(EIC);
 		}
 
-		if(IA_BuildingPlacement)
-			EIC->BindAction(IA_BuildingPlacement, ETriggerEvent::Started, this, &AActionCharacter::OnBuildingPlacementPressed);
+		// 좌클릭 중복 제거
+		//if(IA_BuildingPlacement)
+			//EIC->BindAction(IA_BuildingPlacement, ETriggerEvent::Started, this, &AActionCharacter::OnBuildingPlacementPressed);
 
 		if (IA_RotateBuildingPart)
 			EIC->BindAction(IA_RotateBuildingPart, ETriggerEvent::Started, this, &AActionCharacter::OnRotateBuildingPartPressed);
@@ -232,10 +234,18 @@ void AActionCharacter::OnSecondaryActionPressed()
 {
 	if (IsUIBlockingGameplayInput()) return;
 
+	// 배치 중에는 우클릭을 보조 액션보다 배치 취소로 우선 처리해요
+	if (AActionPlayerController* PlayerController = Cast<AActionPlayerController>(GetController()))
+	{
+		if (true == PlayerController->TryCancelPlacement())
+			return;
+	}
+
 	if (HeldItemComponent)
 	{
 		HeldItemComponent->UseSecondaryAction(true);
 	}
+
 }
 
 void AActionCharacter::OnSecondaryActionReleased()
@@ -610,6 +620,37 @@ void AActionCharacter::OnUseBeltSlotPressed(int32 BeltIndex)
 	//	Inventory->UseBeltSlot(BeltIndex);
 	//}
 
+	if (false == IsValid(InventoryComponent)) return;
+
+	if (InventoryComponent->BeltSlots.IsValidIndex(BeltIndex))
+	{
+		const FItemInstance& Instance = InventoryComponent->BeltSlots[BeltIndex];
+
+		// Placeable 아이템은 즉시 소비하지 않고 로컬 설치 프리뷰를 시작해요
+		if (Instance.IsValid() && EItemCategory::Placeable == Instance.ItemData->Category)
+		{
+			UPlaceableItemData* PlaceableData = Cast<UPlaceableItemData>(Instance.ItemData);
+			AActionPlayerController* PlayerController = Cast<AActionPlayerController>(GetController());
+
+			if (true == IsValid(PlaceableData) && true == IsValid(PlayerController))
+			{
+				// 설치 확정 시에 동일한 원본 아이템을 검증해야 하기 떄문에
+				// 슬롯 위치랑 InstanceID를 전달해요
+				const FInventorySlotRef SourceSlot{EInventorySlotCategory::Belt, BeltIndex};
+				PlayerController->OnStartPlaceablePlacement(PlaceableData, SourceSlot, Instance.InstanceID);
+			}
+			return; // Placeable은 선택 시점에 아이템을 소비하지 않아요
+		}
+
+		// 다른 아이템을 선택하면 진행중이던 Placeable 설치 모드 종료
+		if (true == Instance.IsValid())
+		{
+			if (AActionPlayerController* PlayerController = Cast<AActionPlayerController>(GetController()))
+				PlayerController->OnStopPlacement();
+		}
+	}
+
+	// 기존 HeldItem·Equipment·Consumable 사용은 서버에서 처리해요
 	if (InventoryComponent)
 	{
 		InventoryComponent->Server_UseBeltSlot(BeltIndex);
@@ -618,8 +659,6 @@ void AActionCharacter::OnUseBeltSlotPressed(int32 BeltIndex)
 
 void AActionCharacter::OnAttackPressed()
 {
-	if (IsUIBlockingGameplayInput()) return;
-
 	// 손에 도구/무기가 장착되어 있으면 도구 주 액션(Primary Action) 실행
 	if (HeldItemComponent && HeldItemComponent->GetCurrentHeldItem())
 	{
