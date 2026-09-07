@@ -43,6 +43,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "HeldItem")
 	void UnequipHeldItem();
 
+	// 지금 든 액터를 파괴/재스폰하지 않고 데이터(및 그에 따른 메시)만 다른 UHeldItemData로 바꿔
+	// 끼운다 — EquipHeldItemByData는 내부적으로 항상 기존 액터를 Destroy() 후 새로 스폰하므로,
+	// "같은 슬롯 안에서 상태만 바뀌는" 아이템(예: 빈 물병 ↔ 채워진 물병)에는 쓸 수 없다(그 아이템
+	// 액터 자신이 자기 자신을 파괴하는 셈이 되어 위험). 서버 권위 하에서만 동작.
+	UFUNCTION(BlueprintCallable, Category = "HeldItem")
+	void SwapEquippedItemData(UHeldItemData* NewData);
+
 	// 좌클릭 액션 (주 사용)
 	UFUNCTION(BlueprintCallable, Category = "HeldItem|Input")
 	void UsePrimaryAction(bool bStarted);

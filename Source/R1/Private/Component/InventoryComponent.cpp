@@ -131,15 +131,32 @@ void UInventoryComponent::SetSlot(EInventorySlotCategory Category, int32 Index, 
 
 	// 손에 들고 있는 벨트 슬롯(HeldBeltIndex)의 아이템 종류가 이번 변경으로 바뀌면(다른 슬롯으로
 	// 옮겨져 비워지거나, 다른 아이템으로 교체됨) 인벤토리 데이터와 캐릭터가 실제로 들고 있는 손
-	// 아이템이 어긋나지 않도록 먼저 장착을 해제한다. 같은 아이템의 수량만 바뀌는 경우는 계속
-	// 들고 있어야 하므로 제외한다. SetSlot이 모든 슬롯 변경의 단일 관문이라 여기 한 곳에서만
-	// 처리하면 TransferItem/DropItem 등 어떤 경로로 벨트 슬롯이 바뀌든 빠짐없이 커버된다.
+	// 아이템이 어긋나지 않도록 처리한다. 같은 아이템의 수량만 바뀌는 경우는 계속 들고 있어야
+	// 하므로 제외한다. SetSlot이 모든 슬롯 변경의 단일 관문이라 여기 한 곳에서만 처리하면
+	// TransferItem/DropItem 등 어떤 경로로 벨트 슬롯이 바뀌든 빠짐없이 커버된다.
 	if (Category == EInventorySlotCategory::Belt && Index == HeldBeltIndex && Array[Index].ItemData != NewValue.ItemData)
 	{
-		HeldBeltIndex = INDEX_NONE;
-		if (UHeldItemComponent* HeldItemComp = GetOwner()->FindComponentByClass<UHeldItemComponent>())
+		UHeldItemComponent* HeldItemComp = GetOwner()->FindComponentByClass<UHeldItemComponent>();
+		UHeldItemData* NewHeldData = NewValue.IsValid() ? Cast<UHeldItemData>(NewValue.ItemData) : nullptr;
+
+		if (NewHeldData)
 		{
-			HeldItemComp->UnequipHeldItem();
+			// 새 내용물도 여전히 HeldItem이면(예: 빈 물병 ↔ 채워진 물병처럼 같은 도구의 상태만
+			// 바뀌는 경우) 손에서 내렸다가 다시 드는 대신 같은 자리에서 데이터/메시만 바꿔 끼운다 —
+			// HeldBeltIndex도 그대로 유지(계속 이 슬롯을 손에 들고 있는 상태).
+			if (HeldItemComp)
+			{
+				HeldItemComp->SwapEquippedItemData(NewHeldData);
+			}
+		}
+		else
+		{
+			// 그 외(슬롯이 비워지거나 HeldItem이 아닌 다른 아이템으로 바뀜)는 기존과 동일하게 해제.
+			HeldBeltIndex = INDEX_NONE;
+			if (HeldItemComp)
+			{
+				HeldItemComp->UnequipHeldItem();
+			}
 		}
 	}
 
