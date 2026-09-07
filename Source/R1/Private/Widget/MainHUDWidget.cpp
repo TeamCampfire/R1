@@ -72,6 +72,22 @@ void UMainHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
 	CheckWarehouseAutoClose();
+	CheckCampfireAutoClose();
+}
+
+void UMainHUDWidget::CheckCampfireAutoClose()
+{
+	if (!bCampfireSessionOpen) return;
+
+	ACampfire* Campfire = OpenCampfireActor.Get();
+	APawn* Pawn = GetOwningPlayerPawn();
+
+	// 서버의 상호작용 허용 조건과 같은 기준으로 검사
+	if (!IsValid(Campfire) || !IsValid(Pawn)
+		|| !IInteractableInterface::Execute_CanInteract(Campfire, Pawn))
+	{
+		CloseCampfire();
+	}
 }
 
 void UMainHUDWidget::CheckWarehouseAutoClose()
@@ -121,6 +137,9 @@ void UMainHUDWidget::HideDeathScreen()
 
 void UMainHUDWidget::OnPossessedCharChange()
 {
+	// 조종 대상 바뀌면 모닥불 UI 무조건 닫기
+	CloseCampfire();
+
 	// 조종 대상이 바뀌면(부활로 새 캐릭터를 빙의하는 경우 등) 열려있던 창고 세션은 무조건 끊는다 —
 	// UWarehouseWidget은 InventoryWidget/BeltBarWidget과 달리 OnPossessedCharChange를 직접
 	// 구독하지 않고 OpenWarehouse가 호출된 시점의 폰에서만 BoundPlayerInventory를 찾아두므로,
@@ -187,6 +206,7 @@ bool UMainHUDWidget::ToggleInventoryPanel()
 	if (!bNewOpenState)
 	{
 		CloseCampfire();
+
 		// 닫을 때는 선택 상태(파란 테두리)도 같이 초기화 — 다음에 열었을 때 예전 선택이 남아있지 않게.
 		InventoryWidget->ClearSelection();
 
@@ -213,6 +233,8 @@ void UMainHUDWidget::OpenCampfire(ACampfire* Campfire)
 	InventoryWidget->SetActiveCampfire(Campfire);
 	CampfireWidget->BindCampfire(Campfire);
 	CampfireWidget->SetVisibility(ESlateVisibility::Visible);
+	OpenCampfireActor = Campfire;
+	bCampfireSessionOpen = true;
 	if (CachedController)
 	{
 		if (APawn* Pawn = CachedController->GetPawn())
@@ -223,7 +245,6 @@ void UMainHUDWidget::OpenCampfire(ACampfire* Campfire)
 			}
 		}
 		if (!bInventoryWasOpen) CachedController->SetInventoryInputState(true);
-		bCampfireSessionOpen = true;
 	}
 }
 
@@ -246,6 +267,7 @@ void UMainHUDWidget::CloseCampfire()
 		}
 	}
 	bCampfireSessionOpen = false;
+	OpenCampfireActor.Reset();
 }
 
 bool UMainHUDWidget::IsInventoryPanelOpen() const

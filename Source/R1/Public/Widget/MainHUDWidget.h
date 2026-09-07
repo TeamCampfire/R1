@@ -92,6 +92,7 @@ protected:
 	// 멀어지면 자동으로 닫는다(월드를 돌아다니며 조작하지 못하게 막는 InventoryComponent 서버
 	// 검증과는 별개로, UI 자체도 따라와서 계속 열려있는 게 부자연스러워서 클라이언트에서 처리).
 	void CheckWarehouseAutoClose();
+	void CheckCampfireAutoClose();
 
 	// 현재 표시 중인 건축 안내 메시지를 숨기는 함수
 	void HideBuildingPlacementMessage();
@@ -124,6 +125,7 @@ protected:
 	TObjectPtr<UCampfireWidget> CampfireWidget;
 
 	bool bCampfireSessionOpen = false;
+	TWeakObjectPtr<ACampfire> OpenCampfireActor;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UBeltBarWidget> BeltBarWidget;
