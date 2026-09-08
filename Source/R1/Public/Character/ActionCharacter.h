@@ -350,4 +350,7 @@ protected:
 
 	float DefaultEyeHeight = 0.f;
 	float CurrentWorldEyeHeight = 0.f; // 로컬이 아니라 "월드" 목표 눈높이
+
+	UPROPERTY()
+	float VehicleYawOffset = 0.0f;
 };

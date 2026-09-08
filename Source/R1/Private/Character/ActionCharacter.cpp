@@ -151,6 +151,32 @@ void AActionCharacter::Tick(float DeltaTime)
 	//	FirstPersonCamera->GetRelativeLocation().Y,
 	//	LocalOffset
 	//));
+
+	if (bIsSitting && CurrentVehicle && IsLocallyControlled())
+	{
+		const float CurrentVehicleYaw =
+			CurrentVehicle->GetActorRotation().Yaw;
+
+		const float DeltaYaw =
+			FMath::FindDeltaAngleDegrees(
+				VehicleYawOffset,
+				CurrentVehicleYaw);
+
+		if (!FMath::IsNearlyZero(DeltaYaw))
+		{
+			if (AController* PC = GetController())
+			{
+				FRotator ControlRotation =
+					PC->GetControlRotation();
+
+				ControlRotation.Yaw += DeltaYaw;
+
+				PC->SetControlRotation(ControlRotation);
+			}
+		}
+
+		VehicleYawOffset = CurrentVehicleYaw;
+	}
 	
 }
 
@@ -272,6 +298,8 @@ void AActionCharacter::SetIsInVehicle(bool bIsInVehicleNew, bool bIsDriver)
 	bIsSitting = bIsInVehicleNew;
 	//LegMesh->SetVisibility(!bIsInVehicleNew);
 	//FeetMesh->SetVisibility(!bIsInVehicleNew);
+
+	VehicleYawOffset = CurrentVehicle->GetActorRotation().Yaw;
 
 	GetCapsuleComponent()->SetCollisionEnabled(
 		bIsInVehicleNew?
