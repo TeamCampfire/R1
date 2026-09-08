@@ -258,6 +258,22 @@ void AActionPlayerController::OnChatOpenPressed()
 	ChatWidget->OpenChat();
 }
 
+void AActionPlayerController::OnCloseChat()
+{
+	AMainHUD* HUD = GetHUD<AMainHUD>();
+	UMainHUDWidget* MainHudWidget = HUD ? HUD->GetMainHudWidget() : nullptr;
+	UChatWidget* ChatWidget = MainHudWidget->GetChatWidget();
+
+	// 채팅 위젯이 없거나 열려 있지 않은 상태
+	if (nullptr == ChatWidget || false == ChatWidget->IsChatOpen()) return;
+
+	// 채팅 화면을 기본 채팅창으로 바꿔요
+	ChatWidget->CloseChat();
+
+	// 닫을 때도 입력모드 세팅
+	ApplyUIInputState(false);
+}
+
 void AActionPlayerController::SetInventoryInputState(bool bOpen)
 {
 	ApplyUIInputState(bOpen);
