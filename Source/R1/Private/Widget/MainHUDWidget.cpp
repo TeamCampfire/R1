@@ -371,10 +371,29 @@ void UMainHUDWidget::ShowBuildingDurability(float CurrentDurability, float MaxDu
 
 	BuildingDurabilityWidget->UpdateDurability(CurrentDurability, MaxDurability);
 	BuildingDurabilityWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+
+	FTimerManager& TimerManager = GetWorld()->GetTimerManager();
+
+	// 연속 공격 시 이전 타이머 때문에 UI가 일찍 사라지지 않도록 초기화
+	TimerManager.ClearTimer(BuildingDurabilityTimerHandle);
+
+	// 잘못된 시간이 들어와도 UI가 즉시 사라지지 않도록 최소 시간을 보장합니다.
+	const float SafeDisplayDuration = FMath::Max(0.1f, 1.5f); //1.5초는 최소 UI 떠있는 시간
+
+	TimerManager.SetTimer(
+		BuildingDurabilityTimerHandle,
+		this,
+		&UMainHUDWidget::HideBuildingDurability,
+		SafeDisplayDuration,
+		false
+	);
 }
 
 void UMainHUDWidget::HideBuildingDurability()
 {
+	// 기존 자동 숨김 타이머를 정리
+	GetWorld()->GetTimerManager().ClearTimer(BuildingDurabilityTimerHandle);
+
 	if (true == IsValid(BuildingDurabilityWidget))
 		BuildingDurabilityWidget->SetVisibility(ESlateVisibility::Collapsed);
 }

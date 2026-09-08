@@ -160,4 +160,8 @@ protected:
 	// BuildingDurability 건물 내구도 UI
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<class UBuildingDurabilityWidget> BuildingDurabilityWidget;
+
+	// 내구도 UI 자동 숨김 시간 타이머
+	// 연속으로 공격하면 기존 타이머를 초기화하고 마지막 공격부터 다시 계산
+	FTimerHandle BuildingDurabilityTimerHandle;
 };
