@@ -20,6 +20,7 @@ class UWarehouseInventoryComponent;
 class AActionPlayerController;
 class UCampfireWidget;
 class ACampfire;
+class USoundBase;
 /**
  * 
  */
@@ -125,6 +126,12 @@ protected:
 	TObjectPtr<UCampfireWidget> CampfireWidget;
 
 	bool bCampfireSessionOpen = false;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Campfire|Audio")
+	TObjectPtr<USoundBase> CampfireOpenSound;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Campfire|Audio")
+	TObjectPtr<USoundBase> CampfireCloseSound;
 	TWeakObjectPtr<ACampfire> OpenCampfireActor;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))

@@ -1,6 +1,8 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Widget/MainHUDWidget.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
 #include "Widget/Inventory/InventoryWidget.h"
 #include "Widget/Inventory/WarehouseWidget.h"
 #include "Component/WarehouseInventoryComponent.h"
@@ -237,6 +239,7 @@ bool UMainHUDWidget::ToggleInventoryPanel()
 void UMainHUDWidget::OpenCampfire(ACampfire* Campfire)
 {
 	if (!IsValid(Campfire) || !InventoryWidget || !CampfireWidget) return;
+	const bool bPlayOpenSound = !bCampfireSessionOpen;
 	const bool bInventoryWasOpen = IsInventoryPanelOpen();
 	InventoryWidget->SetVisibility(ESlateVisibility::Visible);
 	InventoryWidget->SetActiveCampfire(Campfire);
@@ -255,10 +258,15 @@ void UMainHUDWidget::OpenCampfire(ACampfire* Campfire)
 		}
 		if (!bInventoryWasOpen) CachedController->SetInventoryInputState(true);
 	}
+	if (bPlayOpenSound && CampfireOpenSound && CachedController && CachedController->IsLocalController())
+	{
+		UGameplayStatics::PlaySound2D(this, CampfireOpenSound);
+	}
 }
 
 void UMainHUDWidget::CloseCampfire()
 {
+	const bool bPlayCloseSound = bCampfireSessionOpen;
 	if (InventoryWidget) InventoryWidget->ClearActiveCampfire();
 	if (CampfireWidget)
 	{
@@ -277,6 +285,10 @@ void UMainHUDWidget::CloseCampfire()
 	}
 	bCampfireSessionOpen = false;
 	OpenCampfireActor.Reset();
+	if (bPlayCloseSound && CampfireCloseSound && CachedController && CachedController->IsLocalController())
+	{
+		UGameplayStatics::PlaySound2D(this, CampfireCloseSound);
+	}
 }
 
 bool UMainHUDWidget::IsInventoryPanelOpen() const

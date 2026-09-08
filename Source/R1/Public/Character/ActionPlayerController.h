@@ -27,6 +27,21 @@ class R1_API AActionPlayerController : public APlayerController
 	GENERATED_BODY()
 	
 public:
+	// 제작 대기열은 화면과 분리하여 창을 닫아도 유지한다.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Crafting")
+	TObjectPtr<class UCraftingComponent> CraftingComponent;
+
+	UPROPERTY()
+	TObjectPtr<class UCraftingWidget> CraftingWidget;
+
+	// Bench가 nullptr이면 기본 제작 화면을 연다.
+	UFUNCTION(Client, Reliable)
+	void Client_OpenCrafting(class AWorkbench* Bench);
+
+	UFUNCTION(BlueprintCallable, Category = "Crafting")
+	void CloseCrafting();
+
+	void ToggleCrafting();
 	UFUNCTION(Client, Reliable)
 	void Client_OpenCampfire(class ACampfire* Campfire);
 
