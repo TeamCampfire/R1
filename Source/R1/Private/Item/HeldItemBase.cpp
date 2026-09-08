@@ -25,7 +25,7 @@ AHeldItemBase::AHeldItemBase()
 	ItemMesh3P->SetCastHiddenShadow(true);
 
 	ItemMesh1P = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ItemMesh1P"));
-	//ItemMesh1P->SetupAttachment(RootComponent);
+	ItemMesh1P->SetupAttachment(RootComponent);
 	ItemMesh1P->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	ItemMesh1P->SetCollisionResponseToAllChannels(ECR_Ignore);
 	ItemMesh1P->SetOnlyOwnerSee(true);
@@ -91,6 +91,7 @@ void AHeldItemBase::ToggleState()
 void AHeldItemBase::SetActiveState(bool InValue)
 {
 	bIsActive = InValue;
+	OnItemStateChanged(bIsActive);
 }
 
 void AHeldItemBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
