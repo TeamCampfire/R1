@@ -78,6 +78,10 @@ public:
 
 	// 배치 모드가 활성화 되어 있다면 설치를 요청하고 true를 반환해요
 	bool TryConfirmPlacement();
+
+	// 채팅창 키 눌렀을 때
+	void OnChatOpenPressed();
+
 	//  ===================================================================================
 public:
 
@@ -183,6 +187,10 @@ protected:
 	// 플레이어 리스폰 지점
 	UPROPERTY()
 	TObjectPtr<AActor> RespawnPoint;
+
+	// 기본채팅 <-> 채팅입력 전환 키
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UInputAction> IA_ChatOpen;
 
 public:
 

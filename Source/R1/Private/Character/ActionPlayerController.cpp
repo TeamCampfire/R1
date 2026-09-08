@@ -21,9 +21,8 @@
 #include "Component/InventoryComponent.h"
 #include "Item/PlaceableItem/Campfire/Campfire.h"
 #include "Item/PlaceableItem/Campfire/CampfireComponent.h"
-#include "Component/InventoryComponent.h"
-#include "Widget/MainHUDWidget.h"
 #include "Interface/InteractableInterface.h"
+#include "Widget/Chatting/ChatWidget.h"
 
 AActionPlayerController::AActionPlayerController()
 {
@@ -151,6 +150,9 @@ void AActionPlayerController::SetupInputComponent()
 		// 인벤토리 토글 — 컨트롤러에 바인딩해서 어떤 폰을 조종 중이든(캐릭터든 나중의 탈것이든)
 		// 항상 눌리게 한다(IA_InventoryToggle 선언부 주석 참고).
 		EIC->BindAction(IA_InventoryToggle, ETriggerEvent::Started, this, &AActionPlayerController::OnInventoryTogglePressed);
+
+		// 채팅창 키 바인딩
+		EIC->BindAction(IA_ChatOpen, ETriggerEvent::Started, this, &AActionPlayerController::OnChatOpenPressed);
 	}
 }
 
@@ -231,6 +233,29 @@ bool AActionPlayerController::TryConfirmPlacement()
 
 	BuildingPlacementComponent->ConfirmPlacement();
 	return true;
+}
+
+void AActionPlayerController::OnChatOpenPressed()
+{
+	if (false == IsLocalController()) return;
+
+	if (true == IsAnyUIPanelOpen()) return; // 인벤토리, 창고, 옵션 등등 다른 UI가 열려있으면 채팅창은 안 열어요
+
+	AMainHUD* HUD = GetHUD<AMainHUD>();
+	UMainHUDWidget* MainHudWidget = HUD ? HUD->GetMainHudWidget() : nullptr;
+
+	UChatWidget* ChatWidget = MainHudWidget->GetChatWidget();
+
+	if (nullptr == ChatWidget)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[AActionPlayerController::OnChatOpenPressed()] : ChatWidget이 WBP_MainHUD에 연결되지 않은 듯"));
+		return;
+	}
+
+	// 일단 입력모드 세팅
+	ApplyUIInputState(true);
+
+	ChatWidget->OpenChat();
 }
 
 void AActionPlayerController::SetInventoryInputState(bool bOpen)
