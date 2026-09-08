@@ -12,6 +12,7 @@
 #include "Data/Item/EquipmentItemData.h"
 
 #include "Interface/StatusEffectInterface.h"
+#include "Interface/Vehicle/VehicleInterface.h"
 #include "Component/StatComponent.h"	
 #include "Component/InteractionComponent.h"
 #include "Component/InventoryComponent.h"
@@ -21,6 +22,7 @@
 #include "Data/Item/ItemDataBase.h"
 #include "Data/Item/PlaceableItemData.h"
 #include "Data/Item/HeldItemData.h"
+#include "Vehicle/WheeledVehicleBase.h"
 
 #include "InputMappingContext.h"
 #include "InputAction.h"
@@ -35,6 +37,7 @@ AActionCharacter::AActionCharacter()
 	PrimaryActorTick.bCanEverTick = true;
 	// Replicate 설정
 	bReplicates = true;
+	SetReplicateMovement(true);
 
 	// Head메시 생성
 	TorsoMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("HeadMesh"));
@@ -236,6 +239,8 @@ void AActionCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AActionCharacter, bIsSprinting);
+	DOREPLIFETIME(AActionCharacter, bIsSitting);
+	DOREPLIFETIME(AActionCharacter, CurrentVehicle);
 }
 
 void AActionCharacter::OnSecondaryActionPressed()
@@ -283,6 +288,88 @@ void AActionCharacter::SetCrouchInputMode(ECrouchInputMode NewMode)
 	CrouchInputMode = NewMode;
 	UnCrouch(); // 모드 전환 시 안전하게 초기화 (Hold 누르고 있던 중 전환 등)
 	ApplyMovementSettings();
+}
+
+void AActionCharacter::SetIsInVehicle(bool bIsInVehicleNew, bool bIsDriver)
+{
+	bIsSitting = bIsInVehicleNew;
+	//LegMesh->SetVisibility(!bIsInVehicleNew);
+	//FeetMesh->SetVisibility(!bIsInVehicleNew);
+
+	GetCapsuleComponent()->SetCollisionEnabled(
+		bIsInVehicleNew?
+		ECollisionEnabled::NoCollision
+       :ECollisionEnabled::QueryAndPhysics);
+	bUseControllerRotationYaw = !bIsInVehicleNew;
+
+	SetReplicateMovement(!bIsInVehicleNew);
+
+	if (!HasAuthority())
+	{
+	}
+
+	if (bIsDriver && IsLocallyControlled())
+	{
+		GetMesh()->SetVisibility(!(bIsInVehicleNew));
+	}
+}
+
+void AActionCharacter::ServerRequestExitVehicle_Implementation()
+{
+	if (bIsSitting && CurrentVehicle)
+	{
+		CurrentVehicle->PassengerPressToExitVehicle(this);
+	}
+}
+
+void AActionCharacter::OnRep_IsSitting()
+{
+	UE_LOG(LogTemp, Warning,
+		TEXT("[ON REP SITTING] Char=%s Authority=%d Local=%d Sitting=%d"),
+		*GetNameSafe(this),
+		HasAuthority(),
+		IsLocallyControlled(),
+		bIsSitting
+	);
+	GetCapsuleComponent()->SetCollisionEnabled(
+		bIsSitting
+		? ECollisionEnabled::NoCollision
+		: ECollisionEnabled::QueryAndPhysics
+	);
+	if (!bIsSitting)
+	{
+		GetMesh()->SetVisibility(true);
+		return;
+	}
+
+	// 현재 로컬 PlayerController가 Possess하고 있는 Pawn
+	AActionPlayerController* PC =
+		Cast<AActionPlayerController>(GetWorld()->GetFirstPlayerController());
+
+	if (!PC || !PC->IsLocalController())
+		return;
+
+	APawn* PossessedPawn = PC->GetPawn();
+
+	if (!PossessedPawn)
+		return;
+
+	// 현재 Possess한 Pawn이 Vehicle인지 확인
+	IVehicleInterface* VehicleInterface = Cast<IVehicleInterface>(PossessedPawn);
+
+	if (!VehicleInterface) return;
+
+	// 이 Character가 현재 Vehicle의 운전자인 경우에만
+	// 로컬 화면에서 Mesh 숨김
+	if (VehicleInterface->GetDriverCharacter() == this)
+	{
+		GetMesh()->SetVisibility(false);
+
+		UE_LOG(LogTemp, Warning,
+			TEXT("[LOCAL DRIVER] Hide Mesh - Character=%s"),
+			*GetNameSafe(this)
+		);
+	}
 }
 
 void AActionCharacter::ProcessAttack()
@@ -647,6 +734,14 @@ void AActionCharacter::OnRotateBuildingPartPressed()
 
 void AActionCharacter::OnInteractPressed()
 {
+
+	if (bIsSitting && CurrentVehicle)
+	{
+		ServerRequestExitVehicle();
+		return;
+	}
+
+	InteractionComponent->TryInteract();
 	InteractionComponent->TryInteract();
 
 	//UE_LOG(LogTemp, Log, TEXT("TryInteract()"));

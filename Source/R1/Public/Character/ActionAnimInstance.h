@@ -40,6 +40,9 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Movement")
 	bool bIsSprinting = false;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Movement")
+	bool bIsSitting = false;
+
 
 	UPROPERTY(BlueprintReadOnly, Category = "Anim")
 	TObjectPtr<USkeletalMeshComponent> SourceSkeletalMesh;

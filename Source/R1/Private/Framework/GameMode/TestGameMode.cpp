@@ -66,7 +66,7 @@ void ATestGameMode::RespawnPlayer(AController* InController)
 		if (UStatComponent* StatComp = ExistingCharacter->GetStatComponent())
 		{
 			IHealthInterface* HealthInterface = Cast<IHealthInterface>(StatComp);
-			UE_LOG(LogTemp, Warning,
+			/*UE_LOG(LogTemp, Warning,
 				TEXT("[SERVER] Respawn %s bAlive = %s"),
 				*InController->GetName(),
 				ExistingCharacter &&
@@ -75,7 +75,7 @@ void ATestGameMode::RespawnPlayer(AController* InController)
 					ExistingCharacter->GetStatComponent()
 				)->IsAlive()
 				? TEXT("TRUE")
-				: TEXT("FALSE"));
+				: TEXT("FALSE"));*/
 
 			if (HealthInterface && HealthInterface->IsAlive())
 			{

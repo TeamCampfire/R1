@@ -28,7 +28,6 @@ void UActionAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		return;
 	}
 
-	
 	const FVector Velocity = OwningCharacter->GetVelocity();
 	Speed = Velocity.Size2D();
 	
@@ -43,6 +42,10 @@ void UActionAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	bIsCrouched = OwningCharacter->bIsCrouched;       // 엔진 내장 (public)
 	bIsFalling = MovementComponent->IsFalling();
 	bIsSprinting = OwningCharacter->IsSprinting();
+	bIsSitting = OwningCharacter->IsSitting();
 	if (OwningCharacter->GetHeldItemComponent()->GetCurrentHeldItem())
 		bIsActive = OwningCharacter->GetHeldItemComponent()->GetCurrentHeldItem()->GetActiveState();
+
+
+	//UE_LOG(LogTemp, Error, TEXT("[AnimInstance: %s]"), bIsSitting? TEXT("True") : TEXT("False"));
 }
