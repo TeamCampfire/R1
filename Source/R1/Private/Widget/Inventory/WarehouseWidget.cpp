@@ -178,6 +178,7 @@ void UWarehouseWidget::RebuildSlots()
 		SlotWidget->OnSlotDropped.AddDynamic(this, &UWarehouseWidget::HandleSlotDropped);
 		SlotWidget->OnSlotDroppedCross.AddDynamic(this, &UWarehouseWidget::HandleSlotDroppedCross);
 		SlotWidget->OnSlotClicked.AddDynamic(this, &UWarehouseWidget::HandleSlotClicked);
+		SlotWidget->OnSlotRightClicked.AddDynamic(this, &UWarehouseWidget::HandleSlotRightClicked);
 	};
 
 	// Category는 EnsureGridSlots가 FInventorySlotRef를 만들기 위한 형식상의 값일 뿐이다 —
@@ -229,6 +230,20 @@ void UWarehouseWidget::HandlePlayerSlotClicked(FInventorySlotRef SlotRef)
 	{
 		Warehouse->ClearSelection();
 	}
+}
+
+void UWarehouseWidget::HandleSlotRightClicked(FInventorySlotRef SlotRef)
+{
+	// 창고 슬롯 우클릭 → 플레이어 인벤토리로 빠른 이동. 벨트/메인 우선순위는
+	// UInventoryComponent::QuickMoveFromWarehouse가 카테고리를 보고 결정한다.
+	UInventoryComponent* PlayerInventory = BoundPlayerInventory.Get();
+	UWarehouseInventoryComponent* Warehouse = BoundWarehouse.Get();
+	if (!PlayerInventory || !Warehouse)
+	{
+		return;
+	}
+
+	PlayerInventory->Server_QuickMoveFromWarehouse(Warehouse, SlotRef.Index);
 }
 
 void UWarehouseWidget::HandleSlotDroppedCross(int32 FromContainerId, FInventorySlotRef FromSlot, int32 ToContainerId, FInventorySlotRef ToSlot, int32 Count)

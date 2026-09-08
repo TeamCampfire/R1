@@ -131,15 +131,32 @@ void UInventoryComponent::SetSlot(EInventorySlotCategory Category, int32 Index, 
 
 	// 손에 들고 있는 벨트 슬롯(HeldBeltIndex)의 아이템 종류가 이번 변경으로 바뀌면(다른 슬롯으로
 	// 옮겨져 비워지거나, 다른 아이템으로 교체됨) 인벤토리 데이터와 캐릭터가 실제로 들고 있는 손
-	// 아이템이 어긋나지 않도록 먼저 장착을 해제한다. 같은 아이템의 수량만 바뀌는 경우는 계속
-	// 들고 있어야 하므로 제외한다. SetSlot이 모든 슬롯 변경의 단일 관문이라 여기 한 곳에서만
-	// 처리하면 TransferItem/DropItem 등 어떤 경로로 벨트 슬롯이 바뀌든 빠짐없이 커버된다.
+	// 아이템이 어긋나지 않도록 처리한다. 같은 아이템의 수량만 바뀌는 경우는 계속 들고 있어야
+	// 하므로 제외한다. SetSlot이 모든 슬롯 변경의 단일 관문이라 여기 한 곳에서만 처리하면
+	// TransferItem/DropItem 등 어떤 경로로 벨트 슬롯이 바뀌든 빠짐없이 커버된다.
 	if (Category == EInventorySlotCategory::Belt && Index == HeldBeltIndex && Array[Index].ItemData != NewValue.ItemData)
 	{
-		HeldBeltIndex = INDEX_NONE;
-		if (UHeldItemComponent* HeldItemComp = GetOwner()->FindComponentByClass<UHeldItemComponent>())
+		UHeldItemComponent* HeldItemComp = GetOwner()->FindComponentByClass<UHeldItemComponent>();
+		UHeldItemData* NewHeldData = NewValue.IsValid() ? Cast<UHeldItemData>(NewValue.ItemData) : nullptr;
+
+		if (NewHeldData)
 		{
-			HeldItemComp->UnequipHeldItem();
+			// 새 내용물도 여전히 HeldItem이면(예: 빈 물병 ↔ 채워진 물병처럼 같은 도구의 상태만
+			// 바뀌는 경우) 손에서 내렸다가 다시 드는 대신 같은 자리에서 데이터/메시만 바꿔 끼운다 —
+			// HeldBeltIndex도 그대로 유지(계속 이 슬롯을 손에 들고 있는 상태).
+			if (HeldItemComp)
+			{
+				HeldItemComp->SwapEquippedItemData(NewHeldData);
+			}
+		}
+		else
+		{
+			// 그 외(슬롯이 비워지거나 HeldItem이 아닌 다른 아이템으로 바뀜)는 기존과 동일하게 해제.
+			HeldBeltIndex = INDEX_NONE;
+			if (HeldItemComp)
+			{
+				HeldItemComp->UnequipHeldItem();
+			}
 		}
 	}
 
@@ -869,6 +886,120 @@ bool UInventoryComponent::Server_TransferWithinWarehouse_Validate(UWarehouseInve
 void UInventoryComponent::Server_TransferWithinWarehouse_Implementation(UWarehouseInventoryComponent* Warehouse, int32 FromIndex, int32 ToIndex, int32 Count, bool bAutoHalfSplitIfTargetEmpty)
 {
 	TransferWithinWarehouse(Warehouse, FromIndex, ToIndex, Count, bAutoHalfSplitIfTargetEmpty);
+}
+
+bool UInventoryComponent::QuickMoveToWarehouse(UWarehouseInventoryComponent* Warehouse, FInventorySlotRef PlayerSlot)
+{
+	if (!Warehouse)
+	{
+		return false;
+	}
+
+	const TArray<FItemInstance>& PlayerArray = GetSlotArray(PlayerSlot.Category);
+	if (!PlayerArray.IsValidIndex(PlayerSlot.Index) || !PlayerArray[PlayerSlot.Index].IsValid())
+	{
+		return false;
+	}
+
+	const int32 EmptyWarehouseIndex = Warehouse->StorageSlots.IndexOfByPredicate([](const FItemInstance& Slot) { return !Slot.IsValid(); });
+	if (EmptyWarehouseIndex == INDEX_NONE)
+	{
+		return false;
+	}
+
+	return TransferWithWarehouse(Warehouse, PlayerSlot, EmptyWarehouseIndex, 0, true);
+}
+
+bool UInventoryComponent::Server_QuickMoveToWarehouse_Validate(UWarehouseInventoryComponent* Warehouse, FInventorySlotRef PlayerSlot)
+{
+	if (!Warehouse)
+	{
+		return false;
+	}
+
+	// Server_TransferWithWarehouse_Validate와 동일한 이유로 거리 검증을 둔다.
+	const AActor* PlayerOwner = GetOwner();
+	const AActor* WarehouseOwner = Warehouse->GetOwner();
+	if (!PlayerOwner || !WarehouseOwner)
+	{
+		return false;
+	}
+
+	const float DistSq = FVector::DistSquared(PlayerOwner->GetActorLocation(), WarehouseOwner->GetActorLocation());
+	return DistSq <= FMath::Square(Warehouse->MaxInteractDistance);
+}
+
+void UInventoryComponent::Server_QuickMoveToWarehouse_Implementation(UWarehouseInventoryComponent* Warehouse, FInventorySlotRef PlayerSlot)
+{
+	QuickMoveToWarehouse(Warehouse, PlayerSlot);
+}
+
+bool UInventoryComponent::QuickMoveFromWarehouse(UWarehouseInventoryComponent* Warehouse, int32 WarehouseSlotIndex)
+{
+	if (!Warehouse || !Warehouse->StorageSlots.IsValidIndex(WarehouseSlotIndex))
+	{
+		return false;
+	}
+
+	const FItemInstance& SourceInstance = Warehouse->StorageSlots[WarehouseSlotIndex];
+	if (!SourceInstance.IsValid())
+	{
+		return false;
+	}
+
+	// HeldItem/Consumable/Placeable은 벨트를 우선 시도(벨트에서 바로 손에 들거나/사용하거나/배치해야
+	// 하므로), Equipment는 장비 슬롯 자동 장착이 QuickMoveItem 쪽 규칙이라 벨트에 놓일 이유가 없어
+	// Misc와 동일하게 메인을 우선한다.
+	const EItemCategory Category = SourceInstance.ItemData ? SourceInstance.ItemData->Category : EItemCategory::Misc;
+	const bool bPreferBelt = Category == EItemCategory::HeldItem
+		|| Category == EItemCategory::Consumable
+		|| Category == EItemCategory::Placeable;
+
+	EInventorySlotCategory TargetCategory = EInventorySlotCategory::Main;
+	int32 TargetIndex = INDEX_NONE;
+
+	if (bPreferBelt)
+	{
+		TargetIndex = BeltSlots.IndexOfByPredicate([](const FItemInstance& Slot) { return !Slot.IsValid(); });
+		TargetCategory = EInventorySlotCategory::Belt;
+	}
+
+	// 벨트를 안 우선하거나(Misc), 벨트가 꽉 차서 못 찾았으면 메인 빈 칸으로 대체.
+	if (TargetIndex == INDEX_NONE)
+	{
+		TargetIndex = MainSlots.IndexOfByPredicate([](const FItemInstance& Slot) { return !Slot.IsValid(); });
+		TargetCategory = EInventorySlotCategory::Main;
+	}
+
+	if (TargetIndex == INDEX_NONE)
+	{
+		return false;
+	}
+
+	return TransferWithWarehouse(Warehouse, FInventorySlotRef{ TargetCategory, TargetIndex }, WarehouseSlotIndex, 0, false);
+}
+
+bool UInventoryComponent::Server_QuickMoveFromWarehouse_Validate(UWarehouseInventoryComponent* Warehouse, int32 WarehouseSlotIndex)
+{
+	if (!Warehouse)
+	{
+		return false;
+	}
+
+	const AActor* PlayerOwner = GetOwner();
+	const AActor* WarehouseOwner = Warehouse->GetOwner();
+	if (!PlayerOwner || !WarehouseOwner)
+	{
+		return false;
+	}
+
+	const float DistSq = FVector::DistSquared(PlayerOwner->GetActorLocation(), WarehouseOwner->GetActorLocation());
+	return DistSq <= FMath::Square(Warehouse->MaxInteractDistance);
+}
+
+void UInventoryComponent::Server_QuickMoveFromWarehouse_Implementation(UWarehouseInventoryComponent* Warehouse, int32 WarehouseSlotIndex)
+{
+	QuickMoveFromWarehouse(Warehouse, WarehouseSlotIndex);
 }
 
 bool UInventoryComponent::ConsumeItemInstance(const FInventorySlotRef& SlotRef, const FGuid& ExpectedInstanceID, const UItemDataBase* ExpectedItemData)

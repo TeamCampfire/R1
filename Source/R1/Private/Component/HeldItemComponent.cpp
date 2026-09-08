@@ -292,6 +292,25 @@ AHeldItemBase* UHeldItemComponent::EquipHeldItemByClass(TSubclassOf<AHeldItemBas
 	return CurrentHeldItem;
 }
 
+void UHeldItemComponent::SwapEquippedItemData(UHeldItemData* NewData)
+{
+	// 장착 데이터 변경은 반드시 서버에서만 — 클라이언트가 호출해도 CurrentEquippedItemData는
+	// ReplicatedUsing이라 서버 값만이 진짜다.
+	if (!GetOwner() || !GetOwner()->HasAuthority() || !NewData)
+	{
+		return;
+	}
+
+	CurrentEquippedItemData = NewData;
+
+	// OnRep_CurrentEquippedItemData는 "다른 클라이언트"에서만 리플리케이션으로 자동 호출되므로,
+	// 이 함수를 실행 중인 서버(리슨 서버 포함) 자신의 비주얼은 여기서 직접 갱신해줘야 한다.
+	if (CurrentHeldItem)
+	{
+		CurrentHeldItem->InitItemVisual(NewData);
+	}
+}
+
 void UHeldItemComponent::UnequipHeldItem()
 {
 	// 이전 애니메이션 레이어 해제 (1인칭 팔 & 3인칭 몸)
