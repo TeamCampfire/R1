@@ -1,7 +1,10 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Character/ActionPlayerController.h"
+#include "Component/CraftingComponent.h"
+#include "Widget/CraftingWidget.h"
+#include "Item/PlaceableItem/Workbench.h"
 #include "Character/ActionCharacter.h"
 #include "Component/StatComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -28,6 +31,7 @@
 
 AActionPlayerController::AActionPlayerController()
 {
+	CraftingComponent = CreateDefaultSubobject<UCraftingComponent>(TEXT("CraftingComponent"));
 	// 빌딩 배치 컴포넌트 생성
 	BuildingPlacementComponent = CreateDefaultSubobject<UBuildingPlacementComponent>(TEXT("BuildingPlacementComp"));
 }
@@ -143,6 +147,7 @@ void AActionPlayerController::BeginPlay()
 void AActionPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
+	InputComponent->BindKey(EKeys::Q, IE_Pressed, this, &AActionPlayerController::ToggleCrafting);
 
 	if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(InputComponent))
 	{
@@ -474,6 +479,7 @@ void AActionPlayerController::OnGameMenuTogglePressed()
 
 void AActionPlayerController::OnInventoryTogglePressed()
 {
+	CloseCrafting();
 	// 캐릭터가 죽은 동안(사망 직후 UnPossess ~ 부활 전, 또는 살아있어도 bAlive=false인 짧은
 	// 순간)엔 인벤토리 토글을 무시한다 — 죽은 화면에서 인벤토리 패널을 열어봐야 HUDPanel 자체가
 	// Collapsed라 보이지도 않으면서 OpenUIPanelCount/커서 상태만 어긋나게 된다.
@@ -510,3 +516,55 @@ void AActionPlayerController::ServerTestInflictDamage_Implementation()
 	StatComp->Execute_InflictDamage(StatComp, 50.0f);
 }
 //------------------------------------------------------------------------------------------------------------------------------------------
+
+void AActionPlayerController::ToggleCrafting()
+{
+	if (CraftingWidget)
+	{
+		CloseCrafting();
+		return;
+	}
+	// Q 입력은 로컬 UI만 연다. 실제 제작 요청은 컴포넌트의 서버 RPC를 사용한다.
+	Client_OpenCrafting_Implementation(nullptr);
+}
+
+void AActionPlayerController::CloseCrafting()
+{
+	if (!CraftingWidget)
+	{
+		return;
+	}
+	CraftingWidget->RemoveFromParent();
+	CraftingWidget = nullptr;
+	ApplyUIInputState(false);
+}
+
+void AActionPlayerController::Client_OpenCrafting_Implementation(AWorkbench* Bench)
+{
+	AActionCharacter* PossessedCharacter = Cast<AActionCharacter>(GetPawn());
+	const IHealthInterface* Health = PossessedCharacter
+		? Cast<IHealthInterface>(PossessedCharacter->GetStatComponent()) : nullptr;
+	if (!Health || !Health->IsAlive())
+	{
+		return;
+	}
+	CloseCrafting();
+
+	// 두 창의 입력 카운트를 각각 정리한 뒤 공용 제작 화면을 연다.
+	AMainHUD* MainHUD = GetHUD<AMainHUD>();
+	UMainHUDWidget* MainWidget = MainHUD ? MainHUD->GetMainHudWidget() : nullptr;
+	if (MainWidget && MainWidget->IsInventoryPanelOpen())
+	{
+		MainWidget->ToggleInventoryPanel();
+		SetInventoryInputState(false);
+	}
+	CraftingWidget = CreateWidget<UCraftingWidget>(this, UCraftingWidget::StaticClass());
+	if (!CraftingWidget)
+	{
+		return;
+	}
+	CraftingWidget->Crafting = CraftingComponent;
+	CraftingWidget->Bench = Bench;
+	CraftingWidget->AddToViewport(30);
+	ApplyUIInputState(true);
+}
