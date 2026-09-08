@@ -11,7 +11,18 @@
 
 void ABuildingHammer::OnSecondaryActionStarted()
 {
+	// 우클릭 하면 Super에서 몽타주만 시작하고
+	// 실제 라인트레이스랑 데미지 적용은
+	// 데이터에 바인딩된 해머 액션 몽타주 안에 있는 노티파이 시점에 진행되도록 했어요
 	Super::OnSecondaryActionStarted();
+}
+
+void ABuildingHammer::PerformBuildingHit()
+{
+	// 몽타주 노티파이는 다른 클라이언트의 복제 캐릭터에서도 발생할 수 있기 떄문에
+	// 실제 공격 요청은 이 해머를 직접 조작하는 로컬 플레이어만 진행
+	if (false == IsValid(OwnerCharacter) || false == OwnerCharacter->IsLocallyControlled() || false == IsValid(ItemData))
+		return;
 
 	// 카메라 중앙에서 라인트레이스를 해서 범위 내에 세워진 건물이 있는지 확인
 	if (APlayerController* PC = Cast<APlayerController>(OwnerCharacter->GetController()))
