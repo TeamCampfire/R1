@@ -26,6 +26,9 @@ protected:
 	UFUNCTION(Server, Reliable)
 	void Server_ApplyBuildingDamage(ABuildingActor* TargetBuilding, float Damage);
 
+	UFUNCTION(Server, Reliable)
+	void Server_ApplyPlaceableDamage(class APlaceableItemBase* TargetPlaceable, float Damage);
+
 	// 서버에서 확정된 공격 이후 내구도를 UI에 전달하는 함수
 	UFUNCTION(Client, Reliable) 
 	void Client_ShowBuildingDurability(float CurrentDurability, float MaxDurability);

@@ -30,6 +30,16 @@ public:
 	// 서버에서 Placeable 액터가 생성된 직후 원본 아이템 데이터를 적용해요
 	void InitializePlaceable(class UPlaceableItemData* InPlaceableItemData);
 
+	UFUNCTION(BlueprintPure, Category = "Placeable|Durability")
+	float GetCurrentDurability() { return CurrentDurability; }
+
+	UFUNCTION(BlueprintPure, Category = "Placeable|Durability")
+	float GetMaxDurability();
+
+	// Placeable 아이템에 데미지를 적용하는 함수
+	UFUNCTION(BlueprintCallable, Category = "Placeable|Durability")
+	bool ApplyPlaceableDamage(float DamageAmount);
+
 protected:
 	// PlaceableItemData가 클라이언트에 복제된 뒤 메시를 적용해요
 	UFUNCTION()
@@ -49,4 +59,7 @@ protected:
 	UPROPERTY(ReplicatedUsing = OnRep_PlaceableItemData, VisibleInstanceOnly, BlueprintReadOnly, Category = "Placeable")
 	TObjectPtr<class UPlaceableItemData> PlaceableItemData; // 설치에 사용된 원본 아이템 데이터
 	// OnRep을 통해 메시 컴포넌트에 적용됨
+
+	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Placeable|Durability")
+	float CurrentDurability = 0.f; // 현재 아이템의 내구도
 };

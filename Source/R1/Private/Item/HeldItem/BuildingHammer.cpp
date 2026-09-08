@@ -8,6 +8,7 @@
 #include "Framework/MainHUD.h"
 #include "Widget/MainHUDWidget.h"
 #include "GameFramework/PlayerController.h"
+#include "Item/PlaceableItemBase.h"
 
 void ABuildingHammer::OnSecondaryActionStarted()
 {
@@ -41,14 +42,37 @@ void ABuildingHammer::PerformBuildingHit()
 
 			if (GetWorld()->LineTraceSingleByChannel(OutHitRes, StartPos, EndPos, ECC_Visibility, Params))
 			{
+				// 건축물을 공격한 경우
 				if (ABuildingActor* BuildingActor = Cast<ABuildingActor>(OutHitRes.GetActor()))
 				{
 					// 건물에 데미지를 준다.
-					Server_ApplyBuildingDamage(BuildingActor, 1);
+					Server_ApplyBuildingDamage(BuildingActor, 50.f);
+				}
+
+				// Placeable 아이템을 공격한 경우
+				if (APlaceableItemBase* PlaceableActor = Cast<APlaceableItemBase>(OutHitRes.GetActor()))
+				{
+					// 개별 Placeable에 데미지를 준다
+					Server_ApplyPlaceableDamage(PlaceableActor, 50.f);
 				}
 			}
+
 		}
 	}
+}
+
+void ABuildingHammer::Server_ApplyPlaceableDamage_Implementation(APlaceableItemBase* TargetPlaceable, float Damage)
+{
+	if (nullptr == TargetPlaceable || Damage <= 0.f) return;
+
+	// 아이템이 이번 공격으로 파괴되더라도 UI에 표시는 할 수 있도록 피해 적용 전에 최대 내구도와 예상 결과를 보관
+	float MaxDurability = TargetPlaceable->GetMaxDurability();
+	float ResultDurability = FMath::Max(0.f, TargetPlaceable->GetCurrentDurability() - Damage);
+
+	if (false == TargetPlaceable->ApplyPlaceableDamage(Damage)) return;
+
+	// 서버가 확정한 공격 이후 내구도를 공격한 클라이언트에게 전달
+	Client_ShowBuildingDurability(ResultDurability, MaxDurability);
 }
 
 void ABuildingHammer::Server_ApplyBuildingDamage_Implementation(ABuildingActor* TargetBuilding, float Damage)
