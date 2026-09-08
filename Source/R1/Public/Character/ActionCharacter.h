@@ -31,6 +31,7 @@ class UInventoryComponent;
 class UInteractionComponent;
 class UEquipmentComponent;
 class UItemDataBase;
+class AWheeledVehicleBase;
 
 UCLASS()
 class R1_API AActionCharacter : public ACharacter, public IStatInterface
@@ -63,6 +64,10 @@ public:
 
 	void SetIsInVehicle(bool bIsInVehicleNew, bool bIsDriver);
 
+	// 서버 자동차 하차 RPC
+	UFUNCTION(Server, Reliable)
+	void ServerRequestExitVehicle();
+
 	UFUNCTION()
 	void OnRep_IsSitting();
 
@@ -94,6 +99,9 @@ public:
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastDie();
+		
+	FORCEINLINE AWheeledVehicleBase* GetCurrentVehicle() const { return CurrentVehicle;}
+	FORCEINLINE void SetCurrentVehicle(AWheeledVehicleBase* InVehicle) { CurrentVehicle = InVehicle;}
 
 protected:
 	virtual bool CanJumpInternal_Implementation() const override;
@@ -333,9 +341,8 @@ protected:
 	UPROPERTY(ReplicatedUsing = OnRep_IsSitting)
 	bool bIsSitting = false;
 
-	//// 운전자인가?
-	//UPROPERTY(Replicated)
-	//bool bIsDriver = false;
+	UPROPERTY(Replicated)
+	TObjectPtr<AWheeledVehicleBase> CurrentVehicle;
 
 	// 스탯 컴포넌트
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)

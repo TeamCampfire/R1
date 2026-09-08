@@ -42,4 +42,6 @@ void UActionAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	bIsFalling = MovementComponent->IsFalling();
 	bIsSprinting = OwningCharacter->IsSprinting();
 	bIsSitting = OwningCharacter->IsSitting();
+
+	//UE_LOG(LogTemp, Error, TEXT("[AnimInstance: %s]"), bIsSitting? TEXT("True") : TEXT("False"));
 }

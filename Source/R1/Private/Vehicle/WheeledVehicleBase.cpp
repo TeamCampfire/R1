@@ -27,6 +27,7 @@ AWheeledVehicleBase::AWheeledVehicleBase()
 	// Camera
 	DriverCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("DriverCamera"));
 	DriverCamera->SetupAttachment(RootComponent);
+	//bUseControllerRotationYaw = true;
 
 	// Chassis
 	Chassis = CreateDefaultSubobject<UStaticMeshComponent>(
@@ -120,19 +121,31 @@ void AWheeledVehicleBase::BeginPlay()
 	Super::BeginPlay();	
 	InitializeSeatPoints();
 	SeatOccupants.SetNum(SeatPoints.Num());
-	for (int32 i = 0; i < ChaosVehicleMovement->WheelSetups.Num(); ++i)
-	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("[WHEEL %d] Bone=%s Class=%s"),
-			i,
-			*ChaosVehicleMovement->WheelSetups[i].BoneName.ToString(),
-			*GetNameSafe(ChaosVehicleMovement->WheelSetups[i].WheelClass));
-	}
 }
 
 void AWheeledVehicleBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	if (!bCanFreeLook)
+	{
+		FRotator CurrentRotation = DriverCamera->GetRelativeRotation();
+
+		FRotator TargetRotation = FRotator::ZeroRotator;
+
+		CurrentRotation.Yaw = FMath::FInterpTo(
+			CurrentRotation.Yaw,
+			TargetRotation.Yaw,
+			DeltaTime,
+			5.0f);
+
+		CurrentRotation.Pitch = FMath::FInterpTo(
+			CurrentRotation.Pitch,
+			TargetRotation.Pitch,
+			DeltaTime,
+			5.0f);
+
+		DriverCamera->SetRelativeRotation(CurrentRotation);
+	}
 }
 
 void AWheeledVehicleBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -168,6 +181,9 @@ void AWheeledVehicleBase::EnterVehicle_Implementation(APawn* VehicleCharacter, i
 	}
 
 	if (!SeatPoints.IsValidIndex(InSeatIndex)) return;
+
+	// 탑승 차량 저장
+	VehicleChar->SetCurrentVehicle(this);
 
 	VehicleChar->SetIsInVehicle(true, bIsDriver);
 	USceneComponent* SeatScene = SeatPoints[InSeatIndex];
@@ -212,6 +228,13 @@ void AWheeledVehicleBase::EnterVehicle_Implementation(APawn* VehicleCharacter, i
 
 void AWheeledVehicleBase::ExitVehicle_Implementation(APawn* VehicleCharacter)
 {
+	UE_LOG(LogTemp, Warning,
+		TEXT("[EXIT] Vehicle=%s Character=%s Authority=%d Local=%d"),
+		*GetNameSafe(this),
+		*GetNameSafe(VehicleCharacter),
+		HasAuthority(),
+		IsLocallyControlled());
+
 	if (!VehicleCharacter)return;
 
 	int32 SeatIndex = SeatOccupants.IndexOfByKey(VehicleCharacter);
@@ -228,37 +251,56 @@ void AWheeledVehicleBase::ExitVehicle_Implementation(APawn* VehicleCharacter)
 	SeatOccupants[SeatIndex] = nullptr;
 
 	// 차량에서 분리
+	FVector ExitLocation =
+		SeatPoints[SeatIndex]->GetComponentLocation()
+		+ SeatPoints[SeatIndex]->GetComponentTransform().TransformVector(
+			FVector(0.0f, SeatIndex%2 ==0? -180.0f:180.0f, 0.0f));
+
+	Character->SetActorLocation(ExitLocation);
 	Character->DetachFromActor(
 		FDetachmentTransformRules::KeepWorldTransform);
 
+	FRotator NewRotation = Character->GetActorRotation();
+	NewRotation.Pitch = 0.0f;
+	NewRotation.Roll = 0.0f;
+
+	Character->SetActorRotation(NewRotation);
+
 	// 캐릭터 상태 복구
 	Character->SetIsInVehicle(false, bWasDriver);
+	Character->SetCurrentVehicle(nullptr);
 
 	// 운전자였을 경우에만 차량 Possess 해제
 	if (bWasDriver)
 	{
 		DriverCharacter = nullptr;
 
+		// 현재 Vehicle을 Possess하고 있는 Controller를 가져온다.
 		AActionPlayerController* PC =
-			Cast<AActionPlayerController>(
-				Character->GetController());
+			Cast<AActionPlayerController>(GetController());
 
 		if (PC)
 		{
+			ClientRemoveVehicleInputMapping();
+
+			PC->Possess(Character);
+
+			UE_LOG(LogTemp, Warning,
+				TEXT("[EXIT] Possess Character = %s | CurrentPawn = %s"),
+				*GetNameSafe(Character),
+				*GetNameSafe(PC->GetPawn()));
+
 			if (PC->IsLocalController())
 			{
 				if (ULocalPlayer* LocalPlayer = PC->GetLocalPlayer())
 				{
 					if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
-						LocalPlayer->GetSubsystem<
-						UEnhancedInputLocalPlayerSubsystem>())
+						LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
 					{
 						Subsystem->RemoveMappingContext(IMC_Vehicle);
 					}
 				}
 			}
-
-			PC->Possess(Character);
 		}
 	}
 }
@@ -274,127 +316,6 @@ bool AWheeledVehicleBase::IsSeatOccupied(int32 InSeatIndex) const
 		return false;
 
 	return IsValid(SeatOccupants[InSeatIndex]);
-}
-
-void AWheeledVehicleBase::InitializeSeatPoints()
-{
-	SeatPoints.Empty();
-
-	TArray<USceneComponent*> Components;
-	GetComponents<USceneComponent>(Components);
-
-	for (USceneComponent* Component : Components)
-	{
-		if (!Component) continue;
-
-		// 좌석 추가
-		if (Component->GetName().StartsWith(TEXT("Seat_")))
-		{
-			SeatPoints.Add(Component);
-		}
-	}
-
-	// 좌석 정렬
-	SeatPoints.Sort([](const USceneComponent& A, const USceneComponent& B)
-		{
-			return A.GetName() < B.GetName();
-		});
-}
-
-void AWheeledVehicleBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
-{
-	Super::SetupPlayerInputComponent(PlayerInputComponent);
-
-	UEnhancedInputComponent* EnhancedInputComponent =
-		Cast<UEnhancedInputComponent>(PlayerInputComponent);
-
-	if (!EnhancedInputComponent)
-		return;
-
-	EnhancedInputComponent->BindAction(
-		IA_VehicleThrottle,
-		ETriggerEvent::Triggered,
-		this,
-		&AWheeledVehicleBase::MoveForward);
-
-	EnhancedInputComponent->BindAction(
-		IA_VehicleBrake,
-		ETriggerEvent::Triggered,
-		this,
-		&AWheeledVehicleBase::Brake);
-
-	EnhancedInputComponent->BindAction(
-		IA_VehicleSteering,
-		ETriggerEvent::Triggered,
-		this,
-		&AWheeledVehicleBase::MoveRight);
-
-	EnhancedInputComponent->BindAction(
-		IA_VehicleExit,
-		ETriggerEvent::Started,
-		this,
-		&AWheeledVehicleBase::PressToExitVehicle);
-	EnhancedInputComponent->BindAction(
-		IA_Look,
-		ETriggerEvent::Triggered,
-		this,
-		&AWheeledVehicleBase::OnLook);
-	UE_LOG(LogTemp, Warning,
-		TEXT("[VEHICLE INPUT SETUP] Vehicle=%s Authority=%d Local=%d"),
-		*GetNameSafe(this),
-		HasAuthority(),
-		IsLocallyControlled());
-}
-
-void AWheeledVehicleBase::MoveForward(const FInputActionValue& Value)
-{
-	const float Throttle = Value.Get<float>();
-
-	if (!ChaosVehicleMovement)
-		return;
-
-	ChaosVehicleMovement->SetThrottleInput(Throttle);
-	ChaosVehicleMovement->SetBrakeInput(0.0f);
-
-}
-
-void AWheeledVehicleBase::Brake(const FInputActionValue& Value)
-{
-	const float Brake = Value.Get<float>();
-
-	if (!ChaosVehicleMovement)
-		return;
-
-	ChaosVehicleMovement->SetBrakeInput(Brake);
-	ChaosVehicleMovement->SetThrottleInput(0.0f);
-}
-
-void AWheeledVehicleBase::MoveRight(const FInputActionValue& Value)
-{
-	const float Steering = Value.Get<float>();
-
-	if (!ChaosVehicleMovement)
-		return;
-
-	ChaosVehicleMovement->SetSteeringInput(Steering);
-}
-
-void AWheeledVehicleBase::PressToExitVehicle()
-{
-	AActionCharacter* Character = DriverCharacter;
-
-	if (!Character)
-		return;
-
-	Execute_ExitVehicle(this, Character);
-}
-
-void AWheeledVehicleBase::OnLook(const FInputActionValue& InValue)
-{
-	const FVector2D LookValue = InValue.Get<FVector2D>();
-
-	AddControllerYawInput(LookValue.X);
-	AddControllerPitchInput(LookValue.Y);
 }
 
 void AWheeledVehicleBase::AddVehicleInputMapping()
@@ -431,4 +352,239 @@ void AWheeledVehicleBase::AddVehicleInputMapping()
 		TEXT("[VEHICLE IMC] Added | Vehicle=%s | Local=%d"),
 		*GetNameSafe(this),
 		IsLocallyControlled());
+}
+
+void AWheeledVehicleBase::RemoveVehicleInputMapping()
+{
+	AActionPlayerController* PC =
+		Cast<AActionPlayerController>(GetController());
+
+	if (!PC || !PC->IsLocalController())
+		return;
+
+	ULocalPlayer* LocalPlayer = PC->GetLocalPlayer();
+	if (!LocalPlayer)
+		return;
+
+	UEnhancedInputLocalPlayerSubsystem* Subsystem =
+		LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
+
+	if (!Subsystem || !IMC_Vehicle)
+		return;
+
+	Subsystem->RemoveMappingContext(IMC_Vehicle);
+
+	UE_LOG(LogTemp, Warning,
+		TEXT("[VEHICLE IMC] Removed | Vehicle=%s"),
+		*GetNameSafe(this));
+}
+
+void AWheeledVehicleBase::ClientRemoveVehicleInputMapping_Implementation()
+{
+	RemoveVehicleInputMapping();
+}
+
+void AWheeledVehicleBase::InitializeSeatPoints()
+{
+	SeatPoints.Empty();
+
+	TArray<USceneComponent*> Components;
+	GetComponents<USceneComponent>(Components);
+
+	for (USceneComponent* Component : Components)
+	{
+		if (!Component) continue;
+
+		// 좌석 추가
+		if (Component->GetName().StartsWith(TEXT("Seat_")))
+		{
+			SeatPoints.Add(Component);
+		}
+	}
+
+	// 좌석 정렬
+	SeatPoints.Sort([](const USceneComponent& A, const USceneComponent& B)
+		{
+			return A.GetName() < B.GetName();
+		});
+}
+
+void AWheeledVehicleBase::ServerExitVehicle_Implementation(AActionCharacter* InCharacter)
+{
+	if (!InCharacter) return;
+
+	IVehicleInterface::Execute_ExitVehicle(
+		this,
+		InCharacter);
+}
+
+void AWheeledVehicleBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+	Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+	UEnhancedInputComponent* EnhancedInputComponent =
+		Cast<UEnhancedInputComponent>(PlayerInputComponent);
+
+	if (!EnhancedInputComponent)
+		return;
+
+	EnhancedInputComponent->BindAction(
+		IA_VehicleThrottle,
+		ETriggerEvent::Triggered,
+		this,
+		&AWheeledVehicleBase::MoveForward);
+
+	EnhancedInputComponent->BindAction(
+		IA_VehicleThrottle,
+		ETriggerEvent::Completed,
+		this,
+		&AWheeledVehicleBase::StopMoveForward);
+
+	EnhancedInputComponent->BindAction(
+		IA_VehicleBrake,
+		ETriggerEvent::Triggered,
+		this,
+		&AWheeledVehicleBase::Brake);
+
+	EnhancedInputComponent->BindAction(
+		IA_VehicleBrake,
+		ETriggerEvent::Completed,
+		this,
+		&AWheeledVehicleBase::StopBrake);
+
+	EnhancedInputComponent->BindAction(
+		IA_VehicleSteering,
+		ETriggerEvent::Triggered,
+		this,
+		&AWheeledVehicleBase::MoveRight);
+
+	EnhancedInputComponent->BindAction(
+		IA_VehicleSteering,
+		ETriggerEvent::Completed,
+		this,
+		&AWheeledVehicleBase::StopSteering);
+
+	EnhancedInputComponent->BindAction(
+		IA_VehicleExit,
+		ETriggerEvent::Started,
+		this,
+		&AWheeledVehicleBase::PressToExitVehicle);
+
+	EnhancedInputComponent->BindAction(
+		IA_Look,
+		ETriggerEvent::Triggered,
+		this,
+		&AWheeledVehicleBase::OnLook);
+
+	EnhancedInputComponent->BindAction(
+		IA_FreeLook,
+		ETriggerEvent::Started,
+		this,
+		&AWheeledVehicleBase::OnFreeLookPressed);
+
+	//EnhancedInputComponent->BindAction(
+	//	IA_FreeLook,
+	//	ETriggerEvent::Completed,
+	//	this,
+	//	&AWheeledVehicleBase::OnFreeLookReleased);
+
+}
+
+void AWheeledVehicleBase::MoveForward(const FInputActionValue& Value)
+{
+	const float Throttle = Value.Get<float>();
+
+	if (!ChaosVehicleMovement)
+		return;
+
+	ChaosVehicleMovement->SetThrottleInput(Throttle);
+	ChaosVehicleMovement->SetBrakeInput(0.0f);
+
+}
+
+void AWheeledVehicleBase::StopMoveForward(const FInputActionValue& Value)
+{
+	ChaosVehicleMovement->SetThrottleInput(0.0f);
+}
+
+void AWheeledVehicleBase::Brake(const FInputActionValue& Value)
+{
+	const float Brake = Value.Get<float>();
+
+	if (!ChaosVehicleMovement)
+		return;
+
+	ChaosVehicleMovement->SetBrakeInput(Brake);
+	ChaosVehicleMovement->SetThrottleInput(0.0f);
+}
+
+void AWheeledVehicleBase::StopBrake(const FInputActionValue& Value)
+{
+	ChaosVehicleMovement->SetBrakeInput(0.0f);
+	ChaosVehicleMovement->SetThrottleInput(0.0f);
+}
+
+void AWheeledVehicleBase::MoveRight(const FInputActionValue& Value)
+{
+	const float Steering = Value.Get<float>();
+
+	if (!ChaosVehicleMovement)
+		return;
+
+	ChaosVehicleMovement->SetSteeringInput(Steering);
+}
+
+void AWheeledVehicleBase::StopSteering(const FInputActionValue& Value)
+{
+	ChaosVehicleMovement->SetSteeringInput(0.0f);
+}
+
+void AWheeledVehicleBase::PressToExitVehicle()
+{
+	AActionCharacter* Character = DriverCharacter;
+
+	if (!Character)
+		return;
+
+	//IVehicleInterface::Execute_ExitVehicle(this, Character);
+	ServerExitVehicle(Character);
+}
+
+void AWheeledVehicleBase::PassengerPressToExitVehicle(AActionCharacter* InCharacter)
+{
+	if (!InCharacter)
+		return;
+
+	ServerExitVehicle(InCharacter);
+}
+
+void AWheeledVehicleBase::OnLook(const FInputActionValue& InValue)
+{
+	if (!bCanFreeLook)
+		return;
+
+	const FVector2D LookValue = InValue.Get<FVector2D>();
+
+	FRotator Rotation = DriverCamera->GetRelativeRotation();
+
+	Rotation.Yaw += LookValue.X *1.4;
+	Rotation.Pitch += LookValue.Y *1.4;
+
+	Rotation.Pitch = FMath::Clamp(Rotation.Pitch, -60.0f, 60.0f);
+
+	DriverCamera->SetRelativeRotation(Rotation);
+}
+
+void AWheeledVehicleBase::OnFreeLookPressed(const FInputActionValue& InValue)
+{
+	bCanFreeLook = bCanFreeLook? false : true;
+	//bUseControllerRotationYaw = false;
+	//UE_LOG(LogTemp, Warning, TEXT("[FREELOOK] ON"));
+}
+
+void AWheeledVehicleBase::OnFreeLookReleased(const FInputActionValue& InValue)
+{
+	bCanFreeLook = false;
+	//bUseControllerRotationYaw = true;
+	UE_LOG(LogTemp, Warning, TEXT("[FREELOOK] OFF"));
 }

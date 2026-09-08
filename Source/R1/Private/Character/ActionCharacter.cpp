@@ -22,6 +22,7 @@
 #include "Framework/MainHUD.h"
 #include "Widget/MainHUDWidget.h"
 #include "Data/Item/ItemDataBase.h"
+#include "Vehicle/WheeledVehicleBase.h"
 
 #include "InputMappingContext.h"
 #include "InputAction.h"
@@ -226,6 +227,7 @@ void AActionCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AActionCharacter, bIsSprinting);
 	DOREPLIFETIME(AActionCharacter, bIsSitting);
+	DOREPLIFETIME(AActionCharacter, CurrentVehicle);
 }
 
 void AActionCharacter::OnSecondaryActionPressed()
@@ -286,6 +288,14 @@ void AActionCharacter::SetIsInVehicle(bool bIsInVehicleNew, bool bIsDriver)
 	if (bIsDriver && IsLocallyControlled())
 	{
 		GetMesh()->SetVisibility(!(bIsInVehicleNew));
+	}
+}
+
+void AActionCharacter::ServerRequestExitVehicle_Implementation()
+{
+	if (bIsSitting && CurrentVehicle)
+	{
+		CurrentVehicle->PassengerPressToExitVehicle(this);
 	}
 }
 
@@ -642,6 +652,14 @@ void AActionCharacter::OnRotateBuildingPartPressed()
 
 void AActionCharacter::OnInteractPressed()
 {
+
+	if (bIsSitting && CurrentVehicle)
+	{
+		ServerRequestExitVehicle();
+		return;
+	}
+
+	InteractionComponent->TryInteract();
 	InteractionComponent->TryInteract();
 
 	//UE_LOG(LogTemp, Log, TEXT("TryInteract()"));

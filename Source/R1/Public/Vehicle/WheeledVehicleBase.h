@@ -55,25 +55,58 @@ public:
 	// 탈것	입력 맵핑 추가 함수
 	UFUNCTION()
 	void AddVehicleInputMapping();
+
+	// 탈것	입력 맵핑 제거 함수
+	UFUNCTION()
+	void RemoveVehicleInputMapping();
+
+	// 클라용 IMC 제거 RPC
+	UFUNCTION(Client, Reliable)
+	void ClientRemoveVehicleInputMapping();
+
+	// 운전자용 하차 함수
+	UFUNCTION()
+	void PressToExitVehicle();
+
+	// 승객용 하차 함수
+	UFUNCTION()
+	void PassengerPressToExitVehicle(AActionCharacter* InCharacter);
+
 protected:
 	void InitializeSeatPoints();
+
+	UFUNCTION(Server, Reliable)
+	void ServerExitVehicle(AActionCharacter* InCharacter);
 
 	virtual void SetupPlayerInputComponent(
 		UInputComponent* PlayerInputComponent) override;
 
 	UFUNCTION()
 	void MoveForward(const FInputActionValue& Value);
+
+	UFUNCTION()
+	void StopMoveForward(const FInputActionValue& Value);
+
 	UFUNCTION()
 	void Brake(const FInputActionValue& Value);
+
+	UFUNCTION()
+	void StopBrake(const FInputActionValue& Value);
 
 	UFUNCTION()
 	void MoveRight(const FInputActionValue& Value);
 
 	UFUNCTION()
-	void PressToExitVehicle();
+	void StopSteering(const FInputActionValue& Value);
 
 	UFUNCTION()
 	void OnLook(const FInputActionValue& InValue);
+
+	UFUNCTION()
+	void OnFreeLookPressed(const FInputActionValue& InValue);
+
+	UFUNCTION()
+	void OnFreeLookReleased(const FInputActionValue& InValue);
 
 protected:
 	// 운전자 카메라
@@ -130,8 +163,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UInputAction> IA_Look;
 
+	// 카메라 회전
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UInputAction> IA_FreeLook;
+
 
 private:
 	UPROPERTY()
 	TArray<TObjectPtr<APawn>> SeatOccupants;
+
+	bool bCanFreeLook = false;
 };
