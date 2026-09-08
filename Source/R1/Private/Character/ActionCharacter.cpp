@@ -744,7 +744,6 @@ void AActionCharacter::OnInteractPressed()
 	}
 
 	InteractionComponent->TryInteract();
-	InteractionComponent->TryInteract();
 
 	//UE_LOG(LogTemp, Log, TEXT("TryInteract()"));
 }

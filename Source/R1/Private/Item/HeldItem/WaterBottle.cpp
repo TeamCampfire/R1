@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.09.07
+﻿/// 최초작성 : 2026.09.07
 /// 작 성 자 : 최 요 환
 
 #include "Item/HeldItem/WaterBottle.h"
@@ -137,9 +137,9 @@ bool AWaterBottle::TraceForWaterBody() const
 		if (!GEngine)
 		{
 			return;
-		}
+		}/*
 		GEngine->AddOnScreenDebugMessage(-1, 3.f, bMatched ? FColor::Green : FColor::Silver,
-			FString::Printf(TEXT("[WaterCheck][%s] %s (matched=%d)"), Pass, *GetNameSafe(Overlap.GetActor()), bMatched));
+			FString::Printf(TEXT("[WaterCheck][%s] %s (matched=%d)"), Pass, *GetNameSafe(Overlap.GetActor()), bMatched));*/
 	};
 
 	bool bFoundWater = false;
