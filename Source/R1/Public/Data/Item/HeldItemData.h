@@ -82,4 +82,24 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HeldItem|Mesh")
 	TObjectPtr<UStaticMesh> WeaponMesh;
 
+	// ----------------------------------------------------
+	// 오프셋 설정 (1인칭 팔 / 1인칭 무기 / 3인칭 무기)
+	// ----------------------------------------------------
+
+	// 1인칭 팔(FirstPersonMesh)의 카메라 기준 위치 오프셋 (기본값: X=0, Y=0, Z=-130)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HeldItem|Offset")
+	FVector FirstPersonMeshLocation = FVector(0.f, 0.f, -130.f);
+
+	// 1인칭 팔(FirstPersonMesh)의 카메라 기준 회전 오프셋 (기본값: Pitch=0, Yaw=-90, Roll=0)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HeldItem|Offset")
+	FRotator FirstPersonMeshRotation = FRotator(0.f, -90.f, 0.f);
+
+	// 1인칭 손에 쥔 도구/무기 메시(ItemMesh1P)의 손 소켓 기준 상대 트랜스폼 오프셋 (위치/회전/스케일)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HeldItem|Offset")
+	FTransform ItemMesh1POffset = FTransform::Identity;
+
+	// 3인칭 손에 쥔 도구/무기 메시(ItemMesh3P)의 손 소켓 기준 상대 트랜스폼 오프셋 (위치/회전/스케일)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HeldItem|Offset")
+	FTransform ItemMesh3POffset = FTransform::Identity;
+
 };

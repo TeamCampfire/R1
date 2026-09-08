@@ -1,4 +1,4 @@
-﻿/// 최초작성 : 2026.08.30
+/// 최초작성 : 2026.08.30
 /// 작 성 자 : 주 형 진
 
 // Fill out your copyright notice in the Description page of Project Settings.
@@ -78,6 +78,15 @@ void UHeldItemComponent::AttachHeldItemToCharacter(AHeldItemBase* ItemToAttach)
 		if (HandSocket != NAME_None)
 		{
 			ItemToAttach->AttachToComponent(CharacterMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, HandSocket);
+
+			// 3P 무기 메시 오프셋 적용
+			FTransform Offset3P = ItemToAttach->GetItemMesh3POffset();
+			if (Offset3P.GetScale3D().IsNearlyZero())
+			{
+				Offset3P.SetScale3D(FVector::OneVector);
+			}
+			ItemToAttach->SetActorRelativeTransform(Offset3P);
+
 			UE_LOG(LogTemp, Log, TEXT("[UHeldItemComponent::AttachHeldItemToCharacter] Attached 3P to socket: %s"), *HandSocket.ToString());
 		}
 		else
@@ -87,29 +96,30 @@ void UHeldItemComponent::AttachHeldItemToCharacter(AHeldItemBase* ItemToAttach)
 		}
 
 		// 아이템 변경시에는 모든 몽타주 종료
-		CharacterMesh->GetAnimInstance()->StopAllMontages(0);
+		if (CharacterMesh->GetAnimInstance())
+		{
+			CharacterMesh->GetAnimInstance()->StopAllMontages(0);
+		}
 	}
 
 
 	// 3. 1인칭 팔(FirstPersonMesh) 소켓에 ItemMesh1P 분리 부착
 	if (USkeletalMeshComponent* FPMesh = OwnerCharacter->GetFirstPersonMesh())
 	{
+		// 1인칭 팔 자체의 위치 및 회전 오프셋 적용
+		FVector TargetLocation = ItemToAttach->GetFirstPersonMeshLocation();
+		FRotator TargetRotation = ItemToAttach->GetFirstPersonMeshRotation();
 
-		if (ItemToAttach->GetItemData())
+		// 돌(Rock)의 경우 데이터 에셋에서 별도 회전 변경이 없었다면 기존 -105도 보정 유지 (하위 호환)
+		if (ItemToAttach->GetItemData() && ItemToAttach->GetItemData()->ItemID.ToString() == TEXT("Item_Held_Rock"))
 		{
-			// 돌의 경우 축이 살짝 틀어져 있어서 보정
-			// 눈물겹지만 어쩔 수 없음
-			if (ItemToAttach->GetItemData()->ItemID.ToString() == TEXT("Item_Held_Rock"))
+			if (TargetRotation == FRotator(0.f, -90.f, 0.f))
 			{
-				UE_LOG(LogTemp, Display, TEXT("Testt"));
-				FPMesh->SetRelativeRotation(FRotator(0, -105.f, 0));
-			}
-			else
-			{
-				FPMesh->SetRelativeRotation(FRotator(0, -90.f, 0));
+				TargetRotation = FRotator(0.f, -105.f, 0.f);
 			}
 		}
-		
+
+		FPMesh->SetRelativeLocationAndRotation(TargetLocation, TargetRotation);
 
 		if (UStaticMeshComponent* Mesh1P = ItemToAttach->GetItemMesh1P())
 		{
@@ -122,6 +132,15 @@ void UHeldItemComponent::AttachHeldItemToCharacter(AHeldItemBase* ItemToAttach)
 			if (FPSocket != NAME_None)
 			{
 				Mesh1P->AttachToComponent(FPMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, FPSocket);
+
+				// 1P 무기 메시 소켓 기준 오프셋 적용
+				FTransform Offset1P = ItemToAttach->GetItemMesh1POffset();
+				if (Offset1P.GetScale3D().IsNearlyZero())
+				{
+					Offset1P.SetScale3D(FVector::OneVector);
+				}
+				Mesh1P->SetRelativeTransform(Offset1P);
+
 				UE_LOG(LogTemp, Log, TEXT("[UHeldItemComponent::AttachHeldItemToCharacter] Attached 1P to socket: %s"), *FPSocket.ToString());
 			}
 			else
@@ -145,10 +164,17 @@ void UHeldItemComponent::OnRep_CurrentHeldItem(AHeldItemBase* PreviousHeldItem)
 		PreviousHeldItem->OnUnequipped();
 	}
 
-	// 2. 무기가 해제되어 빈 손(nullptr)이 된 경우 -> 클라이언트에서도 애니메이션 레이어 즉시 언링크!
+	// 2. 무기가 해제되어 빈 손(nullptr)이 된 경우 -> 클라이언트에서도 애니메이션 레이어 즉시 언링크 및 1P 팔 기본 위치 복원!
 	if (!CurrentHeldItem)
 	{
 		UnlinkItemAnimLayers();
+		if (OwnerCharacter)
+		{
+			if (USkeletalMeshComponent* FPMesh = OwnerCharacter->GetFirstPersonMesh())
+			{
+				FPMesh->SetRelativeLocationAndRotation(FVector(0.f, 0.f, -130.f), FRotator(0.f, -90.f, 0.f));
+			}
+		}
 		return;
 	}
 
@@ -315,6 +341,15 @@ void UHeldItemComponent::UnequipHeldItem()
 {
 	// 이전 애니메이션 레이어 해제 (1인칭 팔 & 3인칭 몸)
 	UnlinkItemAnimLayers();
+
+	// 맨손이 되었을 때 1인칭 팔 위치/회전 기본값(0, 0, -130 / 0, -90, 0)으로 복구
+	if (OwnerCharacter)
+	{
+		if (USkeletalMeshComponent* FPMesh = OwnerCharacter->GetFirstPersonMesh())
+		{
+			FPMesh->SetRelativeLocationAndRotation(FVector(0.f, 0.f, -130.f), FRotator(0.f, -90.f, 0.f));
+		}
+	}
 
 	if (CurrentHeldItem)
 	{

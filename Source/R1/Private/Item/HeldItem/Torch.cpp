@@ -9,6 +9,8 @@ void ATorch::OnPrimaryActionStarted()
 	if (bIsActive && !LitAttackMontage) return;
 	if (!bIsActive && !UnlitAttackMontage) return;
 
+	UE_LOG(LogTemp, Display, TEXT("Test"));
+
 	UAnimMontage* TargetMontage = nullptr;
 	if (bIsActive)	TargetMontage = LitAttackMontage;
 	if (!bIsActive) TargetMontage = UnlitAttackMontage;
@@ -37,7 +39,6 @@ void ATorch::OnSecondaryActionStarted()
 
 
 	ToggleState();
-	UE_LOG(LogTemp, Display, TEXT("current : %d"), bIsActive);
 
 	if (UAnimInstance* AnimInst3P = OwnerCharacter->GetMesh() ? OwnerCharacter->GetMesh()->GetAnimInstance() : nullptr)
 	{

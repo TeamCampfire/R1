@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.09.06
+﻿/// 최초작성 : 2026.09.06
 /// 작 성 자 : 최 요 환
 /// 간단설명 : 레벨에 배치되는 창고 액터
 
@@ -9,6 +9,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Interface/InteractableInterface.h"
+#include "Item/PlaceableItemBase.h"
 #include "WarehouseBase.generated.h"
 
 class UStaticMeshComponent;
@@ -24,7 +25,7 @@ class UWarehouseInventoryComponent;
  * 보내야 한다(AActionPlayerController::Client_OpenWarehouse 참고).
  */
 UCLASS()
-class R1_API AWarehouseBase : public AActor, public IInteractableInterface
+class R1_API AWarehouseBase : public APlaceableItemBase, public IInteractableInterface
 {
 	GENERATED_BODY()
 

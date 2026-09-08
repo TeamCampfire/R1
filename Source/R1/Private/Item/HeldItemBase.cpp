@@ -25,7 +25,7 @@ AHeldItemBase::AHeldItemBase()
 	ItemMesh3P->SetCastHiddenShadow(true);
 
 	ItemMesh1P = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ItemMesh1P"));
-	ItemMesh1P->SetupAttachment(RootComponent);
+	//ItemMesh1P->SetupAttachment(RootComponent);
 	ItemMesh1P->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	ItemMesh1P->SetCollisionResponseToAllChannels(ECR_Ignore);
 	ItemMesh1P->SetOnlyOwnerSee(true);
@@ -199,3 +199,38 @@ void AHeldItemBase::Multicast_PlaySecondaryActionMontage_Implementation()
 	OwnerCharacter->PlayAnimMontage(ItemData->SecondaryMontage);
 }
 
+FTransform AHeldItemBase::GetItemMesh1POffset() const
+{
+	if (ItemData)
+	{
+		return ItemData->ItemMesh1POffset;
+	}
+	return DefaultItemMesh1POffset;
+}
+
+FTransform AHeldItemBase::GetItemMesh3POffset() const
+{
+	if (ItemData)
+	{
+		return ItemData->ItemMesh3POffset;
+	}
+	return DefaultItemMesh3POffset;
+}
+
+FVector AHeldItemBase::GetFirstPersonMeshLocation() const
+{
+	if (ItemData)
+	{
+		return ItemData->FirstPersonMeshLocation;
+	}
+	return DefaultFirstPersonMeshLocation;
+}
+
+FRotator AHeldItemBase::GetFirstPersonMeshRotation() const
+{
+	if (ItemData)
+	{
+		return ItemData->FirstPersonMeshRotation;
+	}
+	return DefaultFirstPersonMeshRotation;
+}

@@ -1,4 +1,4 @@
-﻿/// 최초작성 : 2026.08.30
+/// 최초작성 : 2026.08.30
 /// 작 성 자 : 주 형 진
 
 // Fill out your copyright notice in the Description page of Project Settings.
@@ -78,6 +78,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "HeldItem|State")
 	FORCEINLINE bool GetActiveState() { return bIsActive; }
 
+	// 오프셋 접근자 (ItemData 우선, 없을 시 Default 설정값 반환)
+	UFUNCTION(BlueprintPure, Category = "HeldItem|Offset")
+	FTransform GetItemMesh1POffset() const;
+
+	UFUNCTION(BlueprintPure, Category = "HeldItem|Offset")
+	FTransform GetItemMesh3POffset() const;
+
+	UFUNCTION(BlueprintPure, Category = "HeldItem|Offset")
+	FVector GetFirstPersonMeshLocation() const;
+
+	UFUNCTION(BlueprintPure, Category = "HeldItem|Offset")
+	FRotator GetFirstPersonMeshRotation() const;
+
 protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -119,4 +132,18 @@ protected:
 	UPROPERTY(ReplicatedUsing = OnRep_IsActiveState, BlueprintReadOnly, Category = "HeldItem|State")
 	bool bIsActive = false;
 
+	// ----------------------------------------------------
+	// 기본 오프셋 설정 (ItemData가 없을 때 fallback으로 사용)
+	// ----------------------------------------------------
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HeldItem|Offset")
+	FVector DefaultFirstPersonMeshLocation = FVector(0.f, 0.f, -130.f);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HeldItem|Offset")
+	FRotator DefaultFirstPersonMeshRotation = FRotator(0.f, -90.f, 0.f);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HeldItem|Offset")
+	FTransform DefaultItemMesh1POffset = FTransform::Identity;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HeldItem|Offset")
+	FTransform DefaultItemMesh3POffset = FTransform::Identity;
 };
