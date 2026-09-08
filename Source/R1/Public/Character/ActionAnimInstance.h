@@ -44,6 +44,8 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Anim")
 	TObjectPtr<USkeletalMeshComponent> SourceSkeletalMesh;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Action")
+	bool bIsActive = false;
 
 private:
 	UPROPERTY()

@@ -21,6 +21,7 @@ AHeldItemBase::AHeldItemBase()
 	ItemMesh3P->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	ItemMesh3P->SetCollisionResponseToAllChannels(ECR_Ignore);
 	ItemMesh3P->SetOwnerNoSee(true);
+	ItemMesh3P->SetCastShadow(true);
 	ItemMesh3P->SetCastHiddenShadow(true);
 
 	ItemMesh1P = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ItemMesh1P"));
@@ -82,11 +83,22 @@ void AHeldItemBase::InitItemVisual(UHeldItemData* InItemData)
 
 #include "Net/UnrealNetwork.h"
 
+void AHeldItemBase::ToggleState()
+{
+	SetActiveState(!bIsActive);
+}
+
+void AHeldItemBase::SetActiveState(bool InValue)
+{
+	bIsActive = InValue;
+}
+
 void AHeldItemBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(AHeldItemBase, ItemData);
+	DOREPLIFETIME(AHeldItemBase, bIsActive);
 }
 
 void AHeldItemBase::OnRep_ItemData()
@@ -95,6 +107,16 @@ void AHeldItemBase::OnRep_ItemData()
 	{
 		InitItemVisual(ItemData);
 	}
+}
+
+void AHeldItemBase::OnRep_IsActiveState()
+{
+	OnItemStateChanged(bIsActive);
+}
+
+void AHeldItemBase::OnItemStateChanged(bool bNewState)
+{
+
 }
 
 void AHeldItemBase::OnPrimaryActionStarted()

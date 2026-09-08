@@ -385,16 +385,61 @@ void AActionCharacter::Die()
 
 void AActionCharacter::MulticastDie_Implementation()
 {
-	// 캡슐 컴포넌트 충돌 끄기
+	// 1. 캡슐 충돌 완전 비활성화 (캡슐이 바닥에 걸려 렉돌과 부딪히는 것 방지)
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	// 애니메이션 중지
-	//GetMesh()->SetAnimationMode(EAnimationMode::AnimationSingleNode);
-	//GetMesh()->Stop();
-	GetMesh()->SetAnimInstanceClass(nullptr);
-	// 메쉬 랙돌 전환
+	GetCapsuleComponent()->SetCollisionResponseToAllChannels(ECR_Ignore);
+	// 2. 캐릭터 이동 컴포넌트 정지
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		MoveComp->StopMovementImmediately();
+		MoveComp->DisableMovement();
+		MoveComp->SetComponentTickEnabled(false);
+	}
+	// 3. 메인 메시(GetMesh) 렉돌 물리 시뮬레이션 시작
+	GetMesh()->SetAnimInstanceClass(nullptr); // 애니메이션 정지
 	GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
+	GetMesh()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	GetMesh()->SetSimulatePhysics(true);
-	// 컨트롤러 연결 해제
+	GetMesh()->WakeAllRigidBodies();
+	// 4. 모듈형 파츠 메시(Follower) 세팅
+	// 중요: 파츠들은 자체 물리를 켜지 않고(false), 충돌도 끕니다(NoCollision).
+	// LeaderPoseComponent가 메인 메시의 물리 뼈 위치를 그대로 복사해서 렌더링합니다.
+	TArray<USkeletalMeshComponent*> ModularParts = { TorsoMesh, LegMesh, HandMesh, FeetMesh };
+	for (USkeletalMeshComponent* Part : ModularParts)
+	{
+		if (Part)
+		{
+			Part->SetSimulatePhysics(true);
+			//Part->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Part->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+			// 리더가 물리 연산(TG_EndPhysics)을 마친 뒤 파츠가 갱신되도록 틱 의존성 보장
+			Part->AddTickPrerequisiteComponent(GetMesh());
+		}
+	}
+	// 5. 1인칭 프로젝트(R1) 전용 시각화 처리
+	if (IsLocallyControlled())
+	{
+		// 1인칭 전용 팔 숨기기
+		if (FirstPersonMesh)
+		{
+			FirstPersonMesh->SetVisibility(false);
+		}
+		// 죽었을 때는 내 3인칭 렉돌 몸뚱이가 보이도록 OwnerNoSee 해제
+		GetMesh()->SetOwnerNoSee(false);
+		for (USkeletalMeshComponent* Part : ModularParts)
+		{
+			if (Part)
+			{
+				Part->SetOwnerNoSee(false);
+			}
+		}
+		// (선택) 카메라를 머리 본에 붙여 바닥에 쓰러지는 1인칭 시점 연출
+		if (FirstPersonCamera)
+		{
+			FirstPersonCamera->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, FName(TEXT("head")));
+		}
+	}
+	// 6. 컨트롤러 연결 해제
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
 		PC->UnPossess();

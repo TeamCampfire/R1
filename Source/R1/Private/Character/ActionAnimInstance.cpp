@@ -5,6 +5,7 @@
 #include "Character/ActionCharacter.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "KismetAnimationLibrary.h"
+#include "Component/HeldItemComponent.h"
 
 void UActionAnimInstance::NativeInitializeAnimation()
 {
@@ -41,5 +42,7 @@ void UActionAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 
 	bIsCrouched = OwningCharacter->bIsCrouched;       // 엔진 내장 (public)
 	bIsFalling = MovementComponent->IsFalling();
-	bIsSprinting = OwningCharacter->IsSprinting();    
+	bIsSprinting = OwningCharacter->IsSprinting();
+	if (OwningCharacter->GetHeldItemComponent()->GetCurrentHeldItem())
+		bIsActive = OwningCharacter->GetHeldItemComponent()->GetCurrentHeldItem()->GetActiveState();
 }

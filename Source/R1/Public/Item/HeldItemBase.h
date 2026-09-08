@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.30
+﻿/// 최초작성 : 2026.08.30
 /// 작 성 자 : 주 형 진
 
 // Fill out your copyright notice in the Description page of Project Settings.
@@ -69,6 +69,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "HeldItem")
 	FORCEINLINE UHeldItemData* GetItemData() const { return ItemData; }
 
+	UFUNCTION(BlueprintCallable, Category = "HeldItem|State")
+	void ToggleState();
+
+	UFUNCTION(BlueprintCallable, Category = "HeldItem|State")
+	void SetActiveState(bool InValue);
+
+	UFUNCTION(BlueprintCallable, Category = "HeldItem|State")
+	FORCEINLINE bool GetActiveState() { return bIsActive; }
+
 protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -87,6 +96,13 @@ protected:
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_PlaySecondaryActionMontage();
 
+	UFUNCTION()
+	virtual void OnRep_IsActiveState();
+
+	// 상태가 바뀔 때 사용하는 이벤트 함수
+	UFUNCTION(BlueprintCallable, Category = "HeldItem|State")
+	virtual void OnItemStateChanged(bool bNewState);
+
 protected:
 	UPROPERTY(BlueprintReadOnly, Category = "HeldItem")
 	TObjectPtr<AActionCharacter> OwnerCharacter;
@@ -99,5 +115,8 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "HeldItem|ItemMesh")
 	TObjectPtr<UStaticMeshComponent> ItemMesh3P;
+
+	UPROPERTY(ReplicatedUsing = OnRep_IsActiveState, BlueprintReadOnly, Category = "HeldItem|State")
+	bool bIsActive = false;
 
 };
