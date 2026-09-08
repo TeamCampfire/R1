@@ -20,6 +20,9 @@ class UWarehouseInventoryComponent;
 class AActionPlayerController;
 class UCampfireWidget;
 class ACampfire;
+class UPickupNotificationWidget;
+class UItemDataBase;
+class UPanelWidget;
 /**
  * 
  */
@@ -76,6 +79,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Building|Durability")
 	void HideBuildingDurability();
 
+	// 아이템 획득 알림을 스택 맨 위에 하나 추가한다(몇 초 뒤 자동 소멸) —
+	// AActionPlayerController::Client_NotifyItemAcquired가 호출한다. 같은 아이템이어도 기존
+	// 행과 합치지 않고 매번 새로 쌓는다(러스트 원본 동작 확인 후 확정 — PickupNotificationWidget.h
+	// 주석 참고).
+	UFUNCTION(BlueprintCallable, Category = "Notification")
+	void AddPickupNotification(UItemDataBase* ItemData, int32 GainedAmount, int32 NewTotalCount);
+
 public:
 	// 플레이어 컨트롤러 캐싱
 	UPROPERTY()
@@ -111,6 +121,18 @@ protected:
 
 
 	void BindDelegatesToNewChar();
+
+	// PickupNotificationWidget이 자기 수명(Lifetime)이 다 되어 OnExpired를 쏘면 호출된다 —
+	// 배열에서 빼고 컨테이너를 다시 그린다.
+	UFUNCTION()
+	void RemovePickupNotification(UPickupNotificationWidget* Notification);
+
+	// ActivePickupNotifications 순서(맨 앞이 최신)를 그대로 컨테이너에 다시 채운다. 매번 삽입/제거
+	// 시 통째로 다시 그리는 이유: UPanelWidget이 특정 인덱스에 끼워넣는 공개 API를 제공하지 않아서,
+	// "항상 최신이 맨 위" 순서를 유지하려면 이 방식이 가장 단순하다. 행 개수가 몇 개뿐이라
+	// 매번 다시 그려도 비용이 무시할 만하다.
+	void RefreshPickupNotificationContainer();
+
 	// 설정, 사망화면 등을 제외한 모든 HUD 패널
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UCanvasPanel> HUDPanel;
@@ -164,4 +186,28 @@ protected:
 	// 내구도 UI 자동 숨김 시간 타이머
 	// 연속으로 공격하면 기존 타이머를 초기화하고 마지막 공격부터 다시 계산
 	FTimerHandle BuildingDurabilityTimerHandle;
+
+	// 아이템 획득 알림 스택이 쌓일 컨테이너 — WBP_MainHUD에 이 이름 + 패널(VerticalBox 권장)
+	// 타입으로 배치하면 자동 바인딩된다.
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UPanelWidget> PickupNotificationContainer;
+
+	// 알림 행 하나를 표현할 위젯 클래스. WBP 디폴트에서 WBP_PickupNotification(UPickupNotificationWidget
+	// 부모)으로 지정.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Notification")
+	TSubclassOf<UPickupNotificationWidget> PickupNotificationWidgetClass;
+
+	// 알림 행 하나가 화면에 떠있는 시간(초) — 페이드아웃 구간도 포함한 총 시간이다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Notification")
+	float PickupNotificationLifetime = 3.f;
+
+	// 사라지기 전 서서히 투명해지는 구간의 길이(초). PickupNotificationLifetime 중 마지막
+	// 이 시간만큼을 오파시티 1→0 페이드에 쓴다(WBP 애니메이션 불필요, 코드로만 처리).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Notification")
+	float PickupNotificationFadeOutDuration = 0.75f;
+
+	// 지금 떠있는 알림 행들 — [0]이 항상 최신(맨 위). RefreshPickupNotificationContainer가 이
+	// 순서 그대로 컨테이너에 다시 채운다.
+	UPROPERTY()
+	TArray<TObjectPtr<UPickupNotificationWidget>> ActivePickupNotifications;
 };

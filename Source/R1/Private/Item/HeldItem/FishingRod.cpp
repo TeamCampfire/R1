@@ -803,6 +803,7 @@ void AFishingRod::Server_FinishFishing_Implementation(bool bSuccess)
 		{
 			int32 RemainCount = 0;
 			const bool bAdded = InvComp->AddItem(FishRewardItemData, 1, RemainCount);
+			InvComp->NotifyItemAcquired(FishRewardItemData, 1 - RemainCount);
 			if (bAdded)
 			{
 				UE_LOG(LogTemp, Display, TEXT("[낚시 서버] 인벤토리에 보상 [%s] 지급 완료!"), *FishRewardItemData->DisplayName.ToString());

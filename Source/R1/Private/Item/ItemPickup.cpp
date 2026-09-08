@@ -155,9 +155,13 @@ void AItemPickup::TryGrantToInventory(APawn* Interactor)
 
 	UE_LOG(LogTemp, Log, TEXT("아이템 획득 : %s"), *(IInteractableInterface::Execute_GetInteractionDisplayName(this).ToString()));
 	
+	const int32 OriginalCount = Count;
 	int32 Remainder = 0;
 	Inventory->AddItem(ItemData, Count, Remainder);
-	
+
+	// 실제로 인벤토리에 들어간 만큼만 알림 — 인벤토리가 꽉 차서 일부/전부 못 들어갔으면 그만큼 뺀다.
+	Inventory->NotifyItemAcquired(ItemData, OriginalCount - Remainder);
+
 	if (Remainder <= 0)
 	{
 		Destroy();

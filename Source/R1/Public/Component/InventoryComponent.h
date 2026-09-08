@@ -95,6 +95,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	bool AddItem(UItemDataBase* ItemData, int32 Count, int32& OutRemainder);
 
+	// 소유 플레이어에게만(Client RPC) 획득 알림 UI(HUD 스택)를 띄운다. AddItem 자체는 스폰 시
+	// 기본 지급처럼 알림이 필요 없는 호출도 있어서 순수 데이터 함수로 남겨두고, 실제로 "플레이어
+	// 행동으로 얻었다"고 볼 수 있는 지점(월드 픽업/채집/낚시 보상 등)에서 AddItem 성공 직후
+	// 호출부가 직접 불러야 한다. GainedAmount가 0 이하면 무동작.
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void NotifyItemAcquired(UItemDataBase* ItemData, int32 GainedAmount) const;
+
 	// 메인↔벨트 이동/병합/교환, (메인|벨트)→장비(부위 일치 시 자동 장착, 기존 장착품은
 	// From 자리로 스왑), 장비→(메인|벨트)(해제)까지 전부 이 함수 하나로 처리한다.
 	// Count가 0 이하이면 슬롯 전체를 이동시킨다 — 단, bAutoHalfSplitIfTargetEmpty가 true고
