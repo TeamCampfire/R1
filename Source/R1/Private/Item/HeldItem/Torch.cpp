@@ -16,8 +16,8 @@ ATorch::ATorch()
 
 	FlameFxComponent1P = CreateDefaultSubobject<UNiagaraComponent>(TEXT("FlameFx1"));
 	FlameFxComponent1P->SetupAttachment(ItemMesh1P);
-	FlameFxComponent3P->SetOnlyOwnerSee(true);
-	FlameFxComponent3P->bAutoActivate = false;
+	FlameFxComponent1P->SetOnlyOwnerSee(true);
+	FlameFxComponent1P->bAutoActivate = false;
 
 	TorchFireLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("Light3"));
 	TorchFireLight->SetupAttachment(ItemMesh3P);
