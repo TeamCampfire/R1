@@ -6,6 +6,8 @@
 #include "GameFramework/Pawn.h"
 #include "Character/ActionPlayerController.h"
 #include "Component/InteractionComponent.h"
+#include "Framework/MainHUD.h"
+#include "Widget/MainHUDWidget.h"
 
 void UBeltBarWidget::NativePreConstruct()
 {
@@ -135,7 +137,8 @@ void UBeltBarWidget::HandleSlotClicked(FInventorySlotRef SlotRef)
 
 void UBeltBarWidget::HandleSlotRightClicked(FInventorySlotRef SlotRef)
 {
-	if (AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer()))
+	AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer());
+	if (PC)
 	{
 		UInteractionComponent* Interaction = PC->GetPawn()
 			? PC->GetPawn()->FindComponentByClass<UInteractionComponent>() : nullptr;
@@ -145,10 +148,27 @@ void UBeltBarWidget::HandleSlotRightClicked(FInventorySlotRef SlotRef)
 			return;
 		}
 	}
-	if (UInventoryComponent* Inventory = BoundInventory.Get())
+
+	UInventoryComponent* Inventory = BoundInventory.Get();
+	if (!Inventory)
 	{
-		Inventory->Server_QuickMoveItem(SlotRef);
+		return;
 	}
+
+	// 창고가 열려있으면 우클릭은 메인↔벨트/장착(QuickMoveItem) 대신 "창고로 보내기"로 동작한다.
+	if (AMainHUD* HUD = PC ? PC->GetHUD<AMainHUD>() : nullptr)
+	{
+		if (UMainHUDWidget* MainHudWidget = HUD->GetMainHudWidget())
+		{
+			if (UWarehouseInventoryComponent* OpenWarehouse = MainHudWidget->GetOpenWarehouse())
+			{
+				Inventory->Server_QuickMoveToWarehouse(OpenWarehouse, SlotRef);
+				return;
+			}
+		}
+	}
+
+	Inventory->Server_QuickMoveItem(SlotRef);
 }
 
 void UBeltBarWidget::HandleCampfireItemDropped(ACampfire* Campfire, FCampfireSlotRef FromSlot,

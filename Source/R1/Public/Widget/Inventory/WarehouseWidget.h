@@ -92,6 +92,11 @@ protected:
 	UFUNCTION()
 	void HandlePlayerSlotClicked(FInventorySlotRef SlotRef);
 
+	// 창고 슬롯 우클릭 → 창고에서 플레이어 인벤토리로 빠른 이동(카테고리별 벨트/메인 우선순위는
+	// UInventoryComponent::QuickMoveFromWarehouse가 처리).
+	UFUNCTION()
+	void HandleSlotRightClicked(FInventorySlotRef SlotRef);
+
 	void UnbindDelegates();
 	void RebuildSlots();
 	void BindCrossDropOnPlayerWidgets();

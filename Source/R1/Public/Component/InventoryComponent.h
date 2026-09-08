@@ -233,6 +233,24 @@ public:
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_TransferWithinWarehouse(UWarehouseInventoryComponent* Warehouse, int32 FromIndex, int32 ToIndex, int32 Count, bool bAutoHalfSplitIfTargetEmpty);
 
+	// 창고가 열려있을 때 메인/벨트 슬롯 우클릭이 쓰는 빠른 이동(QuickMoveItem의 창고 버전) —
+	// PlayerSlot(메인/벨트)의 아이템을 대상 인덱스를 직접 고르지 않고 창고의 빈 칸 아무데나로
+	// 보낸다. 빈 칸이 없으면(창고가 꽉 참) 다른 아이템과 바꿔치기하지 않고 무동작.
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	bool QuickMoveToWarehouse(UWarehouseInventoryComponent* Warehouse, FInventorySlotRef PlayerSlot);
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_QuickMoveToWarehouse(UWarehouseInventoryComponent* Warehouse, FInventorySlotRef PlayerSlot);
+
+	// 위 반대 방향 — 창고가 열려있을 때 창고 슬롯 우클릭이 쓴다. 대상은 아이템 카테고리에 따라
+	// 갈린다: HeldItem/Consumable/Placeable은 벨트를 먼저 시도하고 벨트가 꽉 찼으면 메인으로,
+	// Equipment/Misc는 메인으로만 보낸다. 어느 쪽도 빈 칸이 없으면(둘 다 꽉 참) 무동작.
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	bool QuickMoveFromWarehouse(UWarehouseInventoryComponent* Warehouse, int32 WarehouseSlotIndex);
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_QuickMoveFromWarehouse(UWarehouseInventoryComponent* Warehouse, int32 WarehouseSlotIndex);
+
 	// 지정한 슬롯의 ItemData와 InstanceID가 모두 일치할 때 해당 아이템(인스턴스)를 1개 소비하는 함수
 	// 일치하지 않거나 소비할 수 없는 상태면 인벤토리를 변경하지 않고 false를 반환
 	// 함수 생성 이유 : Placeable 아이템 배치 사용 과정에서, 배치를 시작한 해당 슬롯의 아이템만 정확히!! 소비하기 위해서.. 그치만 범용적으로 사용 가능

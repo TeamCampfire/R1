@@ -130,12 +130,13 @@ void AActionCharacter::BeginPlay()
 		);
 	}
 
+	
 	if (DefaultItems.Num() > 0)
 	{
 		int32 remain;
 		for (auto& Item : DefaultItems)
 		{
-			//	for debug
+				//for debug
 			if (Item->DisplayName.ToString().Contains(TEXT("나무")))
 			{
 				InventoryComponent->AddItem(Item,200, remain);
@@ -146,6 +147,7 @@ void AActionCharacter::BeginPlay()
 		}
 
 	}
+	
 }
 
 // Called every frame
@@ -159,12 +161,12 @@ void AActionCharacter::Tick(float DeltaTime)
 
 	CurrentWorldEyeHeight = FMath::FInterpTo(CurrentWorldEyeHeight, TargetWorldEyeHeight, DeltaTime, CrouchInterpSpeed);
 
-	//const float LocalOffset = CurrentWorldEyeHeight - GetActorLocation().Z; // 현재 캡슐 위치 기준으로 역산
-	//FirstPersonCamera->SetRelativeLocation(FVector(
-	//	FirstPersonCamera->GetRelativeLocation().X, 
-	//	FirstPersonCamera->GetRelativeLocation().Y,
-	//	LocalOffset
-	//));
+	const float LocalOffset = CurrentWorldEyeHeight - GetActorLocation().Z; // 현재 캡슐 위치 기준으로 역산
+	FirstPersonCamera->SetRelativeLocation(FVector(
+		FirstPersonCamera->GetRelativeLocation().X, 
+		FirstPersonCamera->GetRelativeLocation().Y,
+		LocalOffset
+	));
 	
 }
 

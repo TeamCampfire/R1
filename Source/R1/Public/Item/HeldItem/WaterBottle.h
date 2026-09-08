@@ -79,4 +79,9 @@ protected:
 	// 채우기 판정에 쓰는 구체 반경(cm).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WaterBottle")
 	float FillTraceRadius = 60.f;
+
+	// 판정 지점의 높이 보정(cm) — OwnerCharacter->GetActorLocation()이 캡슐 중심(가슴 근처) 높이라
+	// 그대로 쓰면 수면보다 높게 뜬다. 음수를 주면 그만큼 아래로 내려가서 판정한다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WaterBottle")
+	float FillTraceHeightOffset = -60.f;
 };

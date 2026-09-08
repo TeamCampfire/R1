@@ -888,6 +888,120 @@ void UInventoryComponent::Server_TransferWithinWarehouse_Implementation(UWarehou
 	TransferWithinWarehouse(Warehouse, FromIndex, ToIndex, Count, bAutoHalfSplitIfTargetEmpty);
 }
 
+bool UInventoryComponent::QuickMoveToWarehouse(UWarehouseInventoryComponent* Warehouse, FInventorySlotRef PlayerSlot)
+{
+	if (!Warehouse)
+	{
+		return false;
+	}
+
+	const TArray<FItemInstance>& PlayerArray = GetSlotArray(PlayerSlot.Category);
+	if (!PlayerArray.IsValidIndex(PlayerSlot.Index) || !PlayerArray[PlayerSlot.Index].IsValid())
+	{
+		return false;
+	}
+
+	const int32 EmptyWarehouseIndex = Warehouse->StorageSlots.IndexOfByPredicate([](const FItemInstance& Slot) { return !Slot.IsValid(); });
+	if (EmptyWarehouseIndex == INDEX_NONE)
+	{
+		return false;
+	}
+
+	return TransferWithWarehouse(Warehouse, PlayerSlot, EmptyWarehouseIndex, 0, true);
+}
+
+bool UInventoryComponent::Server_QuickMoveToWarehouse_Validate(UWarehouseInventoryComponent* Warehouse, FInventorySlotRef PlayerSlot)
+{
+	if (!Warehouse)
+	{
+		return false;
+	}
+
+	// Server_TransferWithWarehouse_Validate와 동일한 이유로 거리 검증을 둔다.
+	const AActor* PlayerOwner = GetOwner();
+	const AActor* WarehouseOwner = Warehouse->GetOwner();
+	if (!PlayerOwner || !WarehouseOwner)
+	{
+		return false;
+	}
+
+	const float DistSq = FVector::DistSquared(PlayerOwner->GetActorLocation(), WarehouseOwner->GetActorLocation());
+	return DistSq <= FMath::Square(Warehouse->MaxInteractDistance);
+}
+
+void UInventoryComponent::Server_QuickMoveToWarehouse_Implementation(UWarehouseInventoryComponent* Warehouse, FInventorySlotRef PlayerSlot)
+{
+	QuickMoveToWarehouse(Warehouse, PlayerSlot);
+}
+
+bool UInventoryComponent::QuickMoveFromWarehouse(UWarehouseInventoryComponent* Warehouse, int32 WarehouseSlotIndex)
+{
+	if (!Warehouse || !Warehouse->StorageSlots.IsValidIndex(WarehouseSlotIndex))
+	{
+		return false;
+	}
+
+	const FItemInstance& SourceInstance = Warehouse->StorageSlots[WarehouseSlotIndex];
+	if (!SourceInstance.IsValid())
+	{
+		return false;
+	}
+
+	// HeldItem/Consumable/Placeable은 벨트를 우선 시도(벨트에서 바로 손에 들거나/사용하거나/배치해야
+	// 하므로), Equipment는 장비 슬롯 자동 장착이 QuickMoveItem 쪽 규칙이라 벨트에 놓일 이유가 없어
+	// Misc와 동일하게 메인을 우선한다.
+	const EItemCategory Category = SourceInstance.ItemData ? SourceInstance.ItemData->Category : EItemCategory::Misc;
+	const bool bPreferBelt = Category == EItemCategory::HeldItem
+		|| Category == EItemCategory::Consumable
+		|| Category == EItemCategory::Placeable;
+
+	EInventorySlotCategory TargetCategory = EInventorySlotCategory::Main;
+	int32 TargetIndex = INDEX_NONE;
+
+	if (bPreferBelt)
+	{
+		TargetIndex = BeltSlots.IndexOfByPredicate([](const FItemInstance& Slot) { return !Slot.IsValid(); });
+		TargetCategory = EInventorySlotCategory::Belt;
+	}
+
+	// 벨트를 안 우선하거나(Misc), 벨트가 꽉 차서 못 찾았으면 메인 빈 칸으로 대체.
+	if (TargetIndex == INDEX_NONE)
+	{
+		TargetIndex = MainSlots.IndexOfByPredicate([](const FItemInstance& Slot) { return !Slot.IsValid(); });
+		TargetCategory = EInventorySlotCategory::Main;
+	}
+
+	if (TargetIndex == INDEX_NONE)
+	{
+		return false;
+	}
+
+	return TransferWithWarehouse(Warehouse, FInventorySlotRef{ TargetCategory, TargetIndex }, WarehouseSlotIndex, 0, false);
+}
+
+bool UInventoryComponent::Server_QuickMoveFromWarehouse_Validate(UWarehouseInventoryComponent* Warehouse, int32 WarehouseSlotIndex)
+{
+	if (!Warehouse)
+	{
+		return false;
+	}
+
+	const AActor* PlayerOwner = GetOwner();
+	const AActor* WarehouseOwner = Warehouse->GetOwner();
+	if (!PlayerOwner || !WarehouseOwner)
+	{
+		return false;
+	}
+
+	const float DistSq = FVector::DistSquared(PlayerOwner->GetActorLocation(), WarehouseOwner->GetActorLocation());
+	return DistSq <= FMath::Square(Warehouse->MaxInteractDistance);
+}
+
+void UInventoryComponent::Server_QuickMoveFromWarehouse_Implementation(UWarehouseInventoryComponent* Warehouse, int32 WarehouseSlotIndex)
+{
+	QuickMoveFromWarehouse(Warehouse, WarehouseSlotIndex);
+}
+
 bool UInventoryComponent::ConsumeItemInstance(const FInventorySlotRef& SlotRef, const FGuid& ExpectedInstanceID, const UItemDataBase* ExpectedItemData)
 {
 	if (false == ExpectedInstanceID.IsValid() || false == IsValid(ExpectedItemData)) return false;

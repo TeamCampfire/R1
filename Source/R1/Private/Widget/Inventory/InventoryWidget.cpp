@@ -11,6 +11,8 @@
 #include "Blueprint/UserWidget.h"
 #include "Character/ActionPlayerController.h"
 #include "Item/PlaceableItem/Campfire/Campfire.h"
+#include "Framework/MainHUD.h"
+#include "Widget/MainHUDWidget.h"
 
 UInventoryWidget* UInventoryWidget::ShowInventoryTestWidget(UObject* WorldContextObject, TSubclassOf<UInventoryWidget> WidgetClass)
 {
@@ -242,10 +244,27 @@ void UInventoryWidget::HandleSlotRightClicked(FInventorySlotRef SlotRef)
 		}
 		return;
 	}
-	if (UInventoryComponent* Inventory = BoundInventory.Get())
+
+	UInventoryComponent* Inventory = BoundInventory.Get();
+	if (!Inventory)
 	{
-		Inventory->Server_QuickMoveItem(SlotRef);
+		return;
 	}
+
+	// 창고가 열려있으면 우클릭은 메인↔벨트/장착(QuickMoveItem) 대신 "창고로 보내기"로 동작한다.
+	if (AMainHUD* HUD = GetOwningPlayer() ? GetOwningPlayer()->GetHUD<AMainHUD>() : nullptr)
+	{
+		if (UMainHUDWidget* MainHudWidget = HUD->GetMainHudWidget())
+		{
+			if (UWarehouseInventoryComponent* OpenWarehouse = MainHudWidget->GetOpenWarehouse())
+			{
+				Inventory->Server_QuickMoveToWarehouse(OpenWarehouse, SlotRef);
+				return;
+			}
+		}
+	}
+
+	Inventory->Server_QuickMoveItem(SlotRef);
 }
 
 void UInventoryWidget::HandleCampfireItemDropped(ACampfire* Campfire, FCampfireSlotRef FromSlot,
