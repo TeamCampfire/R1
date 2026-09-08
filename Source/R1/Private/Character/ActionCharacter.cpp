@@ -164,6 +164,39 @@ void AActionCharacter::Tick(float DeltaTime)
 
 	CurrentWorldEyeHeight = FMath::FInterpTo(CurrentWorldEyeHeight, TargetWorldEyeHeight, DeltaTime, CrouchInterpSpeed);
 
+	//const float LocalOffset = CurrentWorldEyeHeight - GetActorLocation().Z; // 현재 캡슐 위치 기준으로 역산
+	//FirstPersonCamera->SetRelativeLocation(FVector(
+	//	FirstPersonCamera->GetRelativeLocation().X, 
+	//	FirstPersonCamera->GetRelativeLocation().Y,
+	//	LocalOffset
+	//));
+
+	if (bIsSitting && CurrentVehicle && IsLocallyControlled())
+	{
+		const float CurrentVehicleYaw =
+			CurrentVehicle->GetActorRotation().Yaw;
+
+		const float DeltaYaw =
+			FMath::FindDeltaAngleDegrees(
+				VehicleYawOffset,
+				CurrentVehicleYaw);
+
+		if (!FMath::IsNearlyZero(DeltaYaw))
+		{
+			if (AController* PC = GetController())
+			{
+				FRotator ControlRotation =
+					PC->GetControlRotation();
+
+				ControlRotation.Yaw += DeltaYaw;
+
+				PC->SetControlRotation(ControlRotation);
+			}
+		}
+
+		VehicleYawOffset = CurrentVehicleYaw;
+	}
+	
 	const float LocalOffset = CurrentWorldEyeHeight - GetActorLocation().Z; // 현재 캡슐 위치 기준으로 역산
 	FirstPersonCamera->SetRelativeLocation(FVector(
 		FirstPersonCamera->GetRelativeLocation().X, 
@@ -297,6 +330,8 @@ void AActionCharacter::SetIsInVehicle(bool bIsInVehicleNew, bool bIsDriver)
 	bIsSitting = bIsInVehicleNew;
 	//LegMesh->SetVisibility(!bIsInVehicleNew);
 	//FeetMesh->SetVisibility(!bIsInVehicleNew);
+
+	VehicleYawOffset = CurrentVehicle->GetActorRotation().Yaw;
 
 	GetCapsuleComponent()->SetCollisionEnabled(
 		bIsInVehicleNew?

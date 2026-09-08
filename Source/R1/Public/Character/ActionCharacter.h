@@ -343,4 +343,7 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|DefaultItem")
 	TArray<TObjectPtr<UItemDataBase>> DefaultItems;
+
+	UPROPERTY()
+	float VehicleYawOffset = 0.0f;
 };
