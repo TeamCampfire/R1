@@ -1,16 +1,12 @@
-﻿// 작업 시작일 : 9/7
-// 작업자 : 우진
-
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Item/PlaceableItemBase.h"
 #include "Interface/InteractableInterface.h"
 #include "Workbench.generated.h"
 
-/**
- * 
- */
+class UCraftingComponent;
+
 UCLASS()
 class R1_API AWorkbench : public APlaceableItemBase, public IInteractableInterface
 {
@@ -18,7 +14,18 @@ class R1_API AWorkbench : public APlaceableItemBase, public IInteractableInterfa
 
 public:
 	AWorkbench();
+	virtual void Destroyed() override;
 	virtual FText GetInteractionDisplayName_Implementation() const override;
 	virtual bool CanInteract_Implementation(APawn* Interactor) const override;
 	virtual void Interact_Implementation(APawn* Interactor) override;
+
+	UFUNCTION(BlueprintPure, Category = "Crafting")
+	UCraftingComponent* GetCraftingComponent() const { return CraftingComponent; }
+
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Crafting")
+	TObjectPtr<UCraftingComponent> CraftingComponent;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Crafting", meta = (ClampMin = "0"))
+	float InteractionDistance = 300.f;
 };

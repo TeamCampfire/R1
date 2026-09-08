@@ -5,60 +5,106 @@
 #include "CraftingWidget.generated.h"
 
 class UCraftingComponent;
+class UCraftingItemWidget;
+class UCraftingMaterialWidget;
 class UItemDataBase;
 class AWorkbench;
-class SVerticalBox;
-class SWrapBox;
-enum class ECheckBoxState : uint8;
+class UWrapBox;
+class UVerticalBox;
+class UEditableTextBox;
+class UButton;
+class UTextBlock;
+class UImage;
 
-/** 기본 제작과 작업대 제작이 공유하는 화면. 인벤토리 변경은 서버 컴포넌트에 요청한다. */
+// Q와 작업대 상호작용에서 동일한 WBP를 생성하고 데이터 원본만 교체한다.
 UCLASS()
 class R1_API UCraftingWidget : public UUserWidget
 {
 	GENERATED_BODY()
+
 public:
-	UPROPERTY()
-	TObjectPtr<UCraftingComponent> Crafting;
+	void BindCrafting(UCraftingComponent* InCrafting, AWorkbench* InBench);
 
-	UPROPERTY()
-	TObjectPtr<AWorkbench> Bench;
-
-	UPROPERTY()
-	TObjectPtr<UItemDataBase> Selected;
-
-	virtual TSharedRef<SWidget> RebuildWidget() override;
-	virtual void ReleaseSlateResources(bool bReleaseChildren) override;
+protected:
+	virtual void NativeOnInitialized() override;
 	virtual void NativeTick(const FGeometry& Geometry, float DeltaTime) override;
+	virtual FReply NativeOnPreviewKeyDown(const FGeometry& Geometry, const FKeyEvent& KeyEvent) override;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Crafting")
+	TSubclassOf<UCraftingItemWidget> ItemWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Crafting")
+	TSubclassOf<UCraftingMaterialWidget> MaterialWidgetClass;
+
+	UPROPERTY(meta=(BindWidget))
+	TObjectPtr<UWrapBox> RecipeContainer;
+	UPROPERTY(meta=(BindWidget))
+	TObjectPtr<UEditableTextBox> SearchBox;
+	UPROPERTY(meta=(BindWidget))
+	TObjectPtr<UWrapBox> QueueContainer;
+	UPROPERTY(meta=(BindWidget))
+	TObjectPtr<UWrapBox> CompletedContainer;
+	UPROPERTY(meta=(BindWidget))
+	TObjectPtr<UVerticalBox> MaterialContainer;
+	UPROPERTY(meta=(BindWidget))
+	TObjectPtr<UImage> SelectedIcon;
+	UPROPERTY(meta=(BindWidget))
+	TObjectPtr<UTextBlock> TitleText;
+	UPROPERTY(meta=(BindWidget))
+	TObjectPtr<UTextBlock> SelectedNameText;
+	UPROPERTY(meta=(BindWidget))
+	TObjectPtr<UTextBlock> DescriptionText;
+	UPROPERTY(meta=(BindWidget))
+	TObjectPtr<UTextBlock> DurationText;
+	UPROPERTY(meta=(BindWidget))
+	TObjectPtr<UTextBlock> QuantityText;
+	UPROPERTY(meta=(BindWidget))
+	TObjectPtr<UTextBlock> StatusText;
+	UPROPERTY(meta=(BindWidget))
+	TObjectPtr<UButton> DecreaseButton;
+	UPROPERTY(meta=(BindWidget))
+	TObjectPtr<UButton> IncreaseButton;
+	UPROPERTY(meta=(BindWidget))
+	TObjectPtr<UButton> MaximumButton;
+	UPROPERTY(meta=(BindWidget))
+	TObjectPtr<UButton> CraftButton;
+	UPROPERTY(meta=(BindWidget))
+	TObjectPtr<UButton> CollectButton;
+	UPROPERTY(meta=(BindWidget))
+	TObjectPtr<UButton> CloseButton;
 
 private:
-	TSharedRef<SWidget> BuildHeader();
-	TSharedRef<SWidget> BuildRecipePanel();
-	TSharedRef<SWidget> BuildDetailsPanel();
-	TSharedRef<SWidget> BuildQuantityControls();
-	// 검색·선택·수량·제작·취소 이벤트 처리.
-	FReply HandleCloseClicked();
+	UFUNCTION()
 	void HandleSearchChanged(const FText& Text);
-	void HandleCraftableFilterChanged(ECheckBoxState State);
-	FReply HandleDecreaseClicked();
-	FReply HandleIncreaseClicked();
-	FReply HandleMaximumClicked();
-	FReply HandleCraftClicked();
-	FReply HandleRecipeClicked(UItemDataBase* Item);
-	FReply HandleCancelClicked(FGuid OrderId);
+	UFUNCTION()
+	void HandleRecipeClicked(UItemDataBase* Item);
+	UFUNCTION()
+	void HandleDecrease();
+	UFUNCTION()
+	void HandleIncrease();
+	UFUNCTION()
+	void HandleMaximum();
+	UFUNCTION()
+	void HandleCraft();
+	UFUNCTION()
+	void HandleCollect();
+	UFUNCTION()
+	void HandleClose();
 
-	// 목록, 재료, 대기열 표시 갱신.
+	static FString NormalizeSearchText(const FString& Text);
+	void RebuildRecipes();
 	void Refresh();
-	void RefreshRecipes();
-	void RefreshMaterials();
 	void RefreshQueue();
-	int32 GetMaxCraftableQuantity() const;
+	UCraftingComponent* GetQueueSource() const;
+	int32 GetMaximum() const;
 
-	// 수량은 1 이상으로 기억하되 제작 불가능하면 화면에는 0으로 표시한다.
-	int32 CraftQuantity = 1;
-	FString NormalizedSearchText;
-	bool bOnlyCraftable = false;
+	UPROPERTY()
+	TObjectPtr<UCraftingComponent> Crafting;
+	UPROPERTY()
+	TObjectPtr<UItemDataBase> Selected;
+	TWeakObjectPtr<AWorkbench> BoundBench;
+	bool bWorkbenchMode = false;
+	FString SearchText;
+	int32 CraftQuantity = 0;
 	float RefreshElapsed = 0.f;
-	TSharedPtr<SWrapBox> RecipeContainer;
-	TSharedPtr<SVerticalBox> MaterialContainer;
-	TSharedPtr<SWrapBox> QueueContainer;
 };

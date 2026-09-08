@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
@@ -7,9 +7,8 @@
 class UItemDataBase;
 class UInventoryComponent;
 class AWorkbench;
-class AItemPickup;
+class APlayerController;
 
-/** 한 번의 제작 요청. Remaining은 아직 지급하지 않은 결과물 개수다. */
 USTRUCT(BlueprintType)
 struct FCraftingOrder
 {
@@ -24,49 +23,80 @@ struct FCraftingOrder
 	UPROPERTY(BlueprintReadOnly)
 	int32 Remaining = 0;
 
-	// 선두 주문의 다음 결과물 완료 시각(서버 시간). 대기 주문은 0이다.
+	// 선두 주문의 다음 한 개가 완료되는 서버 시각. 대기 주문은 0.
 	UPROPERTY(BlueprintReadOnly)
 	float FinishTime = 0.f;
+
+	// 지급 대상은 서버만 사용한다. 작업대의 네트워크 Owner는 바꾸지 않는다.
+	UPROPERTY(NotReplicated)
+	TWeakObjectPtr<APlayerController> Requester;
 };
 
-/** 컨트롤러가 소유하는 서버 권위 제작 대기열. UI를 닫아도 제작은 계속된다. */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCraftingChanged);
+
+// 컨트롤러에 붙으면 개인 큐, 작업대에 붙으면 공유 큐. 진행 로직은 같은 컴포넌트를 사용한다.
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class R1_API UCraftingComponent : public UActorComponent
 {
 	GENERATED_BODY()
+
 public:
 	static constexpr int32 MaxQueueSize = 64;
-
 	UCraftingComponent();
-	virtual void BeginPlay() override;
-	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* TickFunction) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Crafting")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Crafting")
 	TArray<TObjectPtr<UItemDataBase>> Recipes;
 
-	UPROPERTY(Replicated, BlueprintReadOnly, Category="Crafting")
-	TArray<FCraftingOrder> Queue;
+	UPROPERTY(BlueprintAssignable, Category = "Crafting")
+	FOnCraftingChanged OnCraftingChanged;
 
-	// 동일 재료를 합산한 뒤 min(보유량 / 개당 필요량)을 구한다. 잘못된 레시피는 0이다.
-	UFUNCTION(BlueprintPure, Category="Crafting")
+	const TArray<FCraftingOrder>& GetQueue() const { return Queue; }
+	const TArray<FCraftingOrder>& GetCompletedOrders() const { return CompletedOrders; }
+	bool HasQueueSpace() const;
+
+	UFUNCTION(BlueprintPure, Category = "Crafting")
 	int32 GetMaximum(UItemDataBase* Item, AWorkbench* Bench) const;
 
-	// 클라이언트 수량을 신뢰하지 않고 서버에서 재료와 작업대 조건을 다시 검사한다.
+	// 반드시 플레이어 소유 컴포넌트를 통해 요청한다.
 	UFUNCTION(Server, Reliable)
 	void Server_Enqueue(UItemDataBase* Item, int32 Count, AWorkbench* Bench);
 
-	// 미완료 수량의 재료만 반환한다. 이미 지급한 결과물은 취소 대상이 아니다.
 	UFUNCTION(Server, Reliable)
-	void Server_Cancel(FGuid Id);
+	void Server_CollectCompleted(AWorkbench* Bench);
 
 	float GetServerTime() const;
 	UInventoryComponent* Inventory() const;
+	bool CollectIngredientCosts(UItemDataBase* Item, TMap<UItemDataBase*, int32>& OutCosts) const;
+
+	// 파괴된 작업대의 미회수 결과물과 미완료 재료를 월드에 반환한다.
+	void DropContents();
+
+protected:
+	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	UPROPERTY(ReplicatedUsing = OnRep_Crafting, BlueprintReadOnly, Category = "Crafting")
+	TArray<FCraftingOrder> Queue;
+
+	UPROPERTY(ReplicatedUsing = OnRep_Crafting, BlueprintReadOnly, Category = "Crafting")
+	TArray<FCraftingOrder> CompletedOrders;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Crafting", meta = (ClampMin = "0.05"))
+	float UpdateInterval = 0.1f;
 
 private:
-	void LoadDefaultRecipes();
+	void TickCrafting();
 	void StartNextItem();
-	AItemPickup* SpawnOverflowPickup() const;
-	bool GiveOrDrop(UItemDataBase* Item, int32& Count);
-	bool RefundOrder(const FCraftingOrder& Order);
+	void NotifyChanged();
+	bool CanUseWorkbench(AWorkbench* Bench) const;
+	bool CanPlayerCraft() const;
+	bool GiveOrDrop(UItemDataBase* Item, int32& Count, APlayerController* Recipient);
+	bool DropItem(UItemDataBase* Item, int32& Count) const;
+	void CollectCompleted(APlayerController* Recipient);
+
+	UFUNCTION()
+	void OnRep_Crafting();
+
+	FTimerHandle CraftingTimer;
 };

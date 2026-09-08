@@ -34,6 +34,9 @@ public:
 	UPROPERTY()
 	TObjectPtr<class UCraftingWidget> CraftingWidget;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Crafting")
+	TSubclassOf<class UCraftingWidget> CraftingWidgetClass;
+
 	// Bench가 nullptr이면 기본 제작 화면을 연다.
 	UFUNCTION(Client, Reliable)
 	void Client_OpenCrafting(class AWorkbench* Bench);

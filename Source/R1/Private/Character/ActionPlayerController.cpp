@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Character/ActionPlayerController.h"
@@ -558,13 +558,20 @@ void AActionPlayerController::Client_OpenCrafting_Implementation(AWorkbench* Ben
 		MainWidget->ToggleInventoryPanel();
 		SetInventoryInputState(false);
 	}
-	CraftingWidget = CreateWidget<UCraftingWidget>(this, UCraftingWidget::StaticClass());
+	if (!IsLocalController()) return;
+	if (!CraftingWidgetClass)
+	{
+		UE_LOG(LogTemp, Error, TEXT("CraftingWidgetClass is missing. Assign WBP_Crafting in the controller defaults."));
+		return;
+	}
+	CraftingWidget = CreateWidget<UCraftingWidget>(this, CraftingWidgetClass);
 	if (!CraftingWidget)
 	{
 		return;
 	}
-	CraftingWidget->Crafting = CraftingComponent;
-	CraftingWidget->Bench = Bench;
+	CraftingWidget->BindCrafting(CraftingComponent, Bench);
+	CraftingWidget->SetIsFocusable(true);
 	CraftingWidget->AddToViewport(30);
 	ApplyUIInputState(true);
+	CraftingWidget->SetKeyboardFocus();
 }
