@@ -172,16 +172,16 @@ bool AWaterBottle::TraceForWaterBody() const
 			}
 		}
 
-		if (ProfileOverlaps.Num() == 0 && DynamicOverlaps.Num() == 0 && GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, TEXT("[WaterCheck] 두 패스 모두 아무 것도 안 겹침 — 위치/사거리 문제"));
-		}
+		//if (ProfileOverlaps.Num() == 0 && DynamicOverlaps.Num() == 0 && GEngine)
+		//{
+		//	GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, TEXT("[WaterCheck] 두 패스 모두 아무 것도 안 겹침 — 위치/사거리 문제"));
+		//}
 	}
 
 	// 디버그용 — 채우기 판정 범위(전방 FillTraceDistance 지점, 반경 FillTraceRadius)를 시각화한다.
 	// 초록 = 물 감지됨, 빨강 = 못 찾음. Server_FillWater_Implementation이 서버에서만 실행되므로
 	// 서버(리슨 서버 포함) 화면에서만 보인다. 테스트 끝나면 이 블록은 지워도 된다.
-	DrawDebugSphere(GetWorld(), TraceCenter, FillTraceRadius, 16, bFoundWater ? FColor::Green : FColor::Red, false, 2.0f, 0, 1.5f);
+	//DrawDebugSphere(GetWorld(), TraceCenter, FillTraceRadius, 16, bFoundWater ? FColor::Green : FColor::Red, false, 2.0f, 0, 1.5f);
 
 	return bFoundWater;
 }
