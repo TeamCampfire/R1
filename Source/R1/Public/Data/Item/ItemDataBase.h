@@ -87,9 +87,11 @@ public:
 	TArray<FCraftIngredient> CraftingCost;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item|Crafting", meta = (ClampMin = "0.1"))
+	// [wdk59] 이후 제작 시스템에서 추가한 개당 제작 시간이며 큐 완료 시각 계산에 사용한다.
 	float CraftingSeconds = 5.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item|Crafting")
+	// [wdk59] 작업대가 필요한 레시피를 개인 제작에서 제외하고 서버의 제작 조건 검사에도 사용한다.
 	bool bRequiresWorkbench = false;
 
 private:

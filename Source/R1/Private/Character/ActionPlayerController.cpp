@@ -41,6 +41,7 @@ UInventoryComponent* AActionPlayerController::GetPlayerInventory() const
 	return GetPawn() ? GetPawn()->FindComponentByClass<UInventoryComponent>() : nullptr;
 }
 
+// 모닥불 이동 및 점화 RPC에서 현재 폰과 상호작용 가능 거리를 공통으로 검사
 bool AActionPlayerController::CanUseCampfire(ACampfire* Campfire) const
 {
 	return GetPawn() && IsValid(Campfire)
@@ -55,10 +56,12 @@ void AActionPlayerController::Client_OpenCampfire_Implementation(ACampfire* Camp
 	}
 }
 
+// 공유 모닥불의 서버 재고 변경을 플레이어 컨트롤러에 중계 요청
 void AActionPlayerController::Server_MoveInventoryToCampfire_Implementation(ACampfire* Campfire,
 	FInventorySlotRef From, FCampfireSlotRef To, int32 Count, bool bHalfSplit)
 {
-	if (CanUseCampfire(Campfire)) Campfire->GetCampfireComponent()->MoveFromInventory(GetPlayerInventory(), From, To, Count, bHalfSplit);
+	if (CanUseCampfire(Campfire))
+		Campfire->GetCampfireComponent()->MoveFromInventory(GetPlayerInventory(), From, To, Count, bHalfSplit);
 }
 
 void AActionPlayerController::Server_MoveCampfireToInventory_Implementation(ACampfire* Campfire,
@@ -517,6 +520,7 @@ void AActionPlayerController::ServerTestInflictDamage_Implementation()
 }
 //------------------------------------------------------------------------------------------------------------------------------------------
 
+// Q 키로 개인 제작 화면을 토글하며 작업대 없는 제작은 nullptr로 구분
 void AActionPlayerController::ToggleCrafting()
 {
 	if (CraftingWidget)
@@ -524,7 +528,9 @@ void AActionPlayerController::ToggleCrafting()
 		CloseCrafting();
 		return;
 	}
-	// Q 입력은 로컬 UI만 연다. 실제 제작 요청은 컴포넌트의 서버 RPC를 사용한다.
+
+	// Q 입력은 로컬 UI만 작동
+	// 실제 제작 요청은 제작 컴포넌트의 서버 RPC를 사용
 	Client_OpenCrafting_Implementation(nullptr);
 }
 
@@ -534,42 +540,56 @@ void AActionPlayerController::CloseCrafting()
 	{
 		return;
 	}
+
 	CraftingWidget->RemoveFromParent();
 	CraftingWidget = nullptr;
-	ApplyUIInputState(false);
+
+	ApplyUIInputState(false);	// UI 입력 모드 해제
 }
 
+// 개인 제작 컴포넌트와 선택 작업대를 위젯에 연결하고 제작 화면에 입력 포커싱 처리
 void AActionPlayerController::Client_OpenCrafting_Implementation(AWorkbench* Bench)
 {
 	AActionCharacter* PossessedCharacter = Cast<AActionCharacter>(GetPawn());
-	const IHealthInterface* Health = PossessedCharacter
-		? Cast<IHealthInterface>(PossessedCharacter->GetStatComponent()) : nullptr;
+
+	// 죽은 상태에서는 제작창 열기 방지
+	const IHealthInterface* Health =
+		PossessedCharacter
+		? Cast<IHealthInterface>(PossessedCharacter->GetStatComponent())
+		: nullptr;
 	if (!Health || !Health->IsAlive())
 	{
 		return;
 	}
+
+	// 기존에 열려 있는 제작창 닫기
 	CloseCrafting();
 
-	// 두 창의 입력 카운트를 각각 정리한 뒤 공용 제작 화면을 연다.
+	// 두 창의 입력 카운트를 각각 정리한 뒤 공용 제작 화면 열기
 	AMainHUD* MainHUD = GetHUD<AMainHUD>();
 	UMainHUDWidget* MainWidget = MainHUD ? MainHUD->GetMainHudWidget() : nullptr;
+
+	// 인벤토리 열려 있으면 인벤토리 닫기
 	if (MainWidget && MainWidget->IsInventoryPanelOpen())
 	{
 		MainWidget->ToggleInventoryPanel();
 		SetInventoryInputState(false);
 	}
-	if (!IsLocalController()) return;
+
+	if (!IsLocalController())
+		return;
+
 	if (!CraftingWidgetClass)
 	{
-		UE_LOG(LogTemp, Error, TEXT("CraftingWidgetClass is missing. Assign WBP_Crafting in the controller defaults."));
+		UE_LOG(LogTemp, Error, TEXT("CraftingWidgetClass is missing. Assign Crafting Widget in the controller defaults."));
 		return;
 	}
+
 	CraftingWidget = CreateWidget<UCraftingWidget>(this, CraftingWidgetClass);
 	if (!CraftingWidget)
-	{
 		return;
-	}
-	CraftingWidget->BindCrafting(CraftingComponent, Bench);
+
+	CraftingWidget->BindCrafting(CraftingComponent, Bench);	// 작업대 연결
 	CraftingWidget->SetIsFocusable(true);
 	CraftingWidget->AddToViewport(30);
 	ApplyUIInputState(true);

@@ -29,6 +29,7 @@ class R1_API AActionPlayerController : public APlayerController
 public:
 	// 제작 대기열은 화면과 분리하여 창을 닫아도 유지한다.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Crafting")
+	// [wdk59] 개인 제작 큐를 컨트롤러에 두고 작업대 제작 요청도 이 컴포넌트를 통해 서버에 전달한다.
 	TObjectPtr<class UCraftingComponent> CraftingComponent;
 
 	UPROPERTY()
@@ -45,6 +46,8 @@ public:
 	void CloseCrafting();
 
 	void ToggleCrafting();
+
+	// 모닥불 UI 열기와 아래 서버 RPC들은 공유 액터 조작을 플레이어 소유 컨트롤러로 중계
 	UFUNCTION(Client, Reliable)
 	void Client_OpenCampfire(class ACampfire* Campfire);
 

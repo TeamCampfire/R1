@@ -236,6 +236,7 @@ void UInventoryWidget::HandleSlotClicked(FInventorySlotRef SlotRef)
 
 void UInventoryWidget::HandleSlotRightClicked(FInventorySlotRef SlotRef)
 {
+	// 모닥불 UI를 사용하는 동안의 우클릭 이동은 연결된 모닥불로 빠르게 옮기는 요청으로 우선 처리
 	if (ActiveCampfire.IsValid())
 	{
 		if (AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer()))
@@ -267,6 +268,7 @@ void UInventoryWidget::HandleSlotRightClicked(FInventorySlotRef SlotRef)
 	Inventory->Server_QuickMoveItem(SlotRef);
 }
 
+// 아이템 이동: 모닥불에서 메인 인벤토리로 드롭한 수량과 분할 옵션을 서버 RPC에 전달
 void UInventoryWidget::HandleCampfireItemDropped(ACampfire* Campfire, FCampfireSlotRef FromSlot,
 	FInventorySlotRef ToSlot, int32 Count, bool bAutoHalfSplitOnEmptyTarget)
 {

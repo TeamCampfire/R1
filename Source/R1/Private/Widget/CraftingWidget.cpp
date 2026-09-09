@@ -27,6 +27,7 @@ void UCraftingWidget::NativeOnInitialized()
 	CloseButton->OnClicked.AddDynamic(this, &UCraftingWidget::HandleClose);
 }
 
+// [wdk59] 개인 제작과 작업대 제작이 화면을 공유하되 레시피 및 큐 조회 대상은 모드별로 선택한다.
 void UCraftingWidget::BindCrafting(UCraftingComponent* InCrafting, AWorkbench* InBench)
 {
 	Crafting = InCrafting;
@@ -68,6 +69,7 @@ FString UCraftingWidget::NormalizeSearchText(const FString& Text)
 	return Result;
 }
 
+// [wdk59] 작업대 필요 조건과 공백·대소문자를 정규화한 검색어로 레시피 타일을 필터링한다.
 void UCraftingWidget::RebuildRecipes()
 {
 	RecipeContainer->ClearChildren();
@@ -128,6 +130,7 @@ void UCraftingWidget::Refresh()
 	RefreshQueue();
 }
 
+// [wdk59] 진행 주문과 회수 대기 주문을 별도로 표시하고 서버 시간과 앞선 주문을 기준으로 남은 시간을 계산한다.
 void UCraftingWidget::RefreshQueue()
 {
 	const UCraftingComponent* Source = GetQueueSource();
@@ -163,6 +166,7 @@ void UCraftingWidget::RefreshQueue()
 	}
 }
 
+// [wdk59] 작업대 거리 이탈 시 화면을 닫고, 유지 중에는 0.2초 간격으로 재료와 큐 표시를 갱신한다.
 void UCraftingWidget::NativeTick(const FGeometry& Geometry, float DeltaTime)
 {
 	Super::NativeTick(Geometry, DeltaTime);

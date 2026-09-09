@@ -33,12 +33,20 @@ void UCampfireSlotWidget::Refresh(const FItemInstance& Instance)
 	{
 		if (IconImage)
 		{
-			if (UTexture2D* Icon = Instance.ItemData->Icon.LoadSynchronous()) IconImage->SetBrushFromTexture(Icon);
+			if (UTexture2D* Icon = Instance.ItemData->Icon.LoadSynchronous())
+				IconImage->SetBrushFromTexture(Icon);
 			IconImage->SetVisibility(ESlateVisibility::HitTestInvisible);
 		}
-		if (CountBox) CountBox->SetVisibility(ESlateVisibility::HitTestInvisible);
-		if (CountText) CountText->SetText(FText::AsNumber(Instance.StackCount));
-		if (MaxStackText) MaxStackText->SetText(FText::AsNumber(Instance.ItemData->MaxStackSize));
+
+		if (CountBox)
+			CountBox->SetVisibility(ESlateVisibility::HitTestInvisible);
+
+		if (CountText)
+			CountText->SetText(FText::AsNumber(Instance.StackCount));
+
+		if (MaxStackText)
+			MaxStackText->SetText(FText::AsNumber(Instance.ItemData->MaxStackSize));
+
 		SetToolTipText(Instance.ItemData->DisplayName);
 	}
 	else
@@ -51,29 +59,37 @@ void UCampfireSlotWidget::Refresh(const FItemInstance& Instance)
 
 FReply UCampfireSlotWidget::NativeOnMouseButtonDown(const FGeometry&, const FPointerEvent& Event)
 {
+	// 마우스 왼쪽 또는 가운데 버튼으로 드래그 시작 감지
 	if (CachedInstance.IsValid() && (Event.GetEffectingButton() == EKeys::LeftMouseButton || Event.GetEffectingButton() == EKeys::MiddleMouseButton))
 	{
 		bMiddleDrag = Event.GetEffectingButton() == EKeys::MiddleMouseButton;
 		return FReply::Handled().DetectDrag(TakeWidget(), Event.GetEffectingButton());
 	}
-	if (CachedInstance.IsValid() && Event.GetEffectingButton() == EKeys::RightMouseButton) return FReply::Handled();
+
+	// 마우스 우클릭은 NativeOnMouseButtonUp()에서 처리
+
 	return FReply::Handled();
 }
 
 FReply UCampfireSlotWidget::NativeOnMouseButtonUp(const FGeometry& Geometry, const FPointerEvent& Event)
 {
+	// 마우스 우클릭 감지
 	if (CachedInstance.IsValid() && Event.GetEffectingButton() == EKeys::RightMouseButton)
 	{
 		OnSlotRightClicked.Broadcast(Campfire.Get(), SlotRef);
 		return FReply::Handled();
 	}
+
 	return Super::NativeOnMouseButtonUp(Geometry, Event);
 }
 
+// 공용 드래그 데이터에 모닥불 출처, 슬롯, 아이템과 가운데 버튼 분할 여부 담기
 void UCampfireSlotWidget::NativeOnDragDetected(const FGeometry& Geometry, const FPointerEvent& Event, UDragDropOperation*& Out)
 {
 	Super::NativeOnDragDetected(Geometry, Event, Out);
-	if (!CachedInstance.IsValid()) return;
+	if (!CachedInstance.IsValid())
+		return;
+
 	UInventoryDragDropOperation* Op = NewObject<UInventoryDragDropOperation>(this);
 	Op->SourceType = EItemDragSourceType::Campfire;
 	Op->SourceCampfire = Campfire;
@@ -81,47 +97,61 @@ void UCampfireSlotWidget::NativeOnDragDetected(const FGeometry& Geometry, const 
 	Op->DraggedItemData = CachedInstance.ItemData;
 	Op->bAutoHalfSplitOnEmptyTarget = bMiddleDrag;
 	Op->Pivot = EDragPivot::CenterCenter;
+
 	UImage* Visual = NewObject<UImage>(this);
-	if (UTexture2D* Icon = CachedInstance.ItemData->Icon.LoadSynchronous()) Visual->SetBrushFromTexture(Icon);
+	if (UTexture2D* Icon = CachedInstance.ItemData->Icon.LoadSynchronous())
+		Visual->SetBrushFromTexture(Icon);
 	Visual->SetDesiredSizeOverride({64.f, 64.f});
 	Visual->SetRenderOpacity(0.6f);
 	Op->DefaultDragVisual = Visual;
+
 	Out = Op;
 }
 
 void UCampfireSlotWidget::UpdateHoverVisual(bool bHover, bool bAllowed)
 {
-	if (SelectionBorder) SelectionBorder->SetBrushColor(bHover
-		? (bAllowed ? FLinearColor(0.35f, 0.75f, 0.15f, 0.45f) : FLinearColor(0.9f, 0.08f, 0.05f, 0.5f))
-		: FLinearColor::Transparent);
+	if (SelectionBorder)
+		SelectionBorder->SetBrushColor(
+			bHover
+			? (bAllowed ? AllowedColor : DisallowedColor)
+			: FLinearColor::Transparent		// 호버링 중이 아닐 때는 투명하게 설정
+		);
 }
 
 void UCampfireSlotWidget::NativeOnDragEnter(const FGeometry& G, const FDragDropEvent& E, UDragDropOperation* Operation)
 {
 	Super::NativeOnDragEnter(G, E, Operation);
+
 	const UInventoryDragDropOperation* Op = Cast<UInventoryDragDropOperation>(Operation);
 	bool bAllowed = false;
+
 	if (Op)
 	{
 		const UCampfireComponent* Comp = Campfire.IsValid() ? Campfire->GetCampfireComponent() : nullptr;
 		bAllowed = Comp && Comp->CanAcceptItem(SlotRef, Op->DraggedItemData);
 	}
+
 	UpdateHoverVisual(Op != nullptr, bAllowed);
 }
 
 void UCampfireSlotWidget::NativeOnDragLeave(const FDragDropEvent& E, UDragDropOperation* Operation)
 {
 	Super::NativeOnDragLeave(E, Operation);
+
 	UpdateHoverVisual(false, false);
 }
 
+// 드롭 출처와 허용 아이템을 확인하여 인벤토리 이동 요청을 전달
+// 거절된 UI 드롭도 소비
 bool UCampfireSlotWidget::NativeOnDrop(const FGeometry&, const FDragDropEvent&, UDragDropOperation* Operation)
 {
 	UpdateHoverVisual(false, false);
+
 	UInventoryDragDropOperation* Op = Cast<UInventoryDragDropOperation>(Operation);
 	if (!Op) return false;
 
-	// 인식한 UI 드롭은 거절 시에도 소비한다. 기존 인벤토리의 DragCancelled=월드 드롭을 막는다.
+	// 인식한 UI 드롭은 거절 시에도 소비
+	// 기존 인벤토리의 DragCancelled 시 월드 드롭 방지
 	const UCampfireComponent* Comp = Campfire.IsValid() ? Campfire->GetCampfireComponent() : nullptr;
 	if (!Comp || !Comp->CanAcceptItem(SlotRef, Op->DraggedItemData)) return true;
 	if (Op->SourceType == EItemDragSourceType::PlayerInventory)

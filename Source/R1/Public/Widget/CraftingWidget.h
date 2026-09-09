@@ -17,6 +17,7 @@ class UTextBlock;
 class UImage;
 
 // Q와 작업대 상호작용에서 동일한 WBP를 생성하고 데이터 원본만 교체한다.
+// [wdk59] 제작 화면의 검색·수량·재료·큐 표시를 조정하고 개별 타일과 재료 행은 분리된 위젯으로 구성한다.
 UCLASS()
 class R1_API UCraftingWidget : public UUserWidget
 {

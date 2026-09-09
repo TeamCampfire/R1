@@ -606,6 +606,7 @@ void UBuildingPlacementComponent::ServerPlacePlaceable_Implementation(FGuid Requ
 		*GetNameSafe(ItemData),
 		*SafePlacementTransform.GetLocation().ToString());
 
+	// 모닥불 설치와 아이템 소비가 성공한 지점에서 설치 사운드를 알림
 	if (ACampfire* Campfire = Cast<ACampfire>(NewPlaceable))
 	{
 		Campfire->NotifyPlacementSucceeded();

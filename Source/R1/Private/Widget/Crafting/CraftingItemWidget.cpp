@@ -19,6 +19,7 @@ void UCraftingItemWidget::SetItem(UItemDataBase* InItem)
 	SetToolTipText(Item ? Item->DisplayName : FText::GetEmpty());
 }
 
+// [wdk59] 레시피의 제작 가능 여부와 선택 강조를 표시하며 큐에서는 같은 타일을 수량·시간 표시로 재사용한다.
 void UCraftingItemWidget::SetRecipeState(bool bCraftable, bool bSelected)
 {
 	// 클릭 자체는 허용한다. 재료가 부족해도 상세 설명을 확인할 수 있다.

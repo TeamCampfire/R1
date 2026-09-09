@@ -93,6 +93,9 @@ protected:
 	// 멀어지면 자동으로 닫는다(월드를 돌아다니며 조작하지 못하게 막는 InventoryComponent 서버
 	// 검증과는 별개로, UI 자체도 따라와서 계속 열려있는 게 부자연스러워서 클라이언트에서 처리).
 	void CheckWarehouseAutoClose();
+
+	// 열린 모닥불의 유효성과 사용 거리를 확인
+	// -> 유효하지 않으면 UI 세션을 자동 종료
 	void CheckCampfireAutoClose();
 
 	// 현재 표시 중인 건축 안내 메시지를 숨기는 함수

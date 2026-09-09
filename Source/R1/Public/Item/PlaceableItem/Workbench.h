@@ -7,6 +7,7 @@
 
 class UCraftingComponent;
 
+// [wdk59] 설치 가능한 작업대에 공유 제작 컴포넌트와 거리 기반 상호작용을 연결한다.
 UCLASS()
 class R1_API AWorkbench : public APlaceableItemBase, public IInteractableInterface
 {
@@ -23,6 +24,7 @@ public:
 	UCraftingComponent* GetCraftingComponent() const { return CraftingComponent; }
 
 protected:
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Crafting")
 	TObjectPtr<UCraftingComponent> CraftingComponent;
 

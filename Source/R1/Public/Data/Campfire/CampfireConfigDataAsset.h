@@ -32,6 +32,7 @@ struct R1_API FCampfireFuelRecipe
 };
 
 /** 허용 조리 재료와 연료를 변환 전/후 아이템 쌍으로 관리하는 모닥불 설정. */
+// [wdk59] DA_Campfire_Default에서 허용 요리·연료와 변환 결과, 처리 시간을 설정하는 데이터 형식이다.
 UCLASS(BlueprintType)
 class R1_API UCampfireConfigDataAsset : public UPrimaryDataAsset
 {

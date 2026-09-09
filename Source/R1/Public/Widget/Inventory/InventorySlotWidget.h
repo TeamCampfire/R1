@@ -27,8 +27,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnInventorySlotDropped, FInventor
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotClicked, FInventorySlotRef, SlotRef);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotRightClicked, FInventorySlotRef, SlotRef);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotDragCancelled, FInventorySlotRef, SlotRef);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(FOnCampfireItemDroppedToInventory, ACampfire*, Campfire,
-	FCampfireSlotRef, FromSlot, FInventorySlotRef, ToSlot, int32, Count, bool, bAutoHalfSplitOnEmptyTarget);
+
+// 모닥불 출처와 목적 인벤토리 슬롯, 수량 및 분할 옵션을 상위 위젯(인벤토리)에 전달
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(FOnCampfireItemDroppedToInventory, ACampfire*, Campfire, FCampfireSlotRef, FromSlot, FInventorySlotRef, ToSlot, int32, Count, bool, bAutoHalfSplitOnEmptyTarget);
 
 // 드래그 시작 슬롯과 드롭된 슬롯의 ContainerId가 서로 다를 때만 발생한다(같으면 기존
 // FOnInventorySlotDropped가 그대로 발생). 창고처럼 한 화면에 서로 다른 인벤토리 두 개를

@@ -134,6 +134,7 @@ void AActionCharacter::BeginPlay()
 	}
 
 	
+	// 디버깅용 기본 아이템 지급 중 인벤토리 누락은 중단하고 비어 있는 아이템 항목은 건너뛰어 크래시 방지
 	if (DefaultItems.Num() > 0)
 	{
 		if (!IsValid(InventoryComponent))

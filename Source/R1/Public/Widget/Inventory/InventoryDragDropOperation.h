@@ -27,6 +27,8 @@ class R1_API UInventoryDragDropOperation : public UDragDropOperation
 	GENERATED_BODY()
 
 public:
+
+	// 모닥불 연동을 위해 드래그 출처와 아이템 정보를 추가하여 드롭 대상의 허용 판정에 사용
 	UPROPERTY(BlueprintReadWrite, Category = "Inventory")
 	EItemDragSourceType SourceType = EItemDragSourceType::PlayerInventory;
 

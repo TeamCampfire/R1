@@ -80,8 +80,8 @@ private:
 	void HandleSlotDragCancelled(FInventorySlotRef SlotRef);
 
 	UFUNCTION()
-	void HandleCampfireItemDropped(ACampfire* Campfire, FCampfireSlotRef FromSlot,
-		FInventorySlotRef ToSlot, int32 Count, bool bAutoHalfSplitOnEmptyTarget);
+	// 모닥불에서 시작한 드롭을 받아 벨트 슬롯으로 옮기는 서버 요청 연결
+	void HandleCampfireItemDropped(ACampfire* Campfire, FCampfireSlotRef FromSlot, FInventorySlotRef ToSlot, int32 Count, bool bAutoHalfSplitOnEmptyTarget);
 
 	// 언바인딩용으로 보관. 소유 폰이 사라지는 경우도 있어 약한 참조로 들고 있는다.
 	TWeakObjectPtr<UInventoryComponent> BoundInventory;

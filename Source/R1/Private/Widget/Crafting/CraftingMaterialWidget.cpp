@@ -2,6 +2,7 @@
 #include "Components/TextBlock.h"
 #include "Data/Item/ItemDataBase.h"
 
+// [wdk59] 개당 비용과 선택 수량으로 필요량을 계산하고 보유량이 부족한 재료를 색으로 구분한다.
 void UCraftingMaterialWidget::SetMaterial(UItemDataBase* Item, int32 PerItem, int32 Quantity, int32 Owned)
 {
 	const int64 Required = int64(PerItem) * FMath::Max(1, Quantity);

@@ -51,6 +51,7 @@ public:
 	void Server_TryInteract(AActor* Target);
 
 	// 현재 UI로 열어 둔 모닥불. 조준 대상(CurrentTarget)과는 별개의 상호작용 세션이다.
+	// [wdk59] 모닥불 UI 세션의 대상을 저장하고 벨트의 빠른 이동에서 조회한다.
 	void SetActiveCampfire(ACampfire* Campfire);
 	ACampfire* GetActiveCampfire() const;
 

@@ -7,6 +7,7 @@
 class UTextBlock;
 class UItemDataBase;
 
+// [wdk59] 제작 재료의 개당 비용, 총 필요량과 보유량을 표시하는 독립 행 위젯이다.
 UCLASS()
 class R1_API UCraftingMaterialWidget : public UUserWidget
 {

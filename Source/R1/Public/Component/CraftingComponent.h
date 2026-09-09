@@ -35,6 +35,7 @@ struct FCraftingOrder
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCraftingChanged);
 
 // 컨트롤러에 붙으면 개인 큐, 작업대에 붙으면 공유 큐. 진행 로직은 같은 컴포넌트를 사용한다.
+// [wdk59] 개인 또는 작업대 소유의 제작 큐, 재료 검증 및 결과물 지급·보관을 담당한다.
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class R1_API UCraftingComponent : public UActorComponent
 {

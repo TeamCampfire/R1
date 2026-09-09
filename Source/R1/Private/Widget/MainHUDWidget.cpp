@@ -77,6 +77,7 @@ void UMainHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 	CheckCampfireAutoClose();
 }
 
+// 거리 이탈이나 대상 소멸 시 모닥불 + 인벤토리를 닫고, 입력 상태 복구
 void UMainHUDWidget::CheckCampfireAutoClose()
 {
 	if (!bCampfireSessionOpen) return;
@@ -236,34 +237,47 @@ bool UMainHUDWidget::ToggleInventoryPanel()
 	return bNewOpenState;
 }
 
+// 인벤토리, 모닥불 위젯, 상호작용 컴포넌트의 대상을 맞추고 세션 시작 시 열기 소리 재생
 void UMainHUDWidget::OpenCampfire(ACampfire* Campfire)
 {
-	if (!IsValid(Campfire) || !InventoryWidget || !CampfireWidget) return;
-	const bool bPlayOpenSound = !bCampfireSessionOpen;
-	const bool bInventoryWasOpen = IsInventoryPanelOpen();
+	if (!IsValid(Campfire) || !InventoryWidget || !CampfireWidget)
+		return;
+
+	const bool bPlayOpenSound = !bCampfireSessionOpen;		// 모닥불 UI를 새로 열 때만 열림음 재상하도록 제어하기 위해 사용
+	const bool bInventoryWasOpen = IsInventoryPanelOpen();	// UI 입력 모드 제어를 위해 사용
+
 	InventoryWidget->SetVisibility(ESlateVisibility::Visible);
 	InventoryWidget->SetActiveCampfire(Campfire);
+
 	CampfireWidget->BindCampfire(Campfire);
 	CampfireWidget->SetVisibility(ESlateVisibility::Visible);
+
 	OpenCampfireActor = Campfire;
 	bCampfireSessionOpen = true;
+
 	if (CachedController)
 	{
 		if (APawn* Pawn = CachedController->GetPawn())
 		{
-			if (UInteractionComponent* Interaction = Pawn->FindComponentByClass<UInteractionComponent>())
+			if (UInteractionComponent* InteractionComp = Pawn->FindComponentByClass<UInteractionComponent>())
 			{
-				Interaction->SetActiveCampfire(Campfire);
+				InteractionComp->SetActiveCampfire(Campfire);
 			}
 		}
-		if (!bInventoryWasOpen) CachedController->SetInventoryInputState(true);
+
+		// 인벤토리가 닫혀 있던 경우, UI 입력 상태와 마우스 커서 활성화
+		if (!bInventoryWasOpen)
+			CachedController->SetInventoryInputState(true);
 	}
+
+	// 모닥불 열림음 재생
 	if (bPlayOpenSound && CampfireOpenSound && CachedController && CachedController->IsLocalController())
 	{
 		UGameplayStatics::PlaySound2D(this, CampfireOpenSound);
 	}
 }
 
+// [wdk59] 위젯 델리게이트와 활성 대상을 해제하고 열린 세션에 대해서만 닫기 소리를 재생한다.
 void UMainHUDWidget::CloseCampfire()
 {
 	const bool bPlayCloseSound = bCampfireSessionOpen;

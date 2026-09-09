@@ -66,6 +66,7 @@ float UCraftingComponent::GetServerTime() const
 	return GameState ? GameState->GetServerWorldTimeSeconds() : GetWorld()->GetTimeSeconds();
 }
 
+// [wdk59] 중복 재료를 합산하고 잘못된 수량과 제작 시간을 걸러 최대 제작량 및 서버 차감에 같은 비용을 사용한다.
 bool UCraftingComponent::CollectIngredientCosts(UItemDataBase* Item, TMap<UItemDataBase*, int32>& OutCosts) const
 {
 	OutCosts.Reset();
@@ -112,6 +113,7 @@ bool UCraftingComponent::HasQueueSpace() const
 	return Orders.Num() < MaxQueueSize;
 }
 
+// [wdk59] 서버가 레시피, 재료, 작업대 거리와 큐 여유를 재검사한 후 재료를 선불 차감하고 주문을 등록한다.
 void UCraftingComponent::Server_Enqueue_Implementation(UItemDataBase* Item, int32 Count, AWorkbench* Bench)
 {
 	if (Count <= 0 || Count > GetMaximum(Item, Bench)) return;
@@ -171,6 +173,7 @@ bool UCraftingComponent::GiveOrDrop(UItemDataBase* Item, int32& Count, APlayerCo
 	return Count <= 0 || DropItem(Item, Count);
 }
 
+// [wdk59] 개인 제작은 지급 가능할 때까지 기다리고, 작업대 제작은 즉시 지급하지 못한 결과를 회수 대기로 보관한다.
 void UCraftingComponent::TickCrafting()
 {
 	if (Queue.IsEmpty() || !Queue[0].Item || GetServerTime() < Queue[0].FinishTime) return;
@@ -226,6 +229,7 @@ void UCraftingComponent::CollectCompleted(APlayerController* Recipient)
 	NotifyChanged();
 }
 
+// [wdk59] 작업대 파괴 시 완료 아이템과 아직 제작하지 않은 주문의 재료를 월드에 떨어뜨린다.
 void UCraftingComponent::DropContents()
 {
 	if (!GetOwner()->HasAuthority()) return;
