@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Character/ActionCharacter.h"
@@ -218,6 +218,8 @@ void AActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	{
 		// 이동, 회전
 		EIC->BindAction(IA_Move, ETriggerEvent::Triggered, this, &AActionCharacter::OnMoveAction);
+		EIC->BindAction(IA_Move, ETriggerEvent::Completed, this, &AActionCharacter::OnMoveCompleted);
+		EIC->BindAction(IA_Move, ETriggerEvent::Canceled, this, &AActionCharacter::OnMoveCompleted);
 		EIC->BindAction(IA_Look, ETriggerEvent::Triggered, this, &AActionCharacter::OnLookInput);
 
 		// Jump는 눌렀을 때(Started) 시작, 뗐을 때(Completed) 멈춤

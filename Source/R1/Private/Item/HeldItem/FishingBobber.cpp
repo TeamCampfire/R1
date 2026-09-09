@@ -50,9 +50,9 @@ AFishingBobber::AFishingBobber()
 	ProjectileMovement->ProjectileGravityScale = 1.0f;
 	ProjectileMovement->bAutoActivate = false;
 
-	// 4. 멀티플레이어 리플리케이션
-	bReplicates = true;
-	SetReplicateMovement(true);
+	// 4. 멀티플레이어 시각 액터 (각 머신에서 AFishingRod가 로컬 시각 액터로 관리하여 중복/지터 방지)
+	bReplicates = false;
+	SetReplicateMovement(false);
 }
 
 void AFishingBobber::BeginPlay()
@@ -174,10 +174,12 @@ void AFishingBobber::OnEnterWater(AWaterBody* WaterBody, const FVector& SurfaceL
 		UGameplayStatics::PlaySoundAtLocation(GetWorld(), WaterSplashSound, SurfaceLocation);
 	}
 
-	if (GEngine)
+	/*
+	if (GEngine && OwnerRod && OwnerRod->GetOwnerCharacter() && OwnerRod->GetOwnerCharacter()->IsLocallyControlled())
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Green, TEXT("[낚시] 찌가 수면에 안착했습니다. 물고기를 기다립니다..."));
 	}
+	*/
 	UE_LOG(LogTemp, Display, TEXT("[낚시] 찌가 수면(Z=%.1f)에 안착했습니다."), BaseWaterZ);
 
 	// 3. 낚싯대에 착수 완료 통보

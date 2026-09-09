@@ -1,4 +1,4 @@
-﻿/// 최초작성 : 2026.08.30
+/// 최초작성 : 2026.08.30
 /// 작 성 자 : 주 형 진
 
 // Fill out your copyright notice in the Description page of Project Settings.
@@ -186,6 +186,10 @@ void UHeldItemComponent::OnRep_CurrentHeldItem(AHeldItemBase* PreviousHeldItem)
 	if (CurrentEquippedItemData && CurrentEquippedItemData->AnimLayer)
 	{
 		LinkItemAnimLayers(CurrentEquippedItemData->AnimLayer);
+	}
+	else if (CurrentHeldItem && CurrentHeldItem->GetItemData() && CurrentHeldItem->GetItemData()->AnimLayer)
+	{
+		LinkItemAnimLayers(CurrentHeldItem->GetItemData()->AnimLayer);
 	}
 
 	// 로컬 컨트롤러인 경우 입력 컴포넌트 바인딩 전달

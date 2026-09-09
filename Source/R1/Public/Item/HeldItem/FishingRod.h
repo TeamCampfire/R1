@@ -150,15 +150,15 @@ protected:
 	// 입질 시간 초과 (놓침)
 	void OnBiteMissed();
 
-	// 낚시 종료 처리 (성공/실패)
-	void FinishFishing(bool bSuccess);
+	// 낚시 종료 처리 (성공/실패, 선택적 보상 아이템 데이터 및 수량 오버라이드)
+	void FinishFishing(bool bSuccess, UItemDataBase* OptionalRewardItem = nullptr, int32 OptionalRewardCount = 1);
 
 	// 낚시 상태 전환 및 서버 동기화
 	void SetFishingState(EFishingState NewState);
 
 	// 서버 권한 보상 지급 Server RPC
 	UFUNCTION(Server, Reliable, WithValidation)
-	void Server_FinishFishing(bool bSuccess);
+	void Server_FinishFishing(bool bSuccess, UItemDataBase* InRewardItem = nullptr, int32 InCount = 1);
 
 	// 서버 상태 동기화 Server RPC
 	UFUNCTION(Server, Reliable)
@@ -170,6 +170,31 @@ protected:
 
 	UFUNCTION(Server, Reliable)
 	void Server_SetReeling(bool bReeling);
+
+	// 원격 머신 시각적 캐스팅 및 찌/케이블 생성
+	void StartCast_Visuals(const FVector& TipLoc, const FVector& TargetLoc, const FVector& LaunchVelocity);
+
+	// 캐스팅 시작 Server RPC 및 Multicast RPC
+	UFUNCTION(Server, Reliable)
+	void Server_StartCast(const FVector& TipLoc, const FVector& TargetLoc, const FVector& LaunchVelocity);
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_StartCast(const FVector& TipLoc, const FVector& TargetLoc, const FVector& LaunchVelocity);
+
+	// 미니게임 중 찌 위치 동기화 RPC (20 FPS)
+	UFUNCTION(Server, Unreliable)
+	void Server_UpdateBobberLocation(const FVector_NetQuantize& InLocation);
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_UpdateBobberLocation(const FVector_NetQuantize& InLocation);
+
+	// 낚시 종료 시 모든 머신에서 찌 파괴 및 케이블 숨김
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_EndFishing();
+
+	// 낚시 종료(성공/실패) 세레머니 연출 멀티캐스트
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_PlayEndState(bool bSuccess);
 
 	// 모든 낚시 상태 및 스폰된 액터 초기화
 	void ResetFishing();
@@ -189,9 +214,27 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fishing|Classes")
 	TSubclassOf<AFishingBobber> BobberClass;
 
-	// 낚시 성공 시 지급할 기본 물고기 DataAsset
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fishing|Reward")
+	// 낚시 성공 시 지급할 보상 아이템 DataAsset (에디터 및 블루프린트에서 변경 가능한 변수)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Reward")
 	TObjectPtr<UItemDataBase> FishRewardItemData;
+
+	// 낚시 성공 시 지급할 보상 아이템 수량 (변수)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Reward")
+	int32 FishRewardCount = 1;
+
+	// 보상 아이템 데이터 및 수량을 외부에서 동적으로 주입/설정하는 함수
+	UFUNCTION(BlueprintCallable, Category = "Fishing|Reward")
+	void SetFishRewardItemData(UItemDataBase* NewRewardItem, int32 NewCount = 1)
+	{
+		FishRewardItemData = NewRewardItem;
+		FishRewardCount = FMath::Max(1, NewCount);
+	}
+
+	UFUNCTION(BlueprintPure, Category = "Fishing|Reward")
+	UItemDataBase* GetFishRewardItemData() const { return FishRewardItemData; }
+
+	UFUNCTION(BlueprintPure, Category = "Fishing|Reward")
+	int32 GetFishRewardCount() const { return FishRewardCount; }
 
 	// 기본 매핑 컨텍스트 (IMC_Default: 조준 해제 시 복구용)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fishing|Input")
@@ -246,28 +289,40 @@ protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	UFUNCTION()
-	void OnRep_CurrentState(EFishingState NewState);
+	void OnRep_CurrentState();
 
 	// ---- 미니게임 파라미터 (여유롭고 손맛 위주의 캐주얼 밸런스) ----
 	// 릴 감는 속도 (m/s): 제압 성공 시 시원하게 당겨지는 속도
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Minigame")
-	float ReelSpeed = 2.4f;
+	float ReelSpeed = 1.6f;
 
 	// 물고기가 끌고 도망가는 속도 (m/s): A/D 저항이 없을 때 물고기가 줄을 끌고 나가는 속도
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Minigame")
-	float FishPullSpeed = 0.8f;
+	float FishPullSpeed = 1.2f;
 
-	// 올바른 저항(반대 방향 A/D) 시 릴링 장력 증가율 (초당 6%): 안정적으로 릴링 가능
+	// 올바른 저항(중앙 정렬) 시 릴링 장력 증가율 (초당 8%): 약 10초간 안정적으로 릴링 가능
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Minigame")
-	float TensionGainCorrect = 6.0f;
+	float TensionGainCorrect = 8.0f;
 
-	// A/D 제압 없이 S만 누르거나 잘못된 방향일 때 릴링 장력 증가율 (초당 42%): 2초 만에 100% 도달
+	// 중앙 정렬 없이 S만 누르거나 잘못된 방향일 때 릴링 장력 증가율 (초당 48%): 2초 만에 100% 도달하여 줄 끊어짐
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Minigame")
-	float TensionGainWrong = 42.0f;
+	float TensionGainWrong = 48.0f;
 
 	// 릴을 안 감을 때 장력 자연 감소 속도 (초당 35%): 손 떼면 즉시 안정화
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Minigame")
 	float TensionDecayRate = 35.0f;
+
+	// 최대 허용 좌우 편차 (cm): 이 거리 이상 벗어나면 중심 복귀 필요
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Minigame")
+	float MaxLateralOffset = 350.0f;
+
+	// 플레이어의 A/D 당기기 수평 이동 속도 (cm/s): 물고기를 힘겹게 끌어오는 속도
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Minigame")
+	float PlayerPullPower = 340.0f;
+
+	// 물고기가 스스로 좌우로 도망치는 수평 헤엄 속도 (cm/s)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Minigame")
+	float FishEscapeSpeed = 220.0f;
 
 	// 입질 대기 최소/최대 시간 (초)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fishing|Minigame")
@@ -288,6 +343,14 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Animation")
 	float TiltInterpSpeed = 8.0f;
 
+	// 낚시 성공 세레머니 지속 시간 (초) - 성공 애니메이션(catch_success) 완주 대기
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Tuning")
+	float SuccessCeremonyDuration = 2.6f;
+
+	// 낚시 실패/취소 쿨다운 시간 (초)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Tuning")
+	float FailureDuration = 1.0f;
+
 protected:
 	UPROPERTY(ReplicatedUsing = OnRep_CurrentState, BlueprintReadOnly, Category = "Fishing|Runtime")
 	EFishingState CurrentState = EFishingState::Idle;
@@ -298,6 +361,7 @@ protected:
 	// 런타임 미니게임 변수
 	float CurrentTension = 0.0f;       // 0 ~ 100%
 	float CurrentDistance = 0.0f;      // 남은 거리 (m)
+	float CurrentLateralOffset = 0.0f; // 중심선 기준 좌우 편차 (-350cm ~ +350cm)
 	float FishEscapeDirection = 1.0f;  // -1.0(좌) ~ +1.0(우)
 	float FishTurnTimer = 0.0f;        // 물고기 방향 전환 타이머
 	float PlayerPullInput = 0.0f;      // 플레이어 A(-1.0) / D(+1.0)
@@ -314,14 +378,15 @@ protected:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Fishing|Runtime")
 	bool bIsFishingActive = false;     // 낚시 세션 진행 중 (던진 후 락)
 
-	bool bIsFinishCooldown = false;    // 낚시 종료 직후 완충 시간 (0.6초 이동 차단)
+	bool bIsFinishCooldown = false;    // 낚시 종료 직후 완충 시간 (이동 차단)
+	float BobberSyncTimer = 0.0f;      // 찌 위치 네트워크 동기화 타이머
 
 	// 타이머 핸들
 	FTimerHandle BiteTimerHandle;
 	FTimerHandle ReactionTimerHandle;
 	FTimerHandle FinishCooldownTimerHandle;
 
-	void OnFinishCooldownEnded();
+	void OnFinishCeremonyEnded();
 
 	// 프리뷰 착수 유효성
 	bool bValidWaterHit = false;
