@@ -20,8 +20,8 @@
  * 전투용, 채집량은 채집용에서만 의미를 가짐 — 쓰지 않는 필드는 0으로 비워두면 됨)만으로
  * 표현하기로 했기 때문(EItemCategory::HeldItem 주석 참고).
  *
- * 붕대 등 손에 들고 쓰는 소모품은 시간 관계상 이번 프로젝트에서는 제외하고 즉시소비형
- * Consumable로만 구현한다 — 그래서 이 클래스엔 Effects 같은 소비 효과 필드가 없다.
+ * 붕대처럼 손에 들고 쓰는 소모품(좌클릭 시 UItemDataBase::Effects 적용 + 스택 1개 소모)도
+ * 이 클래스를 그대로 쓴다 — bAllowStacking을 true로 켜면 슬롯당 1개 제한(아래 참고)이 풀린다.
  */
 UCLASS()
 class R1_API UHeldItemData : public UItemDataBase
@@ -31,9 +31,19 @@ class R1_API UHeldItemData : public UItemDataBase
 public:
 	UHeldItemData();
 
+	//~ Begin UItemDataBase Interface
+	virtual void EnforceStackRulesForCategory() override;
+	//~ End UItemDataBase Interface
+
 	// 벨트 슬롯에서 선택(장착)했을 때 손에 스폰할 액터 클래스
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HeldItem")
 	TSubclassOf<class AHeldItemBase> HeldItemClass;
+
+	// 무기/도구는 기본적으로 슬롯당 1개만 보관 가능(스택 불가, UItemDataBase::EnforceStackRulesForCategory
+	// 참고)하지만, 붕대처럼 여러 개를 들고 다니며 낱개로 소모하는 특수 HeldItem은 이 값을 true로
+	// 켜서 MaxStackSize를 디자이너가 지정한 값(예: 10) 그대로 유지하게 한다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HeldItem")
+	bool bAllowStacking = false;
 
 	// 부여되는 스탯 변화 (방어력 등 범용 modifier — Defense/MovementSpeedMult 계열).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HeldItem")

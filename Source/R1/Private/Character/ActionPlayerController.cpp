@@ -371,6 +371,16 @@ void AActionPlayerController::Client_OpenWarehouse_Implementation(UWarehouseInve
 	SetWarehouseInputState(true);
 }
 
+void AActionPlayerController::Client_NotifyItemAcquired_Implementation(UItemDataBase* ItemData, int32 GainedAmount, int32 NewTotalCount)
+{
+	AMainHUD* HUD = GetHUD<AMainHUD>();
+	UMainHUDWidget* MainHudWidget = HUD ? HUD->GetMainHudWidget() : nullptr;
+	if (MainHudWidget)
+	{
+		MainHudWidget->AddPickupNotification(ItemData, GainedAmount, NewTotalCount);
+	}
+}
+
 void AActionPlayerController::ApplyUIInputState(bool bOpen)
 {
 	FlushPressedKeys();	// UI 토글 순간 눌려있던 키가 계속 적용되는 것 방지

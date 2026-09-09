@@ -37,6 +37,7 @@
 
 class UItemDataBase;
 class USphereComponent;
+class UTexture2D;
 
 UCLASS()
 class R1_API AItemPickup : public AActor, public IInteractableInterface
@@ -109,6 +110,14 @@ public:
 	// 스택형 아이템의 수량. 장비 아이템은 항상 1로 취급.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Replicated, Category = "Item", meta = (ClampMin = "1"))
 	int32 Count = 1;
+
+	// 조준 시 표시할 아이콘. 아이템별 아이콘(ItemData->Icon)이 아니라 "픽업 가능한 대상"이라는
+	// 것 자체를 나타내는 공통 아이콘 하나를 모든 픽업이 공유한다 — 무엇을 주울 수 있는지는
+	// 이름 텍스트(GetInteractionDisplayName)로 이미 구분되므로, 아이콘은 종류 상관없이
+	// "픽업 가능"을 뜻하는 통일된 이미지로 고정한다(PickupNotificationWidget::CommonPickupIcon과
+	// 동일한 이유). BP_ItemPickup 계열의 클래스 디폴트에서 지정.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interaction")
+	TSoftObjectPtr<UTexture2D> CommonPickupIcon;
 
 protected:
 	// 표시할 메시

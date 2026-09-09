@@ -471,6 +471,7 @@ void AActionCharacter::Server_ProcessAttackTarget_Implementation(AActor* TargetA
 				{
 					int32 RemainCnt = 0;
 					InventoryComponent->AddItem(ItemRes.ItemData, ItemRes.Count, RemainCnt);
+					InventoryComponent->NotifyItemAcquired(ItemRes.ItemData, ItemRes.Count - RemainCnt);
 
 					//// For Debug
 					//UE_LOG(LogTemp, Display, TEXT("[서버] 자원 [%s]를 %d개 획득! (스위트스팟: %s, 고갈보너스: %s)"),
@@ -499,6 +500,7 @@ void AActionCharacter::Server_GrantHarvestReward_Implementation(UItemDataBase* I
 
 	int32 RemainCnt = 0;
 	InventoryComponent->AddItem(ItemData, Count, RemainCnt);
+	InventoryComponent->NotifyItemAcquired(ItemData, Count - RemainCnt);
 }
 
 void AActionCharacter::Die()

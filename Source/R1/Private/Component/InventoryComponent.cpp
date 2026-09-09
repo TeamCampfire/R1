@@ -5,13 +5,13 @@
 #include "Data/Item/ItemDataBase.h"
 #include "Data/Item/EquipmentItemData.h"
 #include "Data/Item/HeldItemData.h"
-#include "Data/Item/ConsumableItemData.h"
 #include "Item/ItemPickup.h"
 #include "GameFramework/Character.h"
 #include "Component/HeldItemComponent.h"
 #include "Component/StatComponent.h"
 #include "Component/WarehouseInventoryComponent.h"
 #include "Character/ActionCharacter.h"
+#include "Character/ActionPlayerController.h"
 #include "Net/UnrealNetwork.h"   // DOREPLIFETIME 계열 매크로가 여기 정의돼 있음
 
 // Sets default values for this component's properties
@@ -84,6 +84,21 @@ bool UInventoryComponent::AddItem(UItemDataBase* ItemData, int32 Count, int32& O
 	// 모든 수량이 완전히 들어갔으면 true 리턴
 	// 1개도 추가되지 않았거나 일부만 추가됬으면 false 리턴
 	return OutRemainder == 0;
+}
+
+void UInventoryComponent::NotifyItemAcquired(UItemDataBase* ItemData, int32 GainedAmount) const
+{
+	if (!ItemData || GainedAmount <= 0)
+	{
+		return;
+	}
+
+	APawn* OwningPawn = Cast<APawn>(GetOwner());
+	AActionPlayerController* PC = OwningPawn ? Cast<AActionPlayerController>(OwningPawn->GetController()) : nullptr;
+	if (PC)
+	{
+		PC->Client_NotifyItemAcquired(ItemData, GainedAmount, GetItemCount(ItemData));
+	}
 }
 
 TArray<FItemInstance>& UInventoryComponent::GetSlotArray(EInventorySlotCategory Category)
@@ -450,7 +465,7 @@ void UInventoryComponent::UseBeltSlot(int32 BeltIndex)
 
 		case EItemCategory::Consumable:
 		{
-			ApplyConsumableEffects(Cast<UConsumableItemData>(Instance.ItemData));
+			ApplyItemEffects(Instance.ItemData);
 
 			const int32 Remaining = Instance.StackCount - 1;
 			SetSlot(EInventorySlotCategory::Belt, BeltIndex, Remaining > 0 ? FItemInstance(Instance.ItemData, Remaining) : FItemInstance());
@@ -487,16 +502,16 @@ bool UInventoryComponent::UseSelectedItem(const FInventorySlotRef& SlotRef)
 		return false;
 	}
 
-	ApplyConsumableEffects(Cast<UConsumableItemData>(Instance.ItemData));
+	ApplyItemEffects(Instance.ItemData);
 
 	const int32 Remaining = Instance.StackCount - 1;
 	SetSlot(SlotRef.Category, SlotRef.Index, Remaining > 0 ? FItemInstance(Instance.ItemData, Remaining) : FItemInstance());
 	return true;
 }
 
-void UInventoryComponent::ApplyConsumableEffects(const UConsumableItemData* ConsumableData)
+void UInventoryComponent::ApplyItemEffects(const UItemDataBase* ItemData)
 {
-	if (!ConsumableData)
+	if (!ItemData)
 	{
 		return;
 	}
@@ -512,7 +527,7 @@ void UInventoryComponent::ApplyConsumableEffects(const UConsumableItemData* Cons
 		return;
 	}
 
-	for (const FItemEffect& Effect : ConsumableData->Effects)
+	for (const FItemEffect& Effect : ItemData->Effects)
 	{
 		StatComp->ApplyItemEffect(Effect);
 	}

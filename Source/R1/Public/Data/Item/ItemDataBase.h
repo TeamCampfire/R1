@@ -86,8 +86,16 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item|Crafting")
 	TArray<FCraftIngredient> CraftingCost;
 
-private:
+	// 사용 시 적용되는 효과 목록. 원래 UConsumableItemData 전용이었으나, 붕대처럼 손에 들고
+	// 좌클릭으로 소모하며 효과를 적용하는 UHeldItemData 아이템도 필요해져 공통 베이스로
+	// 옮겼다(CraftingCost와 동일한 이유 — 여러 서브클래스가 같은 개념을 필요로 함).
+	// 비어있으면(대부분의 HeldItem) 효과 없음으로 취급.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item|Effect")
+	TArray<FItemEffect> Effects;
+
+protected:
 	// Category가 Equipment/HeldItem/Placeable이면 MaxStackSize를 1로 강제한다 — 디자이너가
 	// 실수로 다른 값을 넣거나 에디터에서 Category만 바꿔도 즉시(에디터)/로드 시(런타임) 정정된다.
-	void EnforceStackRulesForCategory();
+	// virtual: UHeldItemData가 bAllowStacking으로 예외를 둘 수 있도록 오버라이드 지점을 연다.
+	virtual void EnforceStackRulesForCategory();
 };

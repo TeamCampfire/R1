@@ -44,6 +44,11 @@ void ACampfire::Interact_Implementation(APawn* Interactor)
 	}
 }
 
+TSoftObjectPtr<UTexture2D> ACampfire::GetInteractionIcon_Implementation() const
+{
+	return InteractionIcon;
+}
+
 void ACampfire::HandleCampfireStateChanged()
 {
 	const bool bLit = CampfireComponent && CampfireComponent->bIsLit;

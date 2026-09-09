@@ -50,5 +50,5 @@ void AWarehouseBase::Interact_Implementation(APawn* Interactor)
 
 TSoftObjectPtr<UTexture2D> AWarehouseBase::GetInteractionIcon_Implementation() const
 {
-	return nullptr;
+	return InteractionIcon;
 }

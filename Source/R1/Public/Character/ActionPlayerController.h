@@ -126,6 +126,13 @@ public:
 	UFUNCTION(Client, Reliable)
 	void Client_OpenWarehouse(class UWarehouseInventoryComponent* Warehouse);
 
+	// UInventoryComponent::NotifyItemAcquired(서버)가 "실제로 플레이어 행동으로 아이템을 얻은"
+	// 순간(월드 픽업/채집/낚시 보상 등)에만 호출한다 — 스폰 시 기본 지급 같은 조용한 AddItem
+	// 호출은 이 경로를 안 타므로 알림이 뜨지 않는다. HUD의 획득 알림 스택(UMainHUDWidget::
+	// AddPickupNotification)에 새 행을 하나 추가하는 용도.
+	UFUNCTION(Client, Reliable)
+	void Client_NotifyItemAcquired(class UItemDataBase* ItemData, int32 GainedAmount, int32 NewTotalCount);
+
 	// Temp: 없애도 될 거 같은데 !!!!!!!!!
 	// GameMenu 패널이 열리면 마우스 커서를 보여주고 UI 입력을 받도록, 닫히면 다시 게임 전용 입력으로 되돌린다.
 	UFUNCTION(BlueprintCallable, Category = "GameMenu")
