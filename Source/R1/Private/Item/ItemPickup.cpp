@@ -9,6 +9,7 @@
 #include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
 #include "R1/R1.h"
+#include "Engine/Texture2D.h"
 
 // Sets default values
 AItemPickup::AItemPickup()
@@ -60,6 +61,17 @@ AItemPickup::AItemPickup()
 
 	Mesh->SetCollisionResponseToChannel(ECC_BUILDABLEGROUND, ECR_Block);
 	Mesh->BodyInstance.bUseCCD = true;
+
+	// AItemPickup은 BP 서브클래스 없이 네이티브 클래스 그대로 스폰되는 경우가 대부분이라
+	// (InventoryComponent::DropItem, BuildingActor 파괴 드랍 등이 AItemPickup::StaticClass()를
+	// 직접 스폰) 클래스 디폴트를 BP 에디터에서 지정할 방법이 없다 — 그래서 다른 HeldItem
+	// 액터들(AFishingRod 등)과 동일하게 생성자에서 기본 애셋을 직접 로드해 지정한다.
+	// 나중에 BP 서브클래스가 생기면 그쪽 클래스 디폴트에서 얼마든지 덮어쓸 수 있다.
+	static ConstructorHelpers::FObjectFinder<UTexture2D> CommonPickupIconFinder(TEXT("/Game/Asset/UI/Icon/T_Pickup.T_Pickup"));
+	if (CommonPickupIconFinder.Succeeded())
+	{
+		CommonPickupIcon = CommonPickupIconFinder.Object;
+	}
 }
 
 void AItemPickup::InitializeFromItem(UItemDataBase* InItemData, int32 InCount)
@@ -201,7 +213,7 @@ void AItemPickup::Interact_Implementation(APawn* Interactor)
 
 TSoftObjectPtr<UTexture2D> AItemPickup::GetInteractionIcon_Implementation() const
 {
-	return ItemData ? ItemData->Icon : nullptr;
+	return CommonPickupIcon;
 }
 
 void AItemPickup::OnConstruction(const FTransform& Transform)

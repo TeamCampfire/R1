@@ -5,7 +5,6 @@
 #include "Data/Item/ItemDataBase.h"
 #include "Data/Item/EquipmentItemData.h"
 #include "Data/Item/HeldItemData.h"
-#include "Data/Item/ConsumableItemData.h"
 #include "Item/ItemPickup.h"
 #include "GameFramework/Character.h"
 #include "Component/HeldItemComponent.h"
@@ -466,7 +465,7 @@ void UInventoryComponent::UseBeltSlot(int32 BeltIndex)
 
 		case EItemCategory::Consumable:
 		{
-			ApplyConsumableEffects(Cast<UConsumableItemData>(Instance.ItemData));
+			ApplyItemEffects(Instance.ItemData);
 
 			const int32 Remaining = Instance.StackCount - 1;
 			SetSlot(EInventorySlotCategory::Belt, BeltIndex, Remaining > 0 ? FItemInstance(Instance.ItemData, Remaining) : FItemInstance());
@@ -503,16 +502,16 @@ bool UInventoryComponent::UseSelectedItem(const FInventorySlotRef& SlotRef)
 		return false;
 	}
 
-	ApplyConsumableEffects(Cast<UConsumableItemData>(Instance.ItemData));
+	ApplyItemEffects(Instance.ItemData);
 
 	const int32 Remaining = Instance.StackCount - 1;
 	SetSlot(SlotRef.Category, SlotRef.Index, Remaining > 0 ? FItemInstance(Instance.ItemData, Remaining) : FItemInstance());
 	return true;
 }
 
-void UInventoryComponent::ApplyConsumableEffects(const UConsumableItemData* ConsumableData)
+void UInventoryComponent::ApplyItemEffects(const UItemDataBase* ItemData)
 {
-	if (!ConsumableData)
+	if (!ItemData)
 	{
 		return;
 	}
@@ -528,7 +527,7 @@ void UInventoryComponent::ApplyConsumableEffects(const UConsumableItemData* Cons
 		return;
 	}
 
-	for (const FItemEffect& Effect : ConsumableData->Effects)
+	for (const FItemEffect& Effect : ItemData->Effects)
 	{
 		StatComp->ApplyItemEffect(Effect);
 	}

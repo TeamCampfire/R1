@@ -13,6 +13,7 @@
 
 class UStaticMeshComponent;
 class UWarehouseInventoryComponent;
+class UTexture2D;
 
 /**
  * 레벨에 배치되는 창고 액터.
@@ -45,6 +46,12 @@ protected:
 	// 조준 시 표시할 이름(예: "창고", "나무 창고").
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Warehouse")
 	FText DisplayName = FText::FromString(TEXT("창고"));
+
+	// 조준 시 표시할 아이콘 — 픽업(AItemPickup::CommonPickupIcon)과 달리 창고는 "픽업"이 아니라
+	// "여는 상호작용"이므로 그에 맞는 별도 아이콘을 쓴다. 창고 종류별로 다른 아이콘을 쓰고
+	// 싶으면 서브클래스/BP 인스턴스마다 이 값만 다르게 지정하면 된다.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Warehouse")
+	TSoftObjectPtr<UTexture2D> InteractionIcon;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> Mesh;

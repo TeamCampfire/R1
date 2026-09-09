@@ -15,7 +15,8 @@ void UPickupNotificationWidget::Initialize(UItemDataBase* ItemData, int32 Gained
 
 	if (IconImage)
 	{
-		if (UTexture2D* Icon = ItemData->Icon.LoadSynchronous())
+		// 아이템별 아이콘(ItemData->Icon)이 아니라 모든 알림이 공유하는 CommonPickupIcon을 쓴다.
+		if (UTexture2D* Icon = CommonPickupIcon.LoadSynchronous())
 		{
 			IconImage->SetBrushFromTexture(Icon);
 			IconImage->SetVisibility(ESlateVisibility::Visible);

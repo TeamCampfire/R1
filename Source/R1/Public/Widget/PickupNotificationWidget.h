@@ -11,6 +11,7 @@
 class UItemDataBase;
 class UTextBlock;
 class UImage;
+class UTexture2D;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPickupNotificationExpired, UPickupNotificationWidget*, Notification);
 
@@ -29,7 +30,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPickupNotificationExpired, UPicku
  * 처리하므로 WBP 쪽엔 페이드용 애님을 따로 만들 필요가 없다.
  *
  * WBP에서 아래 위젯을 정확히 이 이름 + 타입으로 배치하면 자동 바인딩된다(전부 BindWidgetOptional):
- * - IconImage  : 아이템 아이콘.
+ * - IconImage  : 아이콘. 아이템별 아이콘(ItemData->Icon)이 아니라 CommonPickupIcon 하나를
+ *                모든 알림에 공통으로 사용한다("무엇을 얻었는지"는 이름 텍스트로 충분히
+ *                구분되므로, 아이콘은 종류 상관없이 "뭔가 획득함"을 뜻하는 통일된 이미지로 고정).
  * - NameText   : 아이템 이름.
  * - AmountText : "+획득량 (누적 총량)" 텍스트.
  */
@@ -59,6 +62,11 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> AmountText;
+
+	// 아이템별 아이콘 대신 모든 획득 알림에 공통으로 쓸 아이콘. WBP_PickupNotification의
+	// 클래스 디폴트에서 지정한다 — 비어있으면 IconImage를 숨긴다(기존 "아이콘 없는 아이템" 처리와 동일).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Notification")
+	TSoftObjectPtr<UTexture2D> CommonPickupIcon;
 
 private:
 	float Lifetime = 0.f;

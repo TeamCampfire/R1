@@ -285,9 +285,10 @@ private:
 	EMoveSlotResult EquipToSlot(const FInventorySlotRef& From, const FItemInstance& SourceInstance);
 
 	// UseBeltSlot/UseSelectedItem의 Consumable 분기가 공유하는 처리 — 소유 액터의 StatComponent를
-	// 찾아 ConsumableData->Effects를 전부 UStatComponent::ApplyItemEffect에 넘긴다(즉발/지속형
-	// 판단은 그쪽에서 Effect.Duration을 보고 처리).
-	void ApplyConsumableEffects(const class UConsumableItemData* ConsumableData);
+	// 찾아 ItemData->Effects(UItemDataBase 공통 필드)를 전부 UStatComponent::ApplyItemEffect에
+	// 넘긴다(즉발/지속형 판단은 그쪽에서 Effect.Duration을 보고 처리). Consumable 전용이 아니라
+	// UItemDataBase 아무거나 받도록 일반화했다 — 붕대(HeldItem)도 같은 Effects 필드를 쓰기 때문.
+	void ApplyItemEffects(const class UItemDataBase* ItemData);
 
 	// Ingredients에 명시된 재료가 전부 충분한지 확인한다. CanCraftItem 내부 전용 —
 	// 크래프팅은 별도 컴포넌트로 분리될 예정이라, 외부에서는 이 목록형 대신

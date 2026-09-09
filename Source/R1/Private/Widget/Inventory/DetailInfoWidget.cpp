@@ -262,7 +262,13 @@ void UDetailInfoWidget::RebuildInfoRows(const FItemInstance& Selected)
 		//{
 		//	AddNamedStatRow(NSLOCTEXT("DetailInfoWidget", "MaxDurability", "Max Durability"), HeldData->MaxDurability);
 		//}
-		
+
+		// 붕대처럼 Effects(UItemDataBase 공통 필드)를 쓰는 HeldItem용 — 대부분의 무기/도구는
+		// 비어있어서(기본값) 아무것도 추가되지 않는다.
+		for (const FItemEffect& Effect : HeldData->Effects)
+		{
+			AddEffectTextRow(Effect);
+		}
 	}
 	else if (const UConsumableItemData* ConsumableData = Cast<UConsumableItemData>(Selected.ItemData))
 	{
