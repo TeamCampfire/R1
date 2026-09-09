@@ -1,7 +1,6 @@
+﻿
 
 
-
-// Test build
 #include "Item/HeldItem/Torch.h"
 #include "Character/ActionCharacter.h"
 #include "NiagaraComponent.h"

@@ -5,3 +5,4 @@
 #include "CoreMinimal.h"
 
 #define ECC_BUILDABLEGROUND ECC_GameTraceChannel1
+#define ECC_Water ECC_GameTraceChannel3

@@ -60,7 +60,7 @@ void AHeldItemBase::InitItemVisual(UHeldItemData* InItemData)
 
 	if (!ItemData->WeaponMesh)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[AHeldItemBase::InitItemVisual] WeaponMesh is NULL in ItemData: %s"), *ItemData->GetName());
+		//UE_LOG(LogTemp, Warning, TEXT("[AHeldItemBase::InitItemVisual] WeaponMesh is NULL in ItemData: %s"), *ItemData->GetName());
 		return;
 	}
 
@@ -78,7 +78,7 @@ void AHeldItemBase::InitItemVisual(UHeldItemData* InItemData)
 		ItemMesh3P->SetCollisionResponseToAllChannels(ECR_Ignore);
 	}
 
-	UE_LOG(LogTemp, Log, TEXT("[AHeldItemBase::InitItemVisual] Successfully set WeaponMesh: %s"), *ItemData->WeaponMesh->GetName());
+	//UE_LOG(LogTemp, Log, TEXT("[AHeldItemBase::InitItemVisual] Successfully set WeaponMesh: %s"), *ItemData->WeaponMesh->GetName());
 }
 
 #include "Net/UnrealNetwork.h"

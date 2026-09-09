@@ -60,7 +60,17 @@ AActor* AHarvestSpawner::SpawnHarvestableObject(TSubclassOf<AActor> TargetClass)
 		QueryParams.AddIgnoredActor(this); // 자기 자신은 무시
 		QueryParams.bTraceComplex = false; // 단순 콜리전 사용 (필요시 true)
 
-		//1-3. 라인 트레이스 WordStatic을 대상으로만 진행
+		// 해당 지점이 물인지 먼저 확인
+		FHitResult WaterHit;
+		bool bInWater = GetWorld()->LineTraceSingleByChannel(
+			WaterHit,
+			StartPos,
+			EndPos,
+			ECC_Water,
+			QueryParams
+		);
+
+		//1-3. 라인 트레이스 ECC_BUILDABLEGROUND 대상으로만 진행
 		bool bHit = GetWorld()->LineTraceSingleByObjectType(
 			HitRes,
 			StartPos,
@@ -69,9 +79,8 @@ AActor* AHarvestSpawner::SpawnHarvestableObject(TSubclassOf<AActor> TargetClass)
 			QueryParams
 		);
 		//2. 충돌시 해당 지점에 소환
-		if (bHit)
-		{
-			
+		if (bHit && !bInWater)
+		{	
 			SpawnedActor = GetWorld()->SpawnActor<AActor>(TargetClass, HitRes.ImpactPoint, FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f));
 			if (!SpawnedActor) return SpawnedActor;
 			//3. 소환한 액터의 OnDestroy에 SpawnHarvestableObject 달아놓기

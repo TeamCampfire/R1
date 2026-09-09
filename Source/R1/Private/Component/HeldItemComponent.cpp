@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.30
+﻿/// 최초작성 : 2026.08.30
 /// 작 성 자 : 주 형 진
 
 // Fill out your copyright notice in the Description page of Project Settings.
@@ -63,7 +63,7 @@ void UHeldItemComponent::AttachHeldItemToCharacter(AHeldItemBase* ItemToAttach)
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[UHeldItemComponent::AttachHeldItemToCharacter] CurrentEquippedItemData is NULL!"));
+		//UE_LOG(LogTemp, Warning, TEXT("[UHeldItemComponent::AttachHeldItemToCharacter] CurrentEquippedItemData is NULL!"));
 	}
 
 	// 2. 3인칭 전신(GetMesh()) 소켓에 액터 및 3P 메시 부착
@@ -87,12 +87,12 @@ void UHeldItemComponent::AttachHeldItemToCharacter(AHeldItemBase* ItemToAttach)
 			}
 			ItemToAttach->SetActorRelativeTransform(Offset3P);
 
-			UE_LOG(LogTemp, Log, TEXT("[UHeldItemComponent::AttachHeldItemToCharacter] Attached 3P to socket: %s"), *HandSocket.ToString());
+			//UE_LOG(LogTemp, Log, TEXT("[UHeldItemComponent::AttachHeldItemToCharacter] Attached 3P to socket: %s"), *HandSocket.ToString());
 		}
 		else
 		{
 			ItemToAttach->AttachToActor(OwnerCharacter, FAttachmentTransformRules::KeepRelativeTransform);
-			UE_LOG(LogTemp, Warning, TEXT("[UHeldItemComponent::AttachHeldItemToCharacter] 3P Hand socket NOT found, attached to Actor"));
+			//UE_LOG(LogTemp, Warning, TEXT("[UHeldItemComponent::AttachHeldItemToCharacter] 3P Hand socket NOT found, attached to Actor"));
 		}
 
 		// 아이템 변경시에는 모든 몽타주 종료
@@ -141,11 +141,11 @@ void UHeldItemComponent::AttachHeldItemToCharacter(AHeldItemBase* ItemToAttach)
 				}
 				Mesh1P->SetRelativeTransform(Offset1P);
 
-				UE_LOG(LogTemp, Log, TEXT("[UHeldItemComponent::AttachHeldItemToCharacter] Attached 1P to socket: %s"), *FPSocket.ToString());
+				//UE_LOG(LogTemp, Log, TEXT("[UHeldItemComponent::AttachHeldItemToCharacter] Attached 1P to socket: %s"), *FPSocket.ToString());
 			}
 			else
 			{
-				UE_LOG(LogTemp, Warning, TEXT("[UHeldItemComponent::AttachHeldItemToCharacter] 1P Hand socket NOT found on FirstPersonMesh!"));
+				//UE_LOG(LogTemp, Warning, TEXT("[UHeldItemComponent::AttachHeldItemToCharacter] 1P Hand socket NOT found on FirstPersonMesh!"));
 			}
 		}
 	}
@@ -450,7 +450,7 @@ void UHeldItemComponent::LinkItemAnimLayers(TSubclassOf<UAnimInstance> LayerClas
 	if (USkeletalMeshComponent* TPMesh = OwnerCharacter->GetMesh())
 	{
 		TPMesh->LinkAnimClassLayers(LayerClass);
-		UE_LOG(LogTemp, Log, TEXT("[UHeldItemComponent::LinkItemAnimLayers] Linked AnimLayer to 3P Mesh: %s"), *LayerClass->GetName());
+		//UE_LOG(LogTemp, Log, TEXT("[UHeldItemComponent::LinkItemAnimLayers] Linked AnimLayer to 3P Mesh: %s"), *LayerClass->GetName());
 	}
 }
 
@@ -468,7 +468,7 @@ void UHeldItemComponent::UnlinkItemAnimLayers()
 		if (USkeletalMeshComponent* TPMesh = OwnerCharacter->GetMesh())
 		{
 			TPMesh->UnlinkAnimClassLayers(LinkedAnimLayerClass);
-			UE_LOG(LogTemp, Log, TEXT("[UHeldItemComponent::UnlinkItemAnimLayers] Unlinked AnimLayer from 3P Mesh: %s"), *LinkedAnimLayerClass->GetName());
+			//UE_LOG(LogTemp, Log, TEXT("[UHeldItemComponent::UnlinkItemAnimLayers] Unlinked AnimLayer from 3P Mesh: %s"), *LinkedAnimLayerClass->GetName());
 		}
 	}
 
