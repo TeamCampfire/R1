@@ -424,6 +424,9 @@ void UMainHUDWidget::AddPickupNotification(UItemDataBase* ItemData, int32 Gained
 void UMainHUDWidget::RemovePickupNotification(UPickupNotificationWidget* Notification)
 {
 	ActivePickupNotifications.RemoveSingle(Notification);
+
+	// Notification을 지우기만 하면 나머지 행들이 그자리에 남아 있어 빈 공간이 생기므로,
+	// 컨테이너를 새로 갱신하여 남은 행들을 아래로 내린다.
 	RefreshPickupNotificationContainer();
 }
 
