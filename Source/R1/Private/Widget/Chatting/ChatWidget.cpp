@@ -10,6 +10,7 @@
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Components/Border.h"
+#include "Components/SizeBox.h"
 #include "Character/ActionPlayerController.h"
 #include "Framework/GameState/ActionGameState.h"
 
@@ -51,6 +52,16 @@ void UChatWidget::NativeDestruct()
 	Super::NativeDestruct();
 }
 
+void UChatWidget::NativePreConstruct()
+{
+	Super::NativePreConstruct();
+
+	if (nullptr == SizeBox_ExpandedMessageViewport) return;
+
+	// 채팅이 들어가는 공간의 높이의 최대를 세팅
+	SizeBox_ExpandedMessageViewport->SetHeightOverride(SingleChatLineHeight * ExpandedVisibleLineCount);
+}
+
 void UChatWidget::CloseChat()
 {
 	if (nullptr == WidgetSwitcher_ChatMode) return;
@@ -88,7 +99,7 @@ void UChatWidget::OpenChat()
 	EditableText_MessageInput->SetKeyboardFocus();
 }
 
-void UChatWidget::AddChatMessageToUI(const FString& SenderName, const FString& Message)
+void UChatWidget::AddChatMessageToUI(const FString& SenderName, const FString& Message, const FString& Timestamp)
 {
 	if (nullptr == ChatMessageWidgetClass ||
 		nullptr == VerticalBox_CompactMessages || nullptr == VerticalBox_ExpandedMessages)
@@ -101,7 +112,7 @@ void UChatWidget::AddChatMessageToUI(const FString& SenderName, const FString& M
 	// UMG 위젯은 부모를 하나만 가질 수 있기 때문..........
 	if (UChatMessageWidget* CompactMessageWidget = CreateWidget<UChatMessageWidget>(GetOwningPlayer(), ChatMessageWidgetClass))
 	{
-		CompactMessageWidget->SetMessage(SenderName, Message);
+		CompactMessageWidget->SetMessage(SenderName, Message, Timestamp);
 
 		if (UVerticalBoxSlot* CompactSlot = VerticalBox_CompactMessages->AddChildToVerticalBox(CompactMessageWidget))
 			CompactSlot->SetHorizontalAlignment(HAlign_Fill);
@@ -112,7 +123,7 @@ void UChatWidget::AddChatMessageToUI(const FString& SenderName, const FString& M
 
 	if (UChatMessageWidget* ExpandedMessageWidget = CreateWidget<UChatMessageWidget>(GetOwningPlayer(), ChatMessageWidgetClass))
 	{
-		ExpandedMessageWidget->SetMessage(SenderName, Message);
+		ExpandedMessageWidget->SetMessage(SenderName, Message, Timestamp);
 
 		if (UVerticalBoxSlot* ExpandedSlot = VerticalBox_ExpandedMessages->AddChildToVerticalBox(ExpandedMessageWidget))
 			ExpandedSlot->SetHorizontalAlignment(HAlign_Fill);
@@ -122,13 +133,6 @@ void UChatWidget::AddChatMessageToUI(const FString& SenderName, const FString& M
 	// 오래된 메시지부터 제거
 	while (MaxCompactMessageCount < VerticalBox_CompactMessages->GetChildrenCount())
 		VerticalBox_CompactMessages->RemoveChildAt(0);
-
-	while ((MaxExpandedMessageCount + 1) < VerticalBox_ExpandedMessages->GetChildrenCount())
-	{
-		// 0은 위쪽 공간을 차지하고 있는 스페이서
-		// 스페이서를 지울 순 없지..
-		VerticalBox_ExpandedMessages->RemoveChildAt(1);
-	}
 
 	// 새로운 메시지가 추가되면 스크롤을 가장 최신 메시지가 있는 아래쪽으로 내림
 	if (nullptr != ScrollBox_ExpandedMessages)
@@ -183,6 +187,23 @@ void UChatWidget::HandleGlobalChatMessageReceived(const FGlobalChatMessage& Chat
 	if (LastShowGlobalChatMessageID >= Chat.MessageID) return;
 
 	// 채팅을 UI에 보여주고 마지막으로 보여준 Chat ID를 저장해요
-	AddChatMessageToUI(Chat.SenderName, Chat.Message);
+	AddChatMessageToUI(Chat.SenderName, Chat.Message, Chat.Timestamp);
 	LastShowGlobalChatMessageID = Chat.MessageID;
+
+	// 채팅 추가 후
+	// 현재 GameState의 채팅 기록 개수와 입력창 있는 채팅 UI에서의 채팅 개수를 맞춰줘요
+	DestroyExpandedMessagesToGameStateHistory();
+}
+
+void UChatWidget::DestroyExpandedMessagesToGameStateHistory()
+{
+	if (false == ActionGameState.IsValid() || !VerticalBox_ExpandedMessages) return;
+
+	// GameState가 가진 모든 채팅 개수
+	const int32 AllChatCount = ActionGameState->GetGlobalChatHistroy().Num();
+
+	while (VerticalBox_ExpandedMessages->GetChildrenCount() > AllChatCount + 1) // 1은 VerticalBox에 든 아래 정렬을 위한 스페이서 개수
+	{
+		VerticalBox_ExpandedMessages->RemoveChildAt(1); // 0은 스페이서, 1부터 삭제해야 함
+	}
 }

@@ -23,6 +23,9 @@ public:
 
 	UPROPERTY(BlueprintReadOnly)
 	FString Message; // 채팅 내용
+
+	UPROPERTY(BlueprintReadOnly)
+	FString Timestamp; // 서버에서 채팅을 받은 시각 / 시 : 분 : 초
 };
 
 // 전체 채팅 기록 모아둘 곳

@@ -33,6 +33,7 @@ void AActionGameState::AddGlobalChatMessage(const APlayerState* SenderPlayerStat
 	NewMsg.MessageID = NextGlobalChatMessageID++; // ID
 	NewMsg.SenderName = SenderPlayerState->GetPlayerName(); // PlayerName
 	NewMsg.Message = ValidMsg;
+	NewMsg.Timestamp = FDateTime::Now().ToString(TEXT("[%H:%M:%S]"));
 
 	GlobalChatHistory.Add(NewMsg); // 서버는 최신 채팅을 들고 있게 됨
 
@@ -46,10 +47,6 @@ void AActionGameState::AddGlobalChatMessage(const APlayerState* SenderPlayerStat
 	BroadcastNewGlobalChatMessages();
 
 	ForceNetUpdate();
-
-	UE_LOG(LogTemp, Log,
-		TEXT("[Chat][GameState][Server] Id=%d, Sender=%s, Message=%s, HistoryCount=%d"),
-		NewMsg.MessageID, *NewMsg.SenderName, *NewMsg.Message, GlobalChatHistory.Num());
 }
 
 void AActionGameState::OnRep_GlobalChatHistory()

@@ -13,13 +13,14 @@ void UChatMessageWidget::NativeDestruct()
 	Super::NativeDestruct();
 }
 
-void UChatMessageWidget::SetMessage(const FString& SenderName, const FString& Message)
+void UChatMessageWidget::SetMessage(const FString& SenderName, const FString& Message, const FString& Timestamp)
 {
-	if (nullptr == TextBlock_SenderName || nullptr == TextBlock_Message)
+	if (nullptr == TextBlock_SenderName || nullptr == TextBlock_Message || nullptr == TextBlock_Timestamp)
 		return;
 
 	TextBlock_SenderName->SetText(FText::FromString(SenderName));
 	TextBlock_Message->SetText(FText::FromString(Message));
+	TextBlock_Timestamp->SetText(FText::FromString(Timestamp));
 }
 
 void UChatMessageWidget::StartAutoRemoveTimer(float DisplayDuration)

@@ -20,7 +20,7 @@ public:
 public:
 	// 채팅 한 줄에 표시할 플레이어 이름과 메시지를 세팅하는 함수
 	UFUNCTION(BlueprintCallable)
-	void SetMessage(const FString& SenderName, const FString& Message);
+	void SetMessage(const FString& SenderName, const FString& Message, const FString& Timestamp);
 
 	// 일정 시간이 지나면 부모 메시지 목록 위젯에서 본인을 제거 (기본 채팅에서만)
 	void StartAutoRemoveTimer(float DisplayDuration);
@@ -34,6 +34,9 @@ protected:
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<class UTextBlock> TextBlock_Message;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<class UTextBlock> TextBlock_Timestamp;
 
 private:
 	FTimerHandle AutoRemoveTimerHandle; // 일정 시간이 지나면 채팅을 자동 제거하는 타이머
