@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "Item/PlaceableItem/Campfire/CampfireTypes.h"
+#include "CommonHeader/CampfireTypes.h"
 #include "CampfireWidget.generated.h"
 
 class ACampfire;

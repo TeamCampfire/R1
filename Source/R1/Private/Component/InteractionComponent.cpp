@@ -6,7 +6,7 @@
 #include "GameFramework/Pawn.h"
 #include "Camera/CameraComponent.h"
 #include "Components/PrimitiveComponent.h"
-#include "Item/PlaceableItem/Campfire/Campfire.h"
+#include "Item/PlaceableItem/Campfire.h"
 
 // Sets default values for this component's properties
 UInteractionComponent::UInteractionComponent()

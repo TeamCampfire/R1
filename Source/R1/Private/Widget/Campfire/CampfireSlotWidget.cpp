@@ -1,7 +1,7 @@
 ﻿#include "Widget/Campfire/CampfireSlotWidget.h"
 
-#include "Item/PlaceableItem/Campfire/Campfire.h"
-#include "Item/PlaceableItem/Campfire/CampfireComponent.h"
+#include "Item/PlaceableItem/Campfire.h"
+#include "Component/CampfireComponent.h"
 #include "Widget/Inventory/InventoryDragDropOperation.h"
 #include "Components/Border.h"
 #include "Components/Image.h"

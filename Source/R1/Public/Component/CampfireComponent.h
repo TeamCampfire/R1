@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "Item/PlaceableItem/Campfire/CampfireTypes.h"
+#include "CommonHeader/CampfireTypes.h"
 #include "Item/ItemInstance.h"
 #include "Component/InventoryComponent.h"
 #include "CampfireComponent.generated.h"

@@ -18,7 +18,7 @@
 #include "Component/StatComponent.h"
 #include "Widget/BuildingSystem/BuildingDurabilityWidget.h"
 #include "Widget/Campfire/CampfireWidget.h"
-#include "Item/PlaceableItem/Campfire/Campfire.h"
+#include "Item/PlaceableItem/Campfire.h"
 #include "Component/InteractionComponent.h"
 #include "GameFramework/Pawn.h"
 

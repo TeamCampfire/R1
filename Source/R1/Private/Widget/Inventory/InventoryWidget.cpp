@@ -10,7 +10,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Blueprint/UserWidget.h"
 #include "Character/ActionPlayerController.h"
-#include "Item/PlaceableItem/Campfire/Campfire.h"
+#include "Item/PlaceableItem/Campfire.h"
 #include "Framework/MainHUD.h"
 #include "Widget/MainHUDWidget.h"
 

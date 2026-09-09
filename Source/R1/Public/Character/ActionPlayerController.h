@@ -10,7 +10,7 @@
 
 #include "Interface/RespawnPointInterface.h"
 #include "Component/InventoryComponent.h"
-#include "Item/PlaceableItem/Campfire/CampfireTypes.h"
+#include "CommonHeader/CampfireTypes.h"
 #include "ActionPlayerController.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPossessedCharChange);

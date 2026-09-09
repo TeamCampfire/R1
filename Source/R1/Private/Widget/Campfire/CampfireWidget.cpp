@@ -1,7 +1,7 @@
 ﻿#include "Widget/Campfire/CampfireWidget.h"
 
-#include "Item/PlaceableItem/Campfire/Campfire.h"
-#include "Item/PlaceableItem/Campfire/CampfireComponent.h"
+#include "Item/PlaceableItem/Campfire.h"
+#include "Component/CampfireComponent.h"
 #include "Character/ActionPlayerController.h"
 #include "Widget/Campfire/CampfireSlotWidget.h"
 #include "Components/ProgressBar.h"

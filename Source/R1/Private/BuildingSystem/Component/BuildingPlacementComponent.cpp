@@ -14,7 +14,7 @@
 #include "Character/ActionCharacter.h"
 #include "Data/Item/PlaceableItemData.h"
 #include "Item/PlaceableItemBase.h"
-#include "Item/PlaceableItem/Campfire/Campfire.h"
+#include "Item/PlaceableItem/Campfire.h"
 
 UBuildingPlacementComponent::UBuildingPlacementComponent()
 {

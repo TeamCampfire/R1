@@ -9,7 +9,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/DragDropOperation.h"
 #include "Component/InventoryComponent.h"
-#include "Item/PlaceableItem/Campfire/CampfireTypes.h"
+#include "CommonHeader/CampfireTypes.h"
 #include "InventoryDragDropOperation.generated.h"
 
 class UInventorySlotWidget;

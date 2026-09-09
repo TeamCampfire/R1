@@ -1,7 +1,7 @@
-﻿#include "Item/PlaceableItem/Campfire/Campfire.h"
+﻿#include "Item/PlaceableItem/Campfire.h"
 
 #include "Data/Item/PlaceableItemData.h"
-#include "Item/PlaceableItem/Campfire/CampfireComponent.h"
+#include "Component/CampfireComponent.h"
 #include "Character/ActionPlayerController.h"
 #include "Components/AudioComponent.h"
 #include "GameFramework/Pawn.h"

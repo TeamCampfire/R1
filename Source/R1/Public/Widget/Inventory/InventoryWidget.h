@@ -9,7 +9,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Component/InventoryComponent.h"
-#include "Item/PlaceableItem/Campfire/CampfireTypes.h"
+#include "CommonHeader/CampfireTypes.h"
 #include "InventoryWidget.generated.h"
 
 class UInventoryComponent;
