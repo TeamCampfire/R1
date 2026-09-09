@@ -20,6 +20,7 @@ protected:
 	virtual void NativeOnInitialized() override;
 	virtual FReply NativeOnPreviewMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 	virtual void NativeDestruct() override;
+	virtual void NativePreConstruct() override;
 
 public:
 	// 기본 상태의 UI로 변경하는 함수
@@ -49,6 +50,9 @@ private:
 	// 채팅 델리게이트 발동되었을 때 실행할 함수
 	void HandleGlobalChatMessageReceived(const struct FGlobalChatMessage& Chat);
 
+	// 입력창 있는 UI의 메시지 개수를 현재 GameState가 보관중인 채팅 기록의 개수와 맞추는 함수
+	void DestroyExpandedMessagesToGameStateHistory();
+
 protected:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<class UWidgetSwitcher> WidgetSwitcher_ChatMode; // 기본채팅창, 입력채팅창 위젯을 갈아끼울 수 있는 위젯스위처
@@ -70,13 +74,19 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TSubclassOf<class UChatMessageWidget> ChatMessageWidgetClass; // 채팅 한줄짜리 위젯 클래스 -> 메시지 추가될 때 마다 만듦
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Chat Count")
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<class USizeBox> SizeBox_ExpandedMessageViewport; // 입력 채팅 UI에서 채팅 기록 보이는 영역
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Chat")
 	int32 MaxCompactMessageCount = 3; // 기본 채팅창에 동시에 표시할 최대 메시지 개수
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Chat Count")
-	int32 MaxExpandedMessageCount = 20; // 열린 채팅창에서 표시할 최대 메시지 개수
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Chat")
+	int32 ExpandedVisibleLineCount = 10; // 입력 채팅 UI에서 한 화면에 보여줄 채팅 개수
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Chat")
+	float SingleChatLineHeight = 24.0f; // WBP_ChatMessage 위젯의 한 줄 높이
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Chat")
 	float CompactMessageDisplayDuration = 8.0f; // 기본 채팅창에서 메시지가 유지되는 시간
 
 	UPROPERTY(meta = (BindWidget))
