@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.30
+﻿/// 최초작성 : 2026.08.30
 /// 작 성 자 : 주 형 진
 
 // Fill out your copyright notice in the Description page of Project Settings.
@@ -68,9 +68,6 @@ public:
 	// 캐릭터 상태 제어 질의
 	UFUNCTION(BlueprintPure, Category = "HeldItem|State")
 	bool BlocksCharacterMovement() const;
-
-	UFUNCTION(BlueprintPure, Category = "HeldItem|State")
-	bool BlocksDefaultAttack() const;
 
 	// 현재 손에 든 아이템 액터 반환
 	UFUNCTION(BlueprintPure, Category = "HeldItem")

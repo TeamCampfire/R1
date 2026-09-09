@@ -54,12 +54,13 @@ public:
 	// 도구 장착/해제 오버라이드
 	virtual void OnEquipped(AActionCharacter* InCharacter) override;
 	virtual void OnUnequipped() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	// 도구 공통 액션 오버라이드
 	virtual void OnPrimaryActionStarted() override;
 	virtual void OnPrimaryActionCompleted() override;
-	virtual void OnSecondaryActionStarted() override { Input_StartAim(); }
-	virtual void OnSecondaryActionCompleted() override { Input_StopAim(); }
+	virtual void OnSecondaryActionStarted() override { StartAim(); }
+	virtual void OnSecondaryActionCompleted() override { StopAim(); }
 	virtual void OnCancelAction() override { Input_Cancel(); }
 
 	// 캐릭터 이동 입력 중계 (낚시 중 A/D 저항, S 릴 감기)
@@ -68,17 +69,17 @@ public:
 	virtual void SetupInputComponent(class UEnhancedInputComponent* PlayerEIC) override;
 
 	virtual bool BlocksCharacterMovement() const override { return IsFishingActive() || IsFinishCooldown(); }
-	virtual bool BlocksDefaultAttack() const override { return IsFishingActive() || IsFinishCooldown() || (CurrentState != EFishingState::Idle); }
+
 
 	// 찌가 수면에 닿았을 때 찌 액터가 호출
 	void OnBobberLandedInWater();
 
 	// ---- 입력 핸들러 (캐릭터 또는 입력 컴포넌트에서 호출) ----
 	UFUNCTION(BlueprintCallable, Category = "Fishing|Input")
-	void Input_StartAim();
+	void StartAim();
 
 	UFUNCTION(BlueprintCallable, Category = "Fishing|Input")
-	void Input_StopAim();
+	void StopAim();
 
 	UFUNCTION(BlueprintCallable, Category = "Fishing|Input")
 	void Input_CastOrHook();
@@ -102,11 +103,31 @@ public:
 	void Input_Cancel();
 
 	// ---- 게터 ----
+	//BlueprintPure는 실행 핀 없이 값을 가져올 수 있다.
+	UFUNCTION(BlueprintPure, Category = "Fishing|State")
 	FORCEINLINE EFishingState GetFishingState() const { return CurrentState; }
+
+	UFUNCTION(BlueprintPure, Category = "Fishing|State")
 	FORCEINLINE float GetTensionPercent() const { return FMath::Clamp(CurrentTension / 100.0f, 0.0f, 1.0f); }
+
+	UFUNCTION(BlueprintPure, Category = "Fishing|State")
 	FORCEINLINE float GetRemainingDistance() const { return CurrentDistance; }
+
+	UFUNCTION(BlueprintPure, Category = "Fishing|State")
 	FORCEINLINE bool IsFishingActive() const { return bIsFishingActive; }
+
+	UFUNCTION(BlueprintPure, Category = "Fishing|State")
 	FORCEINLINE bool IsFinishCooldown() const { return bIsFinishCooldown; }
+
+	UFUNCTION(BlueprintPure, Category = "Fishing|Animation")
+	FORCEINLINE float GetPlayerPullInput() const { return AnimPullInput; }
+
+	// 감쇄되지 않은 순수 A/D 플레이어 저항 입력값 (-1.0 ~ +1.0)
+	UFUNCTION(BlueprintPure, Category = "Fishing|Animation")
+	FORCEINLINE float GetRawPlayerPullInput() const { return PlayerPullInput; }
+
+	UFUNCTION(BlueprintPure, Category = "Fishing|Animation")
+	FORCEINLINE bool IsReelingInput() const { return bIsReelingInput || bIsReelingByLMB; }
 
 	// 낚싯대 끝 위치 반환 (소켓이 없어도 안전)
 	FVector GetRodTipLocation() const;
@@ -116,6 +137,9 @@ protected:
 
 	// 캐스팅 궤적 연산 및 프리뷰
 	void UpdateCastingTrajectory(float DeltaTime);
+
+	// 물리 포물선 초기 발사 속도 및 비행 시간 정밀 계산
+	bool CalculateCastVelocity(const FVector& StartPos, const FVector& TargetPos, FVector& OutVelocity, float& OutFlightTime) const;
 
 	// 미니게임 메인 틱 (장력 및 거리 연산)
 	void UpdateMinigame(float DeltaTime);
@@ -129,9 +153,23 @@ protected:
 	// 낚시 종료 처리 (성공/실패)
 	void FinishFishing(bool bSuccess);
 
+	// 낚시 상태 전환 및 서버 동기화
+	void SetFishingState(EFishingState NewState);
+
 	// 서버 권한 보상 지급 Server RPC
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_FinishFishing(bool bSuccess);
+
+	// 서버 상태 동기화 Server RPC
+	UFUNCTION(Server, Reliable)
+	void Server_SetFishingState(EFishingState NewState);
+
+	// 미니게임 입력 서버 동기화 (애니메이션 동기화용)
+	UFUNCTION(Server, Reliable)
+	void Server_SetPull(float PullAxis);
+
+	UFUNCTION(Server, Reliable)
+	void Server_SetReeling(bool bReeling);
 
 	// 모든 낚시 상태 및 스폰된 액터 초기화
 	void ResetFishing();
@@ -142,9 +180,6 @@ protected:
 	void PopFishingInputContext();
 
 protected:
-	// 낚싯대 외형 메시
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UStaticMeshComponent> RodMesh;
 
 	// 낚싯대 끝 ➔ 찌를 잇는 낚싯줄 케이블
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -168,9 +203,6 @@ protected:
 
 	// 낚시 전용 입력 액션들 (낚싯대 자체 소유)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fishing|Input")
-	TObjectPtr<UInputAction> IA_Fishing_Aim;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fishing|Input")
 	TObjectPtr<UInputAction> IA_Fishing_Cast;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fishing|Input")
@@ -187,7 +219,10 @@ protected:
 
 	// ---- 캐스팅 파라미터 ----
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Casting")
-	float FixedCastDistance = 750.0f; // 고정 캐스팅 거리 (7.5m)
+	float MaxCastDistance = 2000.0f; // 최대 캐스팅 가능 거리 (20m)
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Casting")
+	float MinCastDistance = 200.0f;  // 최소 캐스팅 거리 (2m)
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Casting")
 	float MinCatchDistance = 200.0f;  // 플레이어 앞 찌 최소 접근 거리 한계 (2.0m 도달 시 성공)
@@ -199,7 +234,7 @@ protected:
 	float MaxCastPower = 2500.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fishing|Casting")
-	FName RodTipSocketName = TEXT("RodTipSocket");
+	FName RodTipSocketName = TEXT("FishRod_End");
 
 	// 소켓이 없거나 미세조정이 필요할 때 적용할 로컬 오프셋
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Casting")
@@ -208,40 +243,53 @@ protected:
 	// 낚싯대 끝점 로컬 오프셋 반환
 	FVector GetLocalRodTipOffset() const;
 
-	// ---- 미니게임 파라미터 (Rust 스타일 손맛 밸런스) ----
-	// 릴 감는 속도 (m/s)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Minigame")
-	float ReelSpeed = 1.6f;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	// 물고기가 끌고 도망가는 속도 (m/s)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Minigame")
-	float FishPullSpeed = 1.0f;
+	UFUNCTION()
+	void OnRep_CurrentState(EFishingState NewState);
 
-	// 올바른 저항 시 릴링 장력 증가율 (초당)
+	// ---- 미니게임 파라미터 (여유롭고 손맛 위주의 캐주얼 밸런스) ----
+	// 릴 감는 속도 (m/s): 제압 성공 시 시원하게 당겨지는 속도
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Minigame")
-	float TensionGainCorrect = 12.0f;
+	float ReelSpeed = 2.4f;
 
-	// 잘못된 저항(같은 방향) 시 릴링 장력 증가율 (초당)
+	// 물고기가 끌고 도망가는 속도 (m/s): A/D 저항이 없을 때 물고기가 줄을 끌고 나가는 속도
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Minigame")
-	float TensionGainWrong = 35.0f;
+	float FishPullSpeed = 0.8f;
 
-	// 릴을 안 감을 때 장력 자연 감소 속도 (초당)
+	// 올바른 저항(반대 방향 A/D) 시 릴링 장력 증가율 (초당 6%): 안정적으로 릴링 가능
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Minigame")
-	float TensionDecayRate = 16.0f;
+	float TensionGainCorrect = 6.0f;
+
+	// A/D 제압 없이 S만 누르거나 잘못된 방향일 때 릴링 장력 증가율 (초당 42%): 2초 만에 100% 도달
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Minigame")
+	float TensionGainWrong = 42.0f;
+
+	// 릴을 안 감을 때 장력 자연 감소 속도 (초당 35%): 손 떼면 즉시 안정화
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Minigame")
+	float TensionDecayRate = 35.0f;
 
 	// 입질 대기 최소/최대 시간 (초)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fishing|Minigame")
-	float MinBiteWaitTime = 3.0f;
+	float MinBiteWaitTime = 2.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fishing|Minigame")
-	float MaxBiteWaitTime = 7.0f;
+	float MaxBiteWaitTime = 5.0f;
 
-	// 입질 후 챔질 가능 유효 시간 (초)
+	// 입질 후 챔질 가능 유효 시간 (초): 2.0초 -> 4.5초로 대폭 늘려 여유 부여
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fishing|Minigame")
-	float BiteReactionWindow = 2.0f;
+	float BiteReactionWindow = 4.5f;
+
+	// 릴링(감기) 시 좌우 기울기(저항) 감쇄 배율 (0.0: 완전 정면, 0.25: 25%만 약하게 기울임, 1.0: 감쇄 없음)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Animation")
+	float ReelingTiltDamping = 0.25f;
+
+	// 좌우 기울기 전환 보간 속도
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fishing|Animation")
+	float TiltInterpSpeed = 8.0f;
 
 protected:
-	UPROPERTY(BlueprintReadOnly, Category = "Fishing|Runtime")
+	UPROPERTY(ReplicatedUsing = OnRep_CurrentState, BlueprintReadOnly, Category = "Fishing|Runtime")
 	EFishingState CurrentState = EFishingState::Idle;
 
 	UPROPERTY()
@@ -253,10 +301,19 @@ protected:
 	float FishEscapeDirection = 1.0f;  // -1.0(좌) ~ +1.0(우)
 	float FishTurnTimer = 0.0f;        // 물고기 방향 전환 타이머
 	float PlayerPullInput = 0.0f;      // 플레이어 A(-1.0) / D(+1.0)
+
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Fishing|Runtime")
+	float AnimPullInput = 0.0f;        // 애니메이션용 보간 및 감쇄된 좌우 기울기 (-1.0 ~ +1.0)
+
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Fishing|Runtime")
 	bool bIsReelingInput = false;      // S키 / LMB로 릴 감는 중인지 여부
+
 	bool bIsReelingByLMB = false;      // 마우스 좌클릭(LMB)으로 릴 감는 중인지 여부
 	bool bInputInitialized = false;    // 입력 초기화 완료 여부
+
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Fishing|Runtime")
 	bool bIsFishingActive = false;     // 낚시 세션 진행 중 (던진 후 락)
+
 	bool bIsFinishCooldown = false;    // 낚시 종료 직후 완충 시간 (0.6초 이동 차단)
 
 	// 타이머 핸들

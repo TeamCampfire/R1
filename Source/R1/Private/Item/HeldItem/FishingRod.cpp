@@ -4,6 +4,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Item/HeldItem/FishingRod.h"
+#include "R1/R1.h"
 #include "Components/StaticMeshComponent.h"
 #include "CableComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -21,31 +22,22 @@
 #include "InputMappingContext.h"
 #include "InputAction.h"
 #include "Data/Item/ItemDataBase.h"
+#include "Net/UnrealNetwork.h"
+
 
 AFishingRod::AFishingRod()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	// 1. 낚싯대 메시 (기본 낚싯대 형태 실린더)
-	RodMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RodMesh"));
-	RootComponent = RodMesh;
-	RodMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMeshFinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
-	if (CylinderMeshFinder.Succeeded())
-	{
-		RodMesh->SetStaticMesh(CylinderMeshFinder.Object);
-		RodMesh->SetRelativeScale3D(FVector(0.02f, 0.02f, 1.2f)); // 1.2m 얇은 낚싯대
-		RodMesh->SetRelativeRotation(FRotator(45.f, 0.f, 0.f));
-	}
-
-	// 2. 낚싯줄 케이블
+	// 2. 낚싯줄 케이블 (중간 꺾임/처짐이 없는 팽팽한 1세그먼트 직선 낚싯줄)
 	FishingLineCable = CreateDefaultSubobject<UCableComponent>(TEXT("FishingLineCable"));
 	FishingLineCable->SetupAttachment(RootComponent, RodTipSocketName);
-	FishingLineCable->CableWidth = 1.2f;
-	FishingLineCable->NumSegments = 8;
-	FishingLineCable->SolverIterations = 4;
-	FishingLineCable->bEnableStiffness = false;
+	FishingLineCable->CableWidth = 0.6f;
+	FishingLineCable->NumSegments = 1; // 1개 세그먼트: 로드 끝 ~ 찌 직결 팽팽한 직선
+	FishingLineCable->SolverIterations = 1;
+	FishingLineCable->bEnableStiffness = true;
+	FishingLineCable->CableGravityScale = 0.0f; // 중력 처짐/출렁임 완전 제거
+	FishingLineCable->EndLocation = FVector(0.f, 0.f, 5.0f); // 찌 상단에 정확히 연결
 	FishingLineCable->SetVisibility(false);
 
 	CurrentState = EFishingState::Idle;
@@ -76,9 +68,33 @@ void AFishingRod::OnEquipped(AActionCharacter* InCharacter)
 
 void AFishingRod::OnUnequipped()
 {
+	if (bIsFishingActive || CurrentState != EFishingState::Idle)
+	{
+		Server_FinishFishing(false);
+	}
 	ResetFishing();
 	PopFishingInputContext();
 	Super::OnUnequipped();
+}
+
+void AFishingRod::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(BiteTimerHandle);
+		World->GetTimerManager().ClearTimer(ReactionTimerHandle);
+		World->GetTimerManager().ClearTimer(FinishCooldownTimerHandle);
+	}
+
+	if (SpawnedBobber && IsValid(SpawnedBobber))
+	{
+		SpawnedBobber->Destroy();
+		SpawnedBobber = nullptr;
+	}
+
+	PopFishingInputContext();
+
+	Super::EndPlay(EndPlayReason);
 }
 
 void AFishingRod::SetupInputComponent(UEnhancedInputComponent* PlayerEIC)
@@ -87,7 +103,7 @@ void AFishingRod::SetupInputComponent(UEnhancedInputComponent* PlayerEIC)
 	{
 		BindRodInputs(PlayerEIC);
 		bInputInitialized = true;
-		UE_LOG(LogTemp, Display, TEXT("[낚싯대] SetupInputComponent: Enhanced Input 바인딩이 성공적으로 완료되었습니다."));
+		//UE_LOG(LogTemp, Display, TEXT("[낚싯대] SetupInputComponent: Enhanced Input 바인딩이 성공적으로 완료되었습니다."));
 	}
 }
 
@@ -157,12 +173,6 @@ void AFishingRod::OnMoveInput(const FVector2D& MoveValue)
 void AFishingRod::BindRodInputs(UEnhancedInputComponent* EIC)
 {
 	if (!EIC) return;
-
-	if (IA_Fishing_Aim)
-	{
-		EIC->BindAction(IA_Fishing_Aim, ETriggerEvent::Started, this, &AFishingRod::Input_StartAim);
-		EIC->BindAction(IA_Fishing_Aim, ETriggerEvent::Completed, this, &AFishingRod::Input_StopAim);
-	}
 
 	if (IA_Fishing_Cast)
 	{
@@ -262,13 +272,64 @@ FVector AFishingRod::GetLocalRodTipOffset() const
 		return CustomRodTipOffset;
 	}
 
-	if (RodMesh && RodMesh->DoesSocketExist(RodTipSocketName))
+	if (ItemMesh1P && ItemMesh1P->DoesSocketExist(RodTipSocketName))
 	{
-		return RodMesh->GetSocketTransform(RodTipSocketName, RTS_Actor).GetLocation();
+		return ItemMesh1P->GetSocketTransform(RodTipSocketName, RTS_Actor).GetLocation();
 	}
 
 	// 기본 실린더 메시 상단 (Z = +60cm, 앞쪽으로 30cm 오프셋)
 	return FVector(30.f, 0.f, 60.f);
+}
+
+void AFishingRod::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AFishingRod, CurrentState);
+	DOREPLIFETIME(AFishingRod, bIsFishingActive);
+	DOREPLIFETIME_CONDITION(AFishingRod, AnimPullInput, COND_SkipOwner);
+	DOREPLIFETIME_CONDITION(AFishingRod, bIsReelingInput, COND_SkipOwner);
+}
+
+void AFishingRod::SetFishingState(EFishingState NewState)
+{
+	CurrentState = NewState;
+	bIsFishingActive = (NewState == EFishingState::Casting ||
+	                    NewState == EFishingState::WaitingBite ||
+	                    NewState == EFishingState::Biting ||
+	                    NewState == EFishingState::Minigame);
+
+	if (!HasAuthority())
+	{
+		Server_SetFishingState(NewState);
+	}
+}
+
+void AFishingRod::Server_SetFishingState_Implementation(EFishingState NewState)
+{
+	CurrentState = NewState;
+	bIsFishingActive = (NewState == EFishingState::Casting ||
+	                    NewState == EFishingState::WaitingBite ||
+	                    NewState == EFishingState::Biting ||
+	                    NewState == EFishingState::Minigame);
+}
+
+void AFishingRod::Server_SetPull_Implementation(float PullAxis)
+{
+	PlayerPullInput = FMath::Clamp(PullAxis, -1.0f, 1.0f);
+}
+
+void AFishingRod::Server_SetReeling_Implementation(bool bReeling)
+{
+	bIsReelingInput = bReeling;
+}
+
+void AFishingRod::OnRep_CurrentState(EFishingState NewState)
+{
+	bIsFishingActive = (NewState == EFishingState::Casting ||
+	                    NewState == EFishingState::WaitingBite ||
+	                    NewState == EFishingState::Biting ||
+	                    NewState == EFishingState::Minigame);
 }
 
 FVector AFishingRod::GetRodTipLocation() const
@@ -278,9 +339,9 @@ FVector AFishingRod::GetRodTipLocation() const
 		return GetActorTransform().TransformPosition(CustomRodTipOffset);
 	}
 
-	if (RodMesh && RodMesh->DoesSocketExist(RodTipSocketName))
+	if (ItemMesh1P && ItemMesh1P->DoesSocketExist(RodTipSocketName))
 	{
-		return RodMesh->GetSocketLocation(RodTipSocketName);
+		return ItemMesh1P->GetSocketLocation(RodTipSocketName);
 	}
 
 	return GetActorTransform().TransformPosition(FVector(30.f, 0.f, 60.f));
@@ -289,6 +350,11 @@ FVector AFishingRod::GetRodTipLocation() const
 void AFishingRod::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	// 릴링 여부에 따른 애니메이션용 좌우 기울기(Pull) 감쇄 및 부드러운 보간
+	// (릴을 감는 중에는 ReelingTiltDamping(기본 25%) 비율로 감쇄하여 낚싯대 흔들림 방지 및 자연스러운 자세 유지)
+	const float TargetAnimPull = IsReelingInput() ? (PlayerPullInput * ReelingTiltDamping) : PlayerPullInput;
+	AnimPullInput = FMath::FInterpTo(AnimPullInput, TargetAnimPull, DeltaTime, TiltInterpSpeed);
 
 	// 로컬에서 직접 조종하는 내 캐릭터가 아니라면 로컬 렌더링/미니게임 연산 건너뛰기 (멀티플레이 격리)
 	if (!OwnerCharacter || !OwnerCharacter->IsLocallyControlled())
@@ -316,7 +382,16 @@ void AFishingRod::Tick(float DeltaTime)
 	// 3. 낚싯줄 케이블 끝점 실시간 동기화
 	if (FishingLineCable && FishingLineCable->IsVisible())
 	{
-		FishingLineCable->SetWorldLocation(GetRodTipLocation());
+		const FVector RodTipLoc = GetRodTipLocation();
+		FishingLineCable->SetWorldLocation(RodTipLoc);
+
+		if (SpawnedBobber)
+		{
+			const FVector BobberLoc = SpawnedBobber->GetActorLocation();
+			const float LineDist = FVector::Dist(RodTipLoc, BobberLoc);
+			FishingLineCable->CableLength = LineDist;
+			FishingLineCable->EndLocation = FVector(0.f, 0.f, 5.0f);
+		}
 	}
 }
 
@@ -324,29 +399,29 @@ void AFishingRod::Tick(float DeltaTime)
 // 입력 핸들러
 // -------------------------------------------------------------
 
-void AFishingRod::Input_StartAim()
+void AFishingRod::StartAim()
 {
 	// 낚시가 이미 진행 중이거나 쿨다운 중이면 조준 불가
 	if (bIsFishingActive || bIsFinishCooldown) return;
 
 	if (CurrentState == EFishingState::Idle)
 	{
-		CurrentState = EFishingState::Aiming;
+		SetFishingState(EFishingState::Aiming);
 		PushFishingInputContext();
 
-		if (GEngine)
+		if (GEngine && OwnerCharacter && OwnerCharacter->IsLocallyControlled())
 		{
 			GEngine->AddOnScreenDebugMessage(1, 2.0f, FColor::Cyan, TEXT("[낚시] 우클릭 조준 시작: 착수 지점을 확인하세요. (좌클릭으로 투척)"));
 		}
 	}
 }
 
-void AFishingRod::Input_StopAim()
+void AFishingRod::StopAim()
 {
 	// 캐스팅 전 순수 조준 상태에서만 우클릭을 뗐을 때 조준 취소 및 IMC 해제
 	if (CurrentState == EFishingState::Aiming && !bIsFishingActive)
 	{
-		CurrentState = EFishingState::Idle;
+		SetFishingState(EFishingState::Idle);
 		PopFishingInputContext();
 	}
 }
@@ -371,22 +446,10 @@ void AFishingRod::Input_CastOrHook()
 		const FVector TipLoc = GetRodTipLocation();
 		const FVector TargetLoc = PredictedLandingLocation;
 
-		// 물리적 포물선 초기 발사 속도 벡터 계산 (중력 -980 적용)
+		// 물리적 포물선 초기 발사 속도 벡터 정밀 계산 (프리뷰 궤적과 100% 일치)
 		FVector LaunchVelocity = FVector::ZeroVector;
-		const float GravityZ = FMath::Abs(GetWorld()->GetGravityZ());
-		const bool bHaveAim = UGameplayStatics::SuggestProjectileVelocity_CustomArc(
-			this,
-			LaunchVelocity,
-			TipLoc,
-			TargetLoc,
-			GravityZ,
-			0.5f // 50% 포물선 아크
-		);
-
-		if (!bHaveAim)
-		{
-			LaunchVelocity = (TargetLoc - TipLoc).GetSafeNormal() * 1500.0f + FVector(0.f, 0.f, 400.f);
-		}
+		float FlightTime = 0.0f;
+		CalculateCastVelocity(TipLoc, TargetLoc, LaunchVelocity, FlightTime);
 
 		FActorSpawnParameters SpawnParams;
 		SpawnParams.Owner = this;
@@ -397,15 +460,17 @@ void AFishingRod::Input_CastOrHook()
 		if (SpawnedBobber)
 		{
 			SpawnedBobber->SetOwnerRod(this);
-			SpawnedBobber->LaunchBobber(LaunchVelocity);
+			SpawnedBobber->SetExpectedWaterZ(TargetLoc.Z);
+			SpawnedBobber->LaunchBobber(LaunchVelocity, TargetLoc.Z);
 
-			// 낚싯줄 연결 및 끝점 위치 동기화
-			FishingLineCable->SetRelativeLocation(GetLocalRodTipOffset());
+			// 낚싯줄 연결 및 끝점 위치 정밀 동기화
+			FishingLineCable->EndLocation = FVector(0.f, 0.f, 5.0f);
+			FishingLineCable->CableLength = 20.0f;
+			FishingLineCable->SetWorldLocation(TipLoc);
+			FishingLineCable->SetAttachEndToComponent(SpawnedBobber->GetRootComponent());
 			FishingLineCable->SetVisibility(true);
-			FishingLineCable->SetAttachEndTo(SpawnedBobber, NAME_None, NAME_None);
 
-			CurrentState = EFishingState::Casting;
-			bIsFishingActive = true; // ★ 낚시 세션 락 활성화
+			SetFishingState(EFishingState::Casting);
 			PushFishingInputContext(); // ★ 캐스팅 중에도 IMC_Fishing 유지
 
 			if (GEngine)
@@ -447,7 +512,7 @@ void AFishingRod::Input_CastOrHook()
 		bIsReelingInput = false;
 		bIsReelingByLMB = false;
 
-		CurrentState = EFishingState::Minigame;
+		SetFishingState(EFishingState::Minigame);
 		PushFishingInputContext(); // ★ 미니게임 시작 시 IMC_Fishing 확실하게 유지
 
 		if (GEngine)
@@ -466,12 +531,27 @@ void AFishingRod::Input_CastOrHook()
 
 void AFishingRod::Input_SetReeling(bool bReeling)
 {
-	bIsReelingInput = bReeling;
+	if (bIsReelingInput != bReeling)
+	{
+		bIsReelingInput = bReeling;
+		if (!HasAuthority())
+		{
+			Server_SetReeling(bIsReelingInput);
+		}
+	}
 }
 
 void AFishingRod::Input_SetPull(float PullAxis)
 {
-	PlayerPullInput = FMath::Clamp(PullAxis, -1.0f, 1.0f);
+	const float ClampedAxis = FMath::Clamp(PullAxis, -1.0f, 1.0f);
+	if (!FMath::IsNearlyEqual(PlayerPullInput, ClampedAxis, 0.01f))
+	{
+		PlayerPullInput = ClampedAxis;
+		if (!HasAuthority())
+		{
+			Server_SetPull(PlayerPullInput);
+		}
+	}
 }
 
 void AFishingRod::Input_Cancel()
@@ -490,7 +570,14 @@ void AFishingRod::OnBobberLandedInWater()
 {
 	if (CurrentState != EFishingState::Casting) return;
 
-	CurrentState = EFishingState::WaitingBite;
+	SetFishingState(EFishingState::WaitingBite);
+
+	if (FishingLineCable && SpawnedBobber)
+	{
+		const float LineDist = FVector::Dist(GetRodTipLocation(), SpawnedBobber->GetActorLocation());
+		FishingLineCable->CableLength = LineDist * 1.005f;
+		FishingLineCable->EndLocation = FVector(0.f, 0.f, 5.0f);
+	}
 
 	// 랜덤 입질 대기 타이머 시작 (3 ~ 7초)
 	const float RandomWaitTime = FMath::RandRange(MinBiteWaitTime, MaxBiteWaitTime);
@@ -507,7 +594,7 @@ void AFishingRod::TriggerBite()
 {
 	if (CurrentState != EFishingState::WaitingBite) return;
 
-	CurrentState = EFishingState::Biting;
+	SetFishingState(EFishingState::Biting);
 
 	// 찌 첨벙 애니메이션 및 사운드 발동
 	if (SpawnedBobber)
@@ -542,129 +629,185 @@ void AFishingRod::OnBiteMissed()
 // 물리/렌더링/미니게임 핵심 연산
 // -------------------------------------------------------------
 
+bool AFishingRod::CalculateCastVelocity(const FVector& StartPos, const FVector& TargetPos, FVector& OutVelocity, float& OutFlightTime) const
+{
+	if (!GetWorld()) return false;
+
+	const float WorldGravityZ = GetWorld()->GetGravityZ();
+	const float AbsG = FMath::Max(FMath::Abs(WorldGravityZ), 100.0f);
+	const float Dist2D = FVector::Dist2D(StartPos, TargetPos);
+
+	// 거리 비례 자연스러운 포물선 정점 높이 설정 (1.2m ~ 4.0m)
+	const float PeakHeight = FMath::Clamp(Dist2D * 0.22f, 120.0f, 400.0f);
+	const float EffectivePeakZ = FMath::Max(StartPos.Z + PeakHeight, TargetPos.Z + 60.0f);
+
+	// 1. 발사점에서 정점까지 도달하는 수직 상승 속도 및 시간
+	const float RiseHeight = FMath::Max(EffectivePeakZ - StartPos.Z, 10.0f);
+	const float Vz = FMath::Sqrt(2.0f * AbsG * RiseHeight);
+	const float TimeUp = Vz / AbsG;
+
+	// 2. 정점에서 타겟 수면 높이까지 낙하하는 시간
+	const float DropHeight = FMath::Max(EffectivePeakZ - TargetPos.Z, 10.0f);
+	const float TimeDown = FMath::Sqrt(2.0f * DropHeight / AbsG);
+
+	OutFlightTime = FMath::Max(TimeUp + TimeDown, 0.1f);
+
+	// 3. 비행 시간 동안 정확히 타겟 (X, Y)에 도달하는 수평 속도
+	const float InvTime = 1.0f / OutFlightTime;
+	OutVelocity.X = (TargetPos.X - StartPos.X) * InvTime;
+	OutVelocity.Y = (TargetPos.Y - StartPos.Y) * InvTime;
+	OutVelocity.Z = Vz;
+
+	return true;
+}
+
 void AFishingRod::UpdateCastingTrajectory(float DeltaTime)
 {
 	if (!OwnerCharacter || !GetWorld()) return;
 
 	const FVector TipLoc = GetRodTipLocation();
-	FRotator ControlRot = OwnerCharacter->GetControlRotation();
+	FVector CamLoc = OwnerCharacter->GetActorLocation();
+	FRotator CamRot = OwnerCharacter->GetControlRotation();
 
 	if (APlayerController* PC = Cast<APlayerController>(OwnerCharacter->GetController()))
 	{
 		if (PC->PlayerCameraManager)
 		{
-			ControlRot = PC->PlayerCameraManager->GetCameraRotation();
+			CamLoc = PC->PlayerCameraManager->GetCameraLocation();
+			CamRot = PC->PlayerCameraManager->GetCameraRotation();
 		}
 	}
 
-	// 1. 고정 프리뷰 위치 (플레이어 전방 FixedCastDistance)
-	const FVector ForwardDir = ControlRot.Vector().GetSafeNormal2D();
-	const FVector TargetHorizontal = OwnerCharacter->GetActorLocation() + ForwardDir * FixedCastDistance;
+	const FVector CamForward = CamRot.Vector();
+	// 최대 캐스팅 거리보다 여유 있게 트레이스를 쏴서 먼 수면도 감지 후 "거리 초과"로 안내할 수 있게 함
+	const float TraceDistance = FMath::Max(MaxCastDistance * 1.5f, 3500.0f);
+	const FVector TraceStart = CamLoc;
+	const FVector TraceEnd = CamLoc + (CamForward * TraceDistance);
 
 	FCollisionQueryParams QueryParams;
 	QueryParams.AddIgnoredActor(this);
 	QueryParams.AddIgnoredActor(OwnerCharacter);
 	QueryParams.bTraceComplex = false;
 
-	bValidWaterHit = false;
-	FVector LandingPos = TargetHorizontal;
-
-	// 2. WaterBodyCollision의 Overlap(겹침) 검출 (WaterBody는 Overlap이므로 OverlapMultiByProfile 사용)
-	TArray<FOverlapResult> OverlapResults;
-	FCollisionShape CapsuleShape = FCollisionShape::MakeCapsule(40.0f, 250.0f);
-
-	GetWorld()->OverlapMultiByProfile(
-		OverlapResults,
-		TargetHorizontal,
-		FQuat::Identity,
-		FName(TEXT("WaterBodyCollision")),
-		CapsuleShape,
+	// 1. 화면 중앙에서 Water 채널(ECC_Water / ECC_GameTraceChannel3)로 트레이스 발사
+	FHitResult WaterHit;
+	const bool bHitWater = GetWorld()->LineTraceSingleByChannel(
+		WaterHit,
+		TraceStart,
+		TraceEnd,
+		ECC_Water,
 		QueryParams
 	);
 
-	for (const FOverlapResult& Overlap : OverlapResults)
+	// 2. 시야 차단 여부 검사용 가시성 트레이스
+	FHitResult VisHit;
+	const bool bHitVis = GetWorld()->LineTraceSingleByChannel(
+		VisHit,
+		TraceStart,
+		TraceEnd,
+		ECC_Visibility,
+		QueryParams
+	);
+
+	FVector LandingPos = FVector::ZeroVector;
+	FString DebugStateMessage;
+	FColor DebugMessageColor = FColor::White;
+
+	// 물(수면)에 맞았고, 전방에 지형이나 바위 등 가로막는 물체가 수면보다 앞에 있지 않은 경우
+	if (bHitWater && (!bHitVis || WaterHit.Distance <= VisHit.Distance + 10.0f))
 	{
-		if (Overlap.GetActor() && (Overlap.GetActor()->IsA(AWaterBody::StaticClass()) || Overlap.GetActor()->GetName().Contains(TEXT("Water"))))
+		LandingPos = WaterHit.ImpactPoint;
+
+		// AWaterBody인 경우 일정한 수면 높이(ConstantSurfaceZ) 보정 적용
+		if (AWaterBody* WB = Cast<AWaterBody>(WaterHit.GetActor()))
+		{
+			if (WB->GetWaterBodyComponent())
+			{
+				const float SurfaceZ = WB->GetWaterBodyComponent()->GetConstantSurfaceZ();
+				if (FMath::Abs(SurfaceZ - WaterHit.ImpactPoint.Z) < 50.0f)
+				{
+					LandingPos.Z = SurfaceZ;
+				}
+			}
+		}
+
+		// 수평 캐스팅 거리 검증 (캐릭터 위치 기준)
+		const float CastDistance2D = FVector::Dist2D(OwnerCharacter->GetActorLocation(), LandingPos);
+
+		if (CastDistance2D > MaxCastDistance)
+		{
+			bValidWaterHit = false;
+			DebugStateMessage = FString::Printf(TEXT("[조준 불가] 최대 거리 초과! (현재: %.1fm / 최대: %.1fm)"), CastDistance2D / 100.0f, MaxCastDistance / 100.0f);
+			DebugMessageColor = FColor(255, 100, 100);
+		}
+		else if (CastDistance2D < MinCastDistance)
+		{
+			bValidWaterHit = false;
+			DebugStateMessage = FString::Printf(TEXT("[조준 불가] 너무 가깝습니다! (현재: %.1fm / 최소: %.1fm)"), CastDistance2D / 100.0f, MinCastDistance / 100.0f);
+			DebugMessageColor = FColor(255, 100, 100);
+		}
+		else
 		{
 			bValidWaterHit = true;
-			if (AWaterBody* WB = Cast<AWaterBody>(Overlap.GetActor()))
-			{
-				if (WB->GetWaterBodyComponent())
-				{
-					LandingPos.Z = WB->GetWaterBodyComponent()->GetConstantSurfaceZ();
-				}
-			}
-			break;
+			DebugStateMessage = FString::Printf(TEXT("[조준 완료] 수면 포착 (거리: %.1fm)! 좌클릭으로 캐스팅하세요."), CastDistance2D / 100.0f);
+			DebugMessageColor = FColor::Green;
 		}
 	}
-
-	// OverlapMultiByChannel(ECC_WorldDynamic) 백업 검출
-	if (!bValidWaterHit)
+	else if (bHitVis)
 	{
-		TArray<FOverlapResult> DynamicOverlaps;
-		GetWorld()->OverlapMultiByChannel(
-			DynamicOverlaps,
-			TargetHorizontal,
-			FQuat::Identity,
-			ECC_WorldDynamic,
-			CapsuleShape,
-			QueryParams
-		);
-
-		for (const FOverlapResult& Overlap : DynamicOverlaps)
-		{
-			if (Overlap.GetActor() && Overlap.GetActor()->IsA(AWaterBody::StaticClass()))
-			{
-				bValidWaterHit = true;
-				if (AWaterBody* WB = Cast<AWaterBody>(Overlap.GetActor()))
-				{
-					if (WB->GetWaterBodyComponent())
-					{
-						LandingPos.Z = WB->GetWaterBodyComponent()->GetConstantSurfaceZ();
-					}
-				}
-				break;
-			}
-		}
+		// 지형이나 바위, 육지 등 물이 아닌 일반 오브젝트에 닿은 경우
+		LandingPos = VisHit.ImpactPoint;
+		bValidWaterHit = false;
+		DebugStateMessage = TEXT("[조준 불가] 물(수면)이 아닙니다!");
+		DebugMessageColor = FColor::Red;
+	}
+	else
+	{
+		// 허공이나 하늘을 조준 중인 경우
+		LandingPos = CamLoc + CamForward * MaxCastDistance;
+		bValidWaterHit = false;
+		DebugStateMessage = TEXT("[조준 불가] 물(수면)을 향해 조준하세요!");
+		DebugMessageColor = FColor::Red;
 	}
 
 	PredictedLandingLocation = LandingPos;
 
-	// 3. 부드러운 2차 베지어 포물선 아크 렌더링 (LifeTime = 0.0f로 잔상 100% 제거)
+	// 3. 물리 발사체와 100% 동일한 포물선 궤적 연산 및 프리뷰 라인 렌더링
 	const FColor ArcColor = bValidWaterHit ? FColor::Emerald : FColor(255, 50, 50);
-	const FVector MidPoint = (TipLoc + LandingPos) * 0.5f + FVector(0.f, 0.f, 250.f);
 
-	const int32 NumSegments = 24;
+	FVector PreviewVelocity = FVector::ZeroVector;
+	float FlightTime = 0.0f;
+	CalculateCastVelocity(TipLoc, LandingPos, PreviewVelocity, FlightTime);
+
+	const int32 NumSegments = 28;
+	const float TimeStep = FlightTime / NumSegments;
+	const FVector GravityVec = FVector(0.f, 0.f, GetWorld()->GetGravityZ());
+
 	FVector PrevPoint = TipLoc;
-
 	for (int32 i = 1; i <= NumSegments; ++i)
 	{
-		const float T = static_cast<float>(i) / NumSegments;
-		const FVector CurrPoint = FMath::Square(1.0f - T) * TipLoc + 2.0f * (1.0f - T) * T * MidPoint + FMath::Square(T) * LandingPos;
+		const float SimTime = i * TimeStep;
+		const FVector CurrPoint = TipLoc + PreviewVelocity * SimTime + 0.5f * GravityVec * FMath::Square(SimTime);
 
-		DrawDebugLine(GetWorld(), PrevPoint, CurrPoint, ArcColor, false, 0.0f, 0, 4.5f);
+		DrawDebugLine(GetWorld(), PrevPoint, CurrPoint, ArcColor, false, 0.0f, 0, 4.0f);
 		PrevPoint = CurrPoint;
 	}
 
-	// 4. 착수 지점 마커 렌더링 (LifeTime = 0.0f)
+	// 4. 착수 지점 마커 렌더링 (LifeTime = 0.0f로 잔상 방지)
 	if (bValidWaterHit)
 	{
 		DrawDebugCircle(GetWorld(), LandingPos + FVector(0.f, 0.f, 5.f), 40.0f, 24, FColor::Emerald, false, 0.0f, 0, 4.0f, FVector(1, 0, 0), FVector(0, 1, 0), false);
 		DrawDebugCircle(GetWorld(), LandingPos + FVector(0.f, 0.f, 5.f), 18.0f, 16, FColor::Cyan, false, 0.0f, 0, 3.0f, FVector(1, 0, 0), FVector(0, 1, 0), false);
 		DrawDebugCylinder(GetWorld(), LandingPos, LandingPos + FVector(0.f, 0.f, 30.f), 40.0f, 16, FColor::Emerald, false, 0.0f, 0, 2.5f);
-
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(200, 0.05f, FColor::Green, TEXT("[조준 완료] 수면 포착! 좌클릭으로 캐스팅하세요!"));
-		}
 	}
 	else
 	{
 		DrawDebugCircle(GetWorld(), LandingPos + FVector(0.f, 0.f, 5.f), 30.0f, 16, FColor(255, 50, 50), false, 0.0f, 0, 3.0f, FVector(1, 0, 0), FVector(0, 1, 0), false);
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(200, 0.05f, FColor::Red, TEXT("[조준 불가] 물(수면)을 향해 조준하세요!"));
-		}
+	}
+
+	if (GEngine && !DebugStateMessage.IsEmpty())
+	{
+		GEngine->AddOnScreenDebugMessage(200, 0.05f, DebugMessageColor, DebugStateMessage);
 	}
 }
 
@@ -672,56 +815,81 @@ void AFishingRod::UpdateMinigame(float DeltaTime)
 {
 	if (!OwnerCharacter || !SpawnedBobber) return;
 
-	// 1. 물고기 도망 방향 주기적 전환 (1.5 ~ 3.0초 주기)
+	// 1. 물고기 도망 방향 주기적 전환 (3.0 ~ 5.5초 주기: 여유로운 턴)
 	FishTurnTimer -= DeltaTime;
 	if (FishTurnTimer <= 0.0f)
 	{
-		FishEscapeDirection *= -1.0f; // 반대 방향으로 급선회
-		FishTurnTimer = FMath::RandRange(2.0f, 4.0f);
+		FishEscapeDirection *= -1.0f; // 반대 방향으로 선회
+		FishTurnTimer = FMath::RandRange(3.0f, 5.5f);
 	}
 
 	// 2. 플레이어의 저항 방향이 물고기 반대 방향인지 판별
 	// (물고기가 우측(+1)으로 도망갈 때 플레이어가 좌측 A(-1)를 당기면 곱이 음수 -> 올바른 저항)
 	const bool bResistingCorrectly = (FishEscapeDirection * PlayerPullInput < -0.1f);
 
-	// 3. 릴 감기(S / LMB) 및 장력 계산
+	// ★ 핵심 메커니즘: 물고기 반대 방향(A/D)으로 제압 중일 때만 릴(S)이 전진하여 거리가 좁혀짐!
+	// 반대 방향 저항 없이 S만 누르면 릴이 헛돌며 전진하지 못하고 물고기가 줄을 끌고 나가며 텐션만 급상승함.
+	const bool bCanPullIn = bResistingCorrectly && (CurrentTension < 99.0f);
+
+	// 3. 릴 감기(S / LMB) 및 장력/거리 연산
 	if (bIsReelingInput)
 	{
-		// 거리 좁힘
-		CurrentDistance -= ReelSpeed * DeltaTime;
-
-		// 릴링 시 장력 증가 (올바른 방향이면 12%/s, 잘못된 방향이면 35%/s 급상승)
-		const float TensionGain = bResistingCorrectly ? TensionGainCorrect : TensionGainWrong;
-		CurrentTension += TensionGain * DeltaTime;
+		if (bCanPullIn)
+		{
+			// 제압 성공: 릴이 물고기를 힘차게 끌어당김
+			CurrentDistance -= ReelSpeed * DeltaTime;
+			CurrentTension += TensionGainCorrect * DeltaTime;
+		}
+		else if (!bResistingCorrectly)
+		{
+			// 제압 실패(A/D 저항 없음/잘못됨): 물고기가 힘으로 버티며 줄을 끌고 나감, 텐션 급상승!
+			CurrentDistance += FishPullSpeed * 0.5f * DeltaTime;
+			CurrentTension += TensionGainWrong * DeltaTime;
+		}
+		else
+		{
+			// 올바른 방향이지만 텐션 99% 도달: 릴이 헛돌며 대기
+			CurrentDistance += FishPullSpeed * 0.2f * DeltaTime;
+			CurrentTension += TensionGainCorrect * DeltaTime;
+		}
 	}
 	else
 	{
-		// 릴을 안 감으면 장력 자연 감소
+		// 릴을 안 감으면 장력 자연 감소 (초당 35% 빠른 해제)
 		CurrentTension -= TensionDecayRate * DeltaTime;
 
-		// 대신 물고기가 낚싯줄을 끌고 조금씩 멀어짐
+		// 릴을 쉬는 동안 물고기가 조금씩 줄을 끌고 도망침
 		CurrentDistance += FishPullSpeed * DeltaTime;
 	}
 
 	CurrentTension = FMath::Clamp(CurrentTension, 0.0f, 100.0f);
 
-	// 실시간 미니게임 HUD 디버그 출력
+	// 4. 찌에 물고기 도망 방향 및 텐션 상태 피드백 전달 (찌 기울어짐 & 물살 파문)
+	SpawnedBobber->SetFishPullFeedback(FishEscapeDirection, CurrentTension / 100.0f, bResistingCorrectly);
+
+
+	// 보조 디버그 HUD
 	if (GEngine)
 	{
 		const FString FishDirStr = (FishEscapeDirection > 0.0f) ? TEXT("우측 -> [A키 당기기!]") : TEXT("좌측 <- [D키 당기기!]");
-		FString MyInputStr = TEXT("중립");
-		if (PlayerPullInput < -0.1f) MyInputStr = TEXT("A키 당김(좌)");
-		else if (PlayerPullInput > 0.1f) MyInputStr = TEXT("D키 당김(우)");
+		FString MyInputStr = TEXT("중립(저항 없음)");
+		if (PlayerPullInput < -0.1f) MyInputStr = TEXT("A키(좌)");
+		else if (PlayerPullInput > 0.1f) MyInputStr = TEXT("D키(우)");
 
-		const FString ReelStr = bIsReelingInput ? TEXT("릴 감는 중(S) O") : TEXT("릴 정지 X");
-		const FString ResistEvalStr = bResistingCorrectly ? TEXT("★ 올바른 저항! (텐션 완만)") : TEXT("▲ 잘못된 저항! (텐션 급상승)");
+		FString ReelStr = TEXT("릴 정지");
+		if (bIsReelingInput)
+		{
+			if (bCanPullIn) ReelStr = TEXT("★ 정상 릴링 중 (전진 O)");
+			else if (!bResistingCorrectly) ReelStr = TEXT("▲ 릴 헛돎! (물고기 반대 방향 A/D 먼저 당기세요!)");
+			else ReelStr = TEXT("▲ 릴 헛돎! (텐션 과다, 릴 잠시 풀기)");
+		}
 
-		GEngine->AddOnScreenDebugMessage(100, 0.1f, bResistingCorrectly ? FColor::Green : FColor::Orange,
-			FString::Printf(TEXT("[미니게임] 거리: %.1fm | 텐션: %.0f%% | 물고기: %s | 내입력: [%s / %s] | %s"),
-				CurrentDistance, CurrentTension, *FishDirStr, *ReelStr, *MyInputStr, *ResistEvalStr));
+		GEngine->AddOnScreenDebugMessage(100, 0.1f, bCanPullIn ? FColor::Green : FColor::Orange,
+			FString::Printf(TEXT("[미니게임] 거리: %.1fm | 텐션: %.0f%% | 물고기: %s | 내입력: %s | %s"),
+				CurrentDistance, CurrentTension, *FishDirStr, *MyInputStr, *ReelStr));
 	}
 
-	// 4. 찌의 수평 위치 업데이트 및 최소 접근 거리 한계 제어:
+	// 6. 찌의 수평 위치 업데이트 및 최소 접근 거리 한계 제어:
 	const float ActualDist2D = FVector::Dist2D(OwnerCharacter->GetActorLocation(), SpawnedBobber->GetActorLocation());
 	const FVector ToPlayer = (OwnerCharacter->GetActorLocation() - SpawnedBobber->GetActorLocation()).GetSafeNormal2D();
 	const FVector RightVec = FVector::CrossProduct(ToPlayer, FVector::UpVector);
@@ -729,43 +897,54 @@ void AFishingRod::UpdateMinigame(float DeltaTime)
 	// (1) 물고기 좌우 흔들기
 	SpawnedBobber->AddActorWorldOffset(RightVec * FishEscapeDirection * 150.0f * DeltaTime);
 
-	// (2) ★ S키(릴 감기) 시 플레이어 앞 MinCatchDistance(2.0m)까지만 안전하게 견인 (몸속 파고들기 차단)
-	if (bIsReelingInput && ActualDist2D > MinCatchDistance)
+	// (2) 릴 감기 이동 (올바른 A/D 저항으로 제압 중일 때만 플레이어 앞으로 견인)
+	if (bIsReelingInput)
 	{
-		SpawnedBobber->AddActorWorldOffset(ToPlayer * ReelSpeed * 100.0f * DeltaTime);
+		if (bCanPullIn && ActualDist2D > MinCatchDistance)
+		{
+			// 제압 성공: 플레이어 쪽으로 힘차게 끌려옴
+			SpawnedBobber->AddActorWorldOffset(ToPlayer * ReelSpeed * 100.0f * DeltaTime);
+		}
+		else if (!bResistingCorrectly)
+		{
+			// 제압 실패: 물고기가 플레이어 바깥쪽으로 줄을 끌고 나감
+			SpawnedBobber->AddActorWorldOffset(-ToPlayer * FishPullSpeed * 60.0f * DeltaTime);
+		}
+	}
+	else
+	{
+		// 릴을 풀었을 때 물고기가 조금씩 바깥쪽으로 끌고 나감
+		SpawnedBobber->AddActorWorldOffset(-ToPlayer * FishPullSpeed * 60.0f * DeltaTime);
 	}
 
-	// 5. 성공/실패 판정
-	if (CurrentTension >= 100.0f)
+	// 7. 성공 판정 (물 탈출 또는 플레이어 근접 시 대성공!)
+	const bool bBobberEscapedWater = SpawnedBobber->CheckHasEscapedWater();
+	const bool bReachedPlayer = (ActualDist2D <= MinCatchDistance || CurrentDistance <= (MinCatchDistance / 100.0f));
+
+	if (bBobberEscapedWater || bReachedPlayer)
 	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 4.0f, FColor::Red, TEXT("[낚시 실패] 낚싯줄이 끊어졌습니다!"));
-		UE_LOG(LogTemp, Warning, TEXT("[낚시] 장력이 100%%를 초과하여 낚싯줄이 끊어졌습니다! (실패)"));
-		FinishFishing(false);
-	}
-	else if (ActualDist2D <= MinCatchDistance || CurrentDistance <= (MinCatchDistance / 100.0f))
-	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 4.0f, FColor::Green, TEXT("[낚시 대성공!] 물고기를 낚아 올렸습니다! (인벤토리에 생고기 획득)"));
-		UE_LOG(LogTemp, Display, TEXT("[낚시] 찌가 발앞 %.1fm에 도달하여 물고기를 건져 올렸습니다! (성공!)"), MinCatchDistance / 100.0f);
+		const FString SuccessReason = bBobberEscapedWater ? TEXT("찌가 물을 탈출하여 육지로 랜딩 성공!") : TEXT("물고기를 발앞까지 안전하게 끌어당겼습니다!");
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 4.0f, FColor::Green,
+				FString::Printf(TEXT("[낚시 대성공!] %s (인벤토리에 생고기 획득)"), *SuccessReason));
+		}
+		UE_LOG(LogTemp, Display, TEXT("[낚시] %s (성공!)"), *SuccessReason);
 		FinishFishing(true);
 	}
 }
 
 void AFishingRod::FinishFishing(bool bSuccess)
 {
+	if (CurrentState == EFishingState::Idle) return;
+
 	GetWorld()->GetTimerManager().ClearTimer(BiteTimerHandle);
 	GetWorld()->GetTimerManager().ClearTimer(ReactionTimerHandle);
 
-	if (bSuccess)
-	{
-		CurrentState = EFishingState::ReelingSuccess;
+	CurrentState = bSuccess ? EFishingState::ReelingSuccess : EFishingState::Failed;
 
-		// 서버 권한으로 보상 아이템 지급 요청
-		Server_FinishFishing(true);
-	}
-	else
-	{
-		CurrentState = EFishingState::Failed;
-	}
+	// 서버 권한으로 보상 아이템 지급 및 서버 측 세션 종료 요청
+	Server_FinishFishing(bSuccess);
 
 	ResetFishing();
 
@@ -788,27 +967,35 @@ void AFishingRod::OnFinishCooldownEnded()
 
 bool AFishingRod::Server_FinishFishing_Validate(bool bSuccess)
 {
-	// 낚시 세션(bIsFishingActive)이 실제로 활성화되어 있었는지 서버에서 유효성 검증
-	return bIsFishingActive;
+	// 클라이언트 강제 종료(RPC validation failure) 방지: 항상 true 반환
+	return true;
 }
 
 void AFishingRod::Server_FinishFishing_Implementation(bool bSuccess)
 {
-	if (!bSuccess) return;
-
-	// 서버 권한으로 캐릭터 인벤토리에 생고기(DA_Item_Consumable_RawMeat) 지급
-	if (OwnerCharacter && FishRewardItemData)
+	if (bSuccess)
 	{
-		if (UInventoryComponent* InvComp = OwnerCharacter->FindComponentByClass<UInventoryComponent>())
+		// 서버 권한으로 캐릭터 인벤토리에 생고기(DA_Item_Consumable_RawMeat) 지급
+		if (OwnerCharacter && FishRewardItemData)
 		{
-			int32 RemainCount = 0;
-			const bool bAdded = InvComp->AddItem(FishRewardItemData, 1, RemainCount);
-			if (bAdded)
+			if (UInventoryComponent* InvComp = OwnerCharacter->FindComponentByClass<UInventoryComponent>())
 			{
-				UE_LOG(LogTemp, Display, TEXT("[낚시 서버] 인벤토리에 보상 [%s] 지급 완료!"), *FishRewardItemData->DisplayName.ToString());
+				int32 RemainCount = 0;
+				const bool bAdded = InvComp->AddItem(FishRewardItemData, 1, RemainCount);
+				if (bAdded)
+				{
+					UE_LOG(LogTemp, Display, TEXT("[낚시 서버] 인벤토리에 보상 [%s] 지급 완료!"), *FishRewardItemData->DisplayName.ToString());
+				}
 			}
 		}
 	}
+
+	// 서버 측 낚시 세션 및 상태 정리
+	bIsFishingActive = false;
+	CurrentState = EFishingState::Idle;
+	PlayerPullInput = 0.0f;
+	AnimPullInput = 0.0f;
+	bIsReelingInput = false;
 }
 
 void AFishingRod::ResetFishing()
@@ -818,6 +1005,7 @@ void AFishingRod::ResetFishing()
 	CurrentTension = 0.0f;
 	CurrentDistance = 0.0f;
 	PlayerPullInput = 0.0f;
+	AnimPullInput = 0.0f;
 	bIsReelingInput = false;
 	bIsReelingByLMB = false;
 

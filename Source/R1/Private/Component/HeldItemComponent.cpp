@@ -420,15 +420,6 @@ bool UHeldItemComponent::BlocksCharacterMovement() const
 	return false;
 }
 
-bool UHeldItemComponent::BlocksDefaultAttack() const
-{
-	if (CurrentHeldItem)
-	{
-		return CurrentHeldItem->BlocksDefaultAttack();
-	}
-	return false;
-}
-
 void UHeldItemComponent::LinkItemAnimLayers(TSubclassOf<UAnimInstance> LayerClass)
 {
 	if (!LayerClass) return;
