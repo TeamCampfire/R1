@@ -22,14 +22,62 @@
 #include "Component/InventoryComponent.h"
 #include "Item/PlaceableItem/Campfire/Campfire.h"
 #include "Item/PlaceableItem/Campfire/CampfireComponent.h"
-#include "Component/InventoryComponent.h"
-#include "Widget/MainHUDWidget.h"
 #include "Interface/InteractableInterface.h"
+#include "Widget/Chatting/ChatWidget.h"
+#include "Framework/GameState/ActionGameState.h"
 
 AActionPlayerController::AActionPlayerController()
 {
 	// 빌딩 배치 컴포넌트 생성
 	BuildingPlacementComponent = CreateDefaultSubobject<UBuildingPlacementComponent>(TEXT("BuildingPlacementComp"));
+}
+
+void AActionPlayerController::SubmitGlobalChatMessage(const FString& Message)
+{
+	// 이 함수는 로컬에서 호출하는 함수
+	if (false == IsLocalController()) return;
+
+	FString msg = Message.TrimStartAndEnd();
+	if (true == msg.IsEmpty()) return;
+
+	msg = msg.Left(MaxGlobalChatMessageLength); // 채팅 최대 글자 수 제한
+
+	// 클라에서 서버로 이동
+	Server_SendGlobalChatMessage(msg);
+}
+
+void AActionPlayerController::Server_SendGlobalChatMessage_Implementation(const FString& Message)
+{
+	// 서버에서 실행되는 함수
+	if (false == HasAuthority()) return;
+
+	// 클라에서 검사했어도 서버에서 무조건 다시 검사해야 함
+	FString ValidMsg = Message.TrimStartAndEnd();
+
+	if (true == ValidMsg.IsEmpty()) return;
+	ValidMsg = ValidMsg.Left(MaxGlobalChatMessageLength); // 최대 길이 제한
+
+	FString SenderName = TEXT("Default(세팅 안 된 듯)"); // 이름 못 받아왔을 때 보여줄 기본값
+
+	// 채팅 친 사람의 이름은 클라이언트에게 전달받지 않고 서버가 직접 가져와요
+	APlayerState * SenderPlayerState = GetPlayerState<APlayerState>();
+	if (nullptr == SenderPlayerState)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Chat][Server] Sender PlayerState를 찾지 못했습니다."));
+		return;
+	}
+
+	AActionGameState* ActionGameState = GetWorld() ? GetWorld()->GetGameState<AActionGameState>() : nullptr;
+	if (nullptr == ActionGameState)
+	{
+		UE_LOG(LogTemp, Warning, TEXT(
+				"[Chat][Server] AActionGameState를 찾지 못했습니다. "
+				"GameMode의 Game State Class를 확인해 주세요."));
+		return;
+	}
+
+	// 서버의 GameState에 채팅을 하나 기록해요
+	ActionGameState->AddGlobalChatMessage(SenderPlayerState, ValidMsg);
 }
 
 UInventoryComponent* AActionPlayerController::GetPlayerInventory() const
@@ -152,6 +200,9 @@ void AActionPlayerController::SetupInputComponent()
 		// 인벤토리 토글 — 컨트롤러에 바인딩해서 어떤 폰을 조종 중이든(캐릭터든 나중의 탈것이든)
 		// 항상 눌리게 한다(IA_InventoryToggle 선언부 주석 참고).
 		EIC->BindAction(IA_InventoryToggle, ETriggerEvent::Started, this, &AActionPlayerController::OnInventoryTogglePressed);
+
+		// 채팅창 키 바인딩
+		EIC->BindAction(IA_ChatOpen, ETriggerEvent::Started, this, &AActionPlayerController::OnChatOpenPressed);
 	}
 }
 
@@ -232,6 +283,45 @@ bool AActionPlayerController::TryConfirmPlacement()
 
 	BuildingPlacementComponent->ConfirmPlacement();
 	return true;
+}
+
+void AActionPlayerController::OnChatOpenPressed()
+{
+	if (false == IsLocalController()) return;
+
+	if (true == IsAnyUIPanelOpen()) return; // 인벤토리, 창고, 옵션 등등 다른 UI가 열려있으면 채팅창은 안 열어요
+
+	AMainHUD* HUD = GetHUD<AMainHUD>();
+	UMainHUDWidget* MainHudWidget = HUD ? HUD->GetMainHudWidget() : nullptr;
+
+	UChatWidget* ChatWidget = MainHudWidget->GetChatWidget();
+
+	if (nullptr == ChatWidget)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[AActionPlayerController::OnChatOpenPressed()] : ChatWidget이 WBP_MainHUD에 연결되지 않은 듯"));
+		return;
+	}
+
+	// 일단 입력모드 세팅
+	ApplyUIInputState(true);
+
+	ChatWidget->OpenChat();
+}
+
+void AActionPlayerController::OnCloseChat()
+{
+	AMainHUD* HUD = GetHUD<AMainHUD>();
+	UMainHUDWidget* MainHudWidget = HUD ? HUD->GetMainHudWidget() : nullptr;
+	UChatWidget* ChatWidget = MainHudWidget->GetChatWidget();
+
+	// 채팅 위젯이 없거나 열려 있지 않은 상태
+	if (nullptr == ChatWidget || false == ChatWidget->IsChatOpen()) return;
+
+	// 채팅 화면을 기본 채팅창으로 바꿔요
+	ChatWidget->CloseChat();
+
+	// 닫을 때도 입력모드 세팅
+	ApplyUIInputState(false);
 }
 
 void AActionPlayerController::SetInventoryInputState(bool bOpen)

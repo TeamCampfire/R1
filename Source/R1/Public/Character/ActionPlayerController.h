@@ -49,6 +49,13 @@ public:
 
 	AActionPlayerController();
 
+	UFUNCTION(BlueprintCallable)
+	void SubmitGlobalChatMessage(const FString& Message);
+
+	// 클라이언트가 입력한 채팅 메시지를 서버로 전달하는 함수
+	UFUNCTION(Server, Reliable)
+	void Server_SendGlobalChatMessage(const FString& Message);
+
 protected:
 
 	virtual void BeginPlay() override;
@@ -78,6 +85,13 @@ public:
 
 	// 배치 모드가 활성화 되어 있다면 설치를 요청하고 true를 반환해요
 	bool TryConfirmPlacement();
+
+	// 채팅창 키 눌렀을 때
+	void OnChatOpenPressed();
+
+	// 채팅창 닫기
+	void OnCloseChat();
+
 	//  ===================================================================================
 public:
 
@@ -185,6 +199,10 @@ protected:
 	UPROPERTY()
 	TObjectPtr<AActor> RespawnPoint;
 
+	// 기본채팅 <-> 채팅입력 전환 키
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UInputAction> IA_ChatOpen;
+
 public:
 
 	// 컨트롤러 연결 캐릭터 변경 시 호출되는 델리게이트
@@ -201,4 +219,7 @@ private:
 	/* UI 사용 상태 */
 	bool bInventoryOpen = false;
 	bool bGameMenuOpen = false;
+
+	// 전체 채팅 메시지의 최대 글자 수
+	static constexpr int32 MaxGlobalChatMessageLength = 200;
 };
