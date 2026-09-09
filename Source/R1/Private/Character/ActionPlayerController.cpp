@@ -3,7 +3,6 @@
 
 #include "Character/ActionPlayerController.h"
 #include "Component/CraftingComponent.h"
-#include "Widget/CraftingWidget.h"
 #include "Item/PlaceableItem/Workbench.h"
 #include "Character/ActionCharacter.h"
 #include "Component/StatComponent.h"
@@ -523,7 +522,9 @@ void AActionPlayerController::ServerTestInflictDamage_Implementation()
 // Q 키로 개인 제작 화면을 토글하며 작업대 없는 제작은 nullptr로 구분
 void AActionPlayerController::ToggleCrafting()
 {
-	if (CraftingWidget)
+	AMainHUD* HUD = GetHUD<AMainHUD>();
+	UMainHUDWidget* MainWidget = HUD ? HUD->GetMainHudWidget() : nullptr;
+	if (MainWidget && MainWidget->IsCraftingPanelOpen())
 	{
 		CloseCrafting();
 		return;
@@ -534,20 +535,15 @@ void AActionPlayerController::ToggleCrafting()
 	Client_OpenCrafting_Implementation(nullptr);
 }
 
+// 닫기 요청: HUD에 창 정리 위임
 void AActionPlayerController::CloseCrafting()
 {
-	if (!CraftingWidget)
-	{
-		return;
-	}
-
-	CraftingWidget->RemoveFromParent();
-	CraftingWidget = nullptr;
-
-	ApplyUIInputState(false);	// UI 입력 모드 해제
+	AMainHUD* HUD = GetHUD<AMainHUD>();
+	if (UMainHUDWidget* MainWidget = HUD ? HUD->GetMainHudWidget() : nullptr)
+		MainWidget->CloseCraftingPanel();
 }
 
-// 개인 제작 컴포넌트와 선택 작업대를 위젯에 연결하고 제작 화면에 입력 포커싱 처리
+// 제작 가능 상태 확인, 개인 제작 컴포넌트와 선택 작업대를 HUD에 전달
 void AActionPlayerController::Client_OpenCrafting_Implementation(AWorkbench* Bench)
 {
 	AActionCharacter* PossessedCharacter = Cast<AActionCharacter>(GetPawn());
@@ -562,36 +558,13 @@ void AActionPlayerController::Client_OpenCrafting_Implementation(AWorkbench* Ben
 		return;
 	}
 
-	// 기존에 열려 있는 제작창 닫기
-	CloseCrafting();
-
-	// 두 창의 입력 카운트를 각각 정리한 뒤 공용 제작 화면 열기
-	AMainHUD* MainHUD = GetHUD<AMainHUD>();
-	UMainHUDWidget* MainWidget = MainHUD ? MainHUD->GetMainHudWidget() : nullptr;
-
-	// 인벤토리 열려 있으면 인벤토리 닫기
-	if (MainWidget && MainWidget->IsInventoryPanelOpen())
-	{
-		MainWidget->ToggleInventoryPanel();
-		SetInventoryInputState(false);
-	}
-
 	if (!IsLocalController())
 		return;
 
-	if (!CraftingWidgetClass)
+	// 제작 데이터와 작업대를 전달하고 창 관리는 HUD에 위임
+	AMainHUD* HUD = GetHUD<AMainHUD>();
+	if (UMainHUDWidget* MainWidget = HUD ? HUD->GetMainHudWidget() : nullptr)
 	{
-		UE_LOG(LogTemp, Error, TEXT("CraftingWidgetClass is missing. Assign Crafting Widget in the controller defaults."));
-		return;
+		MainWidget->OpenCraftingPanel(CraftingComponent, Bench);
 	}
-
-	CraftingWidget = CreateWidget<UCraftingWidget>(this, CraftingWidgetClass);
-	if (!CraftingWidget)
-		return;
-
-	CraftingWidget->BindCrafting(CraftingComponent, Bench);	// 작업대 연결
-	CraftingWidget->SetIsFocusable(true);
-	CraftingWidget->AddToViewport(30);
-	ApplyUIInputState(true);
-	CraftingWidget->SetKeyboardFocus();
 }

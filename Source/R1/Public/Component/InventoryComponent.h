@@ -265,8 +265,9 @@ protected:
 	//~ End UActorComponent Interface
 
 private:
-	// [wdk59] 모닥불이 기존 SetSlot 경로로 인벤토리를 수정하여 슬롯 변경 알림과 복제를 유지하도록 접근을 허용한다.
+	// 모닥불이 기존 SetSlot 경로로 인벤토리를 수정하여 슬롯 변경 알림과 복제를 유지하도록 접근을 허용
 	friend class UCampfireComponent;
+
 	// 단일 관문 — Main/Belt/Equipment 중 어디를 건드리든 반드시 이걸 거친다.
 	// 브로드캐스트가 누락되는 실수를 막고, 나중에 검증/리플리케이션 로직을 얹을 자리를 확보해둔다.
 	void SetSlot(EInventorySlotCategory Category, int32 Index, const FItemInstance& NewValue);

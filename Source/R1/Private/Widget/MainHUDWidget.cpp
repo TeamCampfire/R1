@@ -1,6 +1,7 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Widget/MainHUDWidget.h"
+#include "Widget/CraftingWidget.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "Widget/Inventory/InventoryWidget.h"
@@ -21,6 +22,58 @@
 #include "Item/PlaceableItem/Campfire.h"
 #include "Component/InteractionComponent.h"
 #include "GameFramework/Pawn.h"
+
+void UMainHUDWidget::OpenCraftingPanel(UCraftingComponent* Crafting, AWorkbench* Bench)
+{
+	if (!CachedController)
+	{
+		UE_LOG(LogTemp, Error, TEXT("No CachedController"));
+	}
+	if (!CachedController->IsLocalController())
+	{
+		UE_LOG(LogTemp, Error, TEXT("No IsLocalController"));
+	}
+	if (!Crafting)
+	{
+		UE_LOG(LogTemp, Error, TEXT("No Crafting"));
+	}
+	if (!CraftingWidget)
+	{
+		UE_LOG(LogTemp, Error, TEXT("No CraftingWidget"));
+	}
+	if (!CachedController || !CachedController->IsLocalController() || !Crafting || !CraftingWidget)
+		return;
+
+	CloseCraftingPanel();
+	if (IsInventoryPanelOpen())
+	{
+		ToggleInventoryPanel();
+		CachedController->SetInventoryInputState(false);
+	}
+
+	// HUD에 배치된 제작창을 재사용하고 매번 현재 제작 대상을 연결한다.
+	CraftingWidget->BindCrafting(Crafting, Bench);
+	CraftingWidget->SetIsFocusable(true);
+	CraftingWidget->SetVisibility(ESlateVisibility::Visible);
+	CachedController->ApplyUIInputState(true);
+	CraftingWidget->SetKeyboardFocus();
+}
+
+void UMainHUDWidget::CloseCraftingPanel()
+{
+	if (!IsCraftingPanelOpen()) return;
+
+	CraftingWidget->SetVisibility(ESlateVisibility::Collapsed);
+	CraftingWidget->UnbindCrafting();
+	if (CachedController) CachedController->ApplyUIInputState(false);
+}
+
+bool UMainHUDWidget::IsCraftingPanelOpen() const
+{
+	return CraftingWidget
+		&& CraftingWidget->GetVisibility() != ESlateVisibility::Collapsed
+		&& CraftingWidget->GetVisibility() != ESlateVisibility::Hidden;
+}
 
 void UMainHUDWidget::NativeOnInitialized()
 {
@@ -49,6 +102,8 @@ void UMainHUDWidget::NativeOnInitialized()
 		InventoryWidget->SetVisibility(ESlateVisibility::Collapsed);
 	}
 	if (CampfireWidget) CampfireWidget->SetVisibility(ESlateVisibility::Collapsed);
+	// 초기 숨김은 열린 패널을 닫는 동작이 아니므로 입력 카운트를 변경하지 않는다.
+	if (CraftingWidget) CraftingWidget->SetVisibility(ESlateVisibility::Collapsed);
 
 	// 게임을 시작했을 때 이전 디자인용 테스트 문구가 화면에 표시되지 않도록 숨겨요
 	if (true == IsValid(Border_BuildingPlacementMessage))
@@ -57,7 +112,10 @@ void UMainHUDWidget::NativeOnInitialized()
 
 void UMainHUDWidget::NativeDestruct()
 {
+	// 제작, 모닥불 UI 열려 있으면 닫기
+	CloseCraftingPanel();
 	CloseCampfire();
+
 	// 위젯이 제거될 때 예약된 타이머가 남아 제거된 위젯을 다시 호출하지 않도록 정리해줍니다
 	if (UWorld* World = GetWorld())
 		World->GetTimerManager().ClearTimer(BuildingPlacementMessageTimerHandle);
@@ -149,7 +207,8 @@ void UMainHUDWidget::HideDeathScreen()
 
 void UMainHUDWidget::OnPossessedCharChange()
 {
-	// 조종 대상 바뀌면 모닥불 UI 무조건 닫기
+	// 조종 대상 바뀌면 제작, 모닥불 UI 무조건 닫기
+	CloseCraftingPanel();
 	CloseCampfire();
 
 	// 조종 대상이 바뀌면(부활로 새 캐릭터를 빙의하는 경우 등) 열려있던 창고 세션은 무조건 끊는다 —
@@ -170,6 +229,9 @@ void UMainHUDWidget::OnPossessedCharChange()
 
 void UMainHUDWidget::OnDeath()
 {
+	// 사망 시 제작, 모닥불 UI 닫기 처리
+	CloseCraftingPanel();
+	CloseCampfire();
 	ShowDeathScreen();
 }
 
@@ -210,6 +272,11 @@ bool UMainHUDWidget::ToggleInventoryPanel()
 	}
 
 	const bool bNewOpenState = !IsInventoryPanelOpen();
+
+	// 인벤토리창 열 때 제작창 닫기
+	if (bNewOpenState)
+		CloseCraftingPanel();
+
 	// InventoryWidget의 호스트 슬롯도 화면 전체를 채우도록 앵커돼 있다 — Visible로 켜면 콘텐츠
 	// 없는 빈 영역이 뒤(z-order상 InventoryWidget보다 아래인 위젯)로 클릭을 전달하지 않고 가로채
 	// 버린다. SelfHitTestInvisible로 켜야 빈 영역은 통과시키고 실제 자식(슬롯/버튼)만 반응한다.
@@ -242,6 +309,9 @@ void UMainHUDWidget::OpenCampfire(ACampfire* Campfire)
 {
 	if (!IsValid(Campfire) || !InventoryWidget || !CampfireWidget)
 		return;
+
+	// 안전장치: 모닥불 UI 열 때 제작 UI 닫기
+	CloseCraftingPanel();
 
 	const bool bPlayOpenSound = !bCampfireSessionOpen;		// 모닥불 UI를 새로 열 때만 열림음 재상하도록 제어하기 위해 사용
 	const bool bInventoryWasOpen = IsInventoryPanelOpen();	// UI 입력 모드 제어를 위해 사용
@@ -277,7 +347,7 @@ void UMainHUDWidget::OpenCampfire(ACampfire* Campfire)
 	}
 }
 
-// [wdk59] 위젯 델리게이트와 활성 대상을 해제하고 열린 세션에 대해서만 닫기 소리를 재생한다.
+// 위젯 델리게이트와 활성 대상을 해제하고, 열린 세션에 대해서만 닫기 소리를 재생
 void UMainHUDWidget::CloseCampfire()
 {
 	const bool bPlayCloseSound = bCampfireSessionOpen;
@@ -316,6 +386,9 @@ void UMainHUDWidget::OpenWarehousePanel(UWarehouseInventoryComponent* Warehouse)
 	{
 		return;
 	}
+
+	// 안전장치: 창고 UI 열 때 제작 UI 닫기
+	CloseCraftingPanel();
 
 	// Rust처럼 창고를 열면 내 인벤토리 패널이 옆에 같이 뜬다 — 이미 열려있으면 손대지 않는다
 	// (플레이어가 직접 열어둔 상태였다면 창고를 닫아도 인벤토리는 그대로 남아있어야 하므로).

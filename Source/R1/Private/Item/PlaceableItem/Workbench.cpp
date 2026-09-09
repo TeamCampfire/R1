@@ -9,13 +9,16 @@ AWorkbench::AWorkbench()
 {
 	PrimaryActorTick.bCanEverTick = false;
 	bReplicates = true;
+
 	CraftingComponent = CreateDefaultSubobject<UCraftingComponent>(TEXT("CraftingComponent"));
 }
 
-// [wdk59] 파괴되기 전에 서버에서 제작 결과물과 남은 재료를 반환한다.
+// 파괴되기 전에 서버에서 제작 결과물과 남은 재료를 반환
 void AWorkbench::Destroyed()
 {
-	if (HasAuthority()) CraftingComponent->DropContents();
+	if (HasAuthority())
+		CraftingComponent->DropContents();
+
 	Super::Destroyed();
 }
 
@@ -30,7 +33,7 @@ bool AWorkbench::CanInteract_Implementation(APawn* Interactor) const
 		&& FVector::DistSquared(Interactor->GetActorLocation(), GetActorLocation()) <= FMath::Square(InteractionDistance);
 }
 
-// [wdk59] 서버의 거리 검사 후 해당 작업대의 제작 화면을 요청자에게 열어 준다.
+// \서버의 거리 검사 후 해당 작업대의 제작 화면을 요청자에게 엶
 void AWorkbench::Interact_Implementation(APawn* Interactor)
 {
 	if (!HasAuthority() || !CanInteract_Implementation(Interactor)) return;

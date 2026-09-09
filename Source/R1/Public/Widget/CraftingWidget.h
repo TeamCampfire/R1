@@ -16,8 +16,9 @@ class UButton;
 class UTextBlock;
 class UImage;
 
-// Q와 작업대 상호작용에서 동일한 WBP를 생성하고 데이터 원본만 교체한다.
-// [wdk59] 제작 화면의 검색·수량·재료·큐 표시를 조정하고 개별 타일과 재료 행은 분리된 위젯으로 구성한다.
+// HUD에 바인딩된 제작창을 Q와 작업대 상호작용에서 재사용하고 데이터 원본만 교체
+// 제작 화면의 검색/수량/재료/큐 표시를 조정
+// 개별 타일과 재료 행은 분리된 위젯으로 구성
 UCLASS()
 class R1_API UCraftingWidget : public UUserWidget
 {
@@ -25,11 +26,41 @@ class R1_API UCraftingWidget : public UUserWidget
 
 public:
 	void BindCrafting(UCraftingComponent* InCrafting, AWorkbench* InBench);
+	// 창을 숨길 때 화면의 참조만 해제
+	// 실제 제작 큐는 컴포넌트에 유지
+	void UnbindCrafting();
 
 protected:
 	virtual void NativeOnInitialized() override;
 	virtual void NativeTick(const FGeometry& Geometry, float DeltaTime) override;
 	virtual FReply NativeOnPreviewKeyDown(const FGeometry& Geometry, const FKeyEvent& KeyEvent) override;
+
+private:
+	UFUNCTION()
+	void HandleSearchChanged(const FText& Text);
+	UFUNCTION()
+	void HandleRecipeClicked(UItemDataBase* Item);
+	UFUNCTION()
+	void HandleDecrease();
+	UFUNCTION()
+	void HandleIncrease();
+	UFUNCTION()
+	void HandleMaximum();
+	UFUNCTION()
+	void HandleCraft();
+	UFUNCTION()
+	void HandleCollect();
+	UFUNCTION()
+	void HandleClose();
+
+	static FString NormalizeSearchText(const FString& Text);
+	void RebuildRecipes();
+	void Refresh();
+	void RefreshQueue();
+	UCraftingComponent* GetQueueSource() const;
+	int32 GetMaximum() const;
+
+protected :
 
 	UPROPERTY(EditDefaultsOnly, Category = "Crafting")
 	TSubclassOf<UCraftingItemWidget> ItemWidgetClass;
@@ -74,38 +105,21 @@ protected:
 	UPROPERTY(meta=(BindWidget))
 	TObjectPtr<UButton> CloseButton;
 
-private:
-	UFUNCTION()
-	void HandleSearchChanged(const FText& Text);
-	UFUNCTION()
-	void HandleRecipeClicked(UItemDataBase* Item);
-	UFUNCTION()
-	void HandleDecrease();
-	UFUNCTION()
-	void HandleIncrease();
-	UFUNCTION()
-	void HandleMaximum();
-	UFUNCTION()
-	void HandleCraft();
-	UFUNCTION()
-	void HandleCollect();
-	UFUNCTION()
-	void HandleClose();
-
-	static FString NormalizeSearchText(const FString& Text);
-	void RebuildRecipes();
-	void Refresh();
-	void RefreshQueue();
-	UCraftingComponent* GetQueueSource() const;
-	int32 GetMaximum() const;
+private :
 
 	UPROPERTY()
 	TObjectPtr<UCraftingComponent> Crafting;
+
 	UPROPERTY()
 	TObjectPtr<UItemDataBase> Selected;
+
 	TWeakObjectPtr<AWorkbench> BoundBench;
+
 	bool bWorkbenchMode = false;
+
 	FString SearchText;
+
 	int32 CraftQuantity = 0;
+
 	float RefreshElapsed = 0.f;
 };
