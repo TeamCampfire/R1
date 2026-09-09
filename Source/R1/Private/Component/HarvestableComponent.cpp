@@ -1,4 +1,4 @@
-﻿#include "Component/HarvestableComponent.h"
+#include "Component/HarvestableComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Kismet/GameplayStatics.h"
 #include "Character/ActionCharacter.h"
@@ -189,7 +189,7 @@ void UHarvestableComponent::Multicast_PlayHitEffects_Implementation(const FVecto
 		}
 		if (SweetSpotNiagaraFX)
 		{
-			UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), SweetSpotNiagaraFX, HitLocation);
+			UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), SweetSpotNiagaraFX, HitLocation, DecalRot);
 		}
 	}
 	else
@@ -200,7 +200,7 @@ void UHarvestableComponent::Multicast_PlayHitEffects_Implementation(const FVecto
 		}
 		if (HitNiagaraFX)
 		{
-			UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), HitNiagaraFX, HitLocation);
+			UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), HitNiagaraFX, HitLocation, DecalRot);
 		}
 	}
 }
