@@ -1,4 +1,4 @@
-#include "Component/HarvestableComponent.h"
+﻿#include "Component/HarvestableComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Kismet/GameplayStatics.h"
 #include "Character/ActionCharacter.h"
@@ -117,6 +117,8 @@ FHarvestRes UHarvestableComponent::OnHitted_Implementation(AActionCharacter* InC
 	Res.HarvesResult = (Res.HarvestedItems.Num() > 0 || Res.bIsDepleted);
 	return Res;
 }
+
+
 
 float UHarvestableComponent::ProcessHitFeedback(AActionCharacter* InCharacter, const FVector& HitLocation, bool& bOutHitSweetSpot)
 {

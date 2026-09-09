@@ -465,3 +465,14 @@ void UHeldItemComponent::UnlinkItemAnimLayers()
 
 	LinkedAnimLayerClass = nullptr;
 }
+
+void UHeldItemComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+
+	if (CurrentHeldItem)
+	{
+		CurrentHeldItem->Destroy();
+		CurrentHeldItem = nullptr;
+	}
+}

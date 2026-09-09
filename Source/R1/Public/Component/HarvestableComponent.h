@@ -174,6 +174,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Harvestable|Item|Bonus")
 	float SweetSpotMultiplier = 2.0f;
 
+
 private:
 	// 피격 피드백(사운드/FX/데칼) 처리 및 스위트스팟 배율 계산
 	float ProcessHitFeedback(AActionCharacter* InCharacter, const FVector& HitLocation, bool& bOutHitSweetSpot);

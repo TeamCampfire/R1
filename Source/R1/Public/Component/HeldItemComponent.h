@@ -103,6 +103,9 @@ protected:
 	void LinkItemAnimLayers(TSubclassOf<UAnimInstance> LayerClass);
 	void UnlinkItemAnimLayers();
 
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 protected:
 	// 게임 시작 시 컴포넌트에서 자동 장착할 기본 아이템 데이터 (에디터 디테일 패널에서 설정)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HeldItem|Default")
