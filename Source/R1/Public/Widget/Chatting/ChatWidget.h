@@ -36,7 +36,7 @@ public:
 
 	// 채팅을 쳐서 전송했을 때 UI에 이미 쳐진 채팅으로 추가하는 함수
 	UFUNCTION(BlueprintCallable, Category = "Chat")
-	void AddChatMessageToUI(const FString& SenderName, const FString& Message);
+	void AddChatMessageToUI(const FString& SenderName, const FString& Message, const FString& Timestamp);
 
 protected:
 	// 채팅 입력이 완료되었을 때 호출 (Enter를 눌렀을 때)

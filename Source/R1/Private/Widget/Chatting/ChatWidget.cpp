@@ -99,7 +99,7 @@ void UChatWidget::OpenChat()
 	EditableText_MessageInput->SetKeyboardFocus();
 }
 
-void UChatWidget::AddChatMessageToUI(const FString& SenderName, const FString& Message)
+void UChatWidget::AddChatMessageToUI(const FString& SenderName, const FString& Message, const FString& Timestamp)
 {
 	if (nullptr == ChatMessageWidgetClass ||
 		nullptr == VerticalBox_CompactMessages || nullptr == VerticalBox_ExpandedMessages)
@@ -112,7 +112,7 @@ void UChatWidget::AddChatMessageToUI(const FString& SenderName, const FString& M
 	// UMG 위젯은 부모를 하나만 가질 수 있기 때문..........
 	if (UChatMessageWidget* CompactMessageWidget = CreateWidget<UChatMessageWidget>(GetOwningPlayer(), ChatMessageWidgetClass))
 	{
-		CompactMessageWidget->SetMessage(SenderName, Message);
+		CompactMessageWidget->SetMessage(SenderName, Message, Timestamp);
 
 		if (UVerticalBoxSlot* CompactSlot = VerticalBox_CompactMessages->AddChildToVerticalBox(CompactMessageWidget))
 			CompactSlot->SetHorizontalAlignment(HAlign_Fill);
@@ -123,7 +123,7 @@ void UChatWidget::AddChatMessageToUI(const FString& SenderName, const FString& M
 
 	if (UChatMessageWidget* ExpandedMessageWidget = CreateWidget<UChatMessageWidget>(GetOwningPlayer(), ChatMessageWidgetClass))
 	{
-		ExpandedMessageWidget->SetMessage(SenderName, Message);
+		ExpandedMessageWidget->SetMessage(SenderName, Message, Timestamp);
 
 		if (UVerticalBoxSlot* ExpandedSlot = VerticalBox_ExpandedMessages->AddChildToVerticalBox(ExpandedMessageWidget))
 			ExpandedSlot->SetHorizontalAlignment(HAlign_Fill);
@@ -187,7 +187,7 @@ void UChatWidget::HandleGlobalChatMessageReceived(const FGlobalChatMessage& Chat
 	if (LastShowGlobalChatMessageID >= Chat.MessageID) return;
 
 	// 채팅을 UI에 보여주고 마지막으로 보여준 Chat ID를 저장해요
-	AddChatMessageToUI(Chat.SenderName, Chat.Message);
+	AddChatMessageToUI(Chat.SenderName, Chat.Message, Chat.Timestamp);
 	LastShowGlobalChatMessageID = Chat.MessageID;
 
 	// 채팅 추가 후
