@@ -1,4 +1,4 @@
-﻿/// 최초작성 : 2026.08.25
+/// 최초작성 : 2026.08.25
 /// 작 성 자 : 최 요 환
 /// 간단설명 : 플레이어 캐릭터의 애니메이션 클래스
 
@@ -26,10 +26,10 @@ protected:
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Movement")
-	float Speed = 0.f;
+	double Speed = 0.0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Movement")
-	float Direction = 0.f;
+	double Direction = 0.0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Movement")
 	bool bIsCrouched = false;
