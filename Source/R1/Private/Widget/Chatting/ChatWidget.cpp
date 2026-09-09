@@ -11,7 +11,7 @@
 #include "Components/VerticalBoxSlot.h"
 #include "Components/Border.h"
 #include "Character/ActionPlayerController.h"
-#include "GameFramework/PlayerState.h"
+#include "Framework/GameState/ActionGameState.h"
 
 void UChatWidget::NativeOnInitialized()
 {
@@ -21,6 +21,8 @@ void UChatWidget::NativeOnInitialized()
 	// EditableText에서 입력 포커싱이 해제되었을 때 HandleMessageCommitted 이거 호출하도록 바인딩했어요
 	if (EditableText_MessageInput)
 		EditableText_MessageInput->OnTextCommitted.AddDynamic(this, &UChatWidget::HandleMessageCommitted);
+
+	BindToActionGameState(); // GameState 채팅 관련 델리게이트 구독
 }
 
 FReply UChatWidget::NativeOnPreviewMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
@@ -36,6 +38,17 @@ FReply UChatWidget::NativeOnPreviewMouseButtonDown(const FGeometry& InGeometry, 
 	}
 
 	return Super::NativeOnPreviewMouseButtonDown(InGeometry, InMouseEvent);
+}
+
+void UChatWidget::NativeDestruct()
+{
+	if (true == ActionGameState.IsValid())
+	{
+		ActionGameState->OnGlobalChatMessageReceive.RemoveAll(this);
+		ActionGameState.Reset();
+	}
+
+	Super::NativeDestruct();
 }
 
 void UChatWidget::CloseChat()
@@ -133,19 +146,43 @@ void UChatWidget::HandleMessageCommitted(const FText& Text, ETextCommit::Type Co
 	if (nullptr == PlayerController) return;
 
 	if (false == msg.IsEmpty()) // 메시지가 없으면 채팅 추가 안 해요
-	{
-		FString SenderName = TEXT("Default(세팅 안 된 듯)");
-
-		if (APlayerState* PlayerState = PlayerController->GetPlayerState<APlayerState>())
-		{
-			FString PlayerName = PlayerState->GetPlayerName().TrimStartAndEnd();
-			if (false == PlayerName.IsEmpty())
-				SenderName = PlayerName; // 플레이어 이름
-
-			AddChatMessageToUI(SenderName, msg);
-		}
-	}
+		PlayerController->SubmitGlobalChatMessage(msg); // 위젯은 플레이어 컨트롤러를 통해 플레이어 이름을 찾거나 메시지를 목록에 추가함
 
 	// 뭐가 됐든 채팅창은 닫아야 해요
 	PlayerController->OnCloseChat();
+}
+
+void UChatWidget::BindToActionGameState()
+{
+	AActionGameState* pActionGameState = GetWorld()->GetGameState<AActionGameState>();
+
+	if (nullptr == pActionGameState)
+	{
+		UE_LOG(LogTemp, Warning, TEXT(
+				"[Chat] AActionGameState를 찾지 못했습니다. "
+				"GameMode의 Game State Class를 확인해 주세요."));
+		return;
+	}
+
+	ActionGameState = pActionGameState;
+
+	// 새로운 채팅이 추가될 떄 호출하는 델리게이트 구독
+	ActionGameState->OnGlobalChatMessageReceive.AddUObject(this, &UChatWidget::HandleGlobalChatMessageReceived);
+
+	// GameState의 채팅 복제가 위젯 생성보다 먼저 되었을 경우를 대비해
+	// 그런 경우는 델리게이트를 놓쳤을 수도 있으니 현재 보관된 기록을 한 번 확인
+	for (const FGlobalChatMessage& Chat : ActionGameState->GetGlobalChatHistroy())
+	{
+		HandleGlobalChatMessageReceived(Chat);
+	}
+}
+
+void UChatWidget::HandleGlobalChatMessageReceived(const FGlobalChatMessage& Chat)
+{
+	// UI가 이미 화면에 보여준 채팅이면.. 리턴
+	if (LastShowGlobalChatMessageID >= Chat.MessageID) return;
+
+	// 채팅을 UI에 보여주고 마지막으로 보여준 Chat ID를 저장해요
+	AddChatMessageToUI(Chat.SenderName, Chat.Message);
+	LastShowGlobalChatMessageID = Chat.MessageID;
 }

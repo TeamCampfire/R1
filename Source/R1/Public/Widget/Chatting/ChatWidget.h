@@ -19,6 +19,7 @@ class R1_API UChatWidget : public UUserWidget
 protected:
 	virtual void NativeOnInitialized() override;
 	virtual FReply NativeOnPreviewMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual void NativeDestruct() override;
 
 public:
 	// 기본 상태의 UI로 변경하는 함수
@@ -40,6 +41,13 @@ protected:
 	// 채팅 입력이 완료되었을 때 호출 (Enter를 눌렀을 때)
 	UFUNCTION()
 	void HandleMessageCommitted(const FText& Text, ETextCommit::Type CommitMethod);
+
+private:
+	// ActionGameState를 찾아 채팅 추가될 때 브로드캐스트하는 델리게이트를 구독하는 함수
+	void BindToActionGameState();
+
+	// 채팅 델리게이트 발동되었을 때 실행할 함수
+	void HandleGlobalChatMessageReceived(const struct FGlobalChatMessage& Chat);
 
 protected:
 	UPROPERTY(meta = (BindWidget))
@@ -73,4 +81,10 @@ protected:
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<class UBorder> Border_ChatClickCatcher; // 채팅 입력 상태에서 화면 전체의 좌클릭 감지하는 투명 Border
+
+private:
+	TWeakObjectPtr<class AActionGameState> ActionGameState; // 현재 연결된 GameState
+
+	int32 LastShowGlobalChatMessageID = 0; // 이 UI가 마지막으로 화면에 표시한 채팅 ID
+
 };

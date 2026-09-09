@@ -49,6 +49,13 @@ public:
 
 	AActionPlayerController();
 
+	UFUNCTION(BlueprintCallable)
+	void SubmitGlobalChatMessage(const FString& Message);
+
+	// 클라이언트가 입력한 채팅 메시지를 서버로 전달하는 함수
+	UFUNCTION(Server, Reliable)
+	void Server_SendGlobalChatMessage(const FString& Message);
+
 protected:
 
 	virtual void BeginPlay() override;
@@ -211,4 +218,7 @@ private:
 	/* UI 사용 상태 */
 	bool bInventoryOpen = false;
 	bool bGameMenuOpen = false;
+
+	// 전체 채팅 메시지의 최대 글자 수
+	static constexpr int32 MaxGlobalChatMessageLength = 200;
 };

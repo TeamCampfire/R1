@@ -23,11 +23,60 @@
 #include "Item/PlaceableItem/Campfire/CampfireComponent.h"
 #include "Interface/InteractableInterface.h"
 #include "Widget/Chatting/ChatWidget.h"
+#include "Framework/GameState/ActionGameState.h"
 
 AActionPlayerController::AActionPlayerController()
 {
 	// 빌딩 배치 컴포넌트 생성
 	BuildingPlacementComponent = CreateDefaultSubobject<UBuildingPlacementComponent>(TEXT("BuildingPlacementComp"));
+}
+
+void AActionPlayerController::SubmitGlobalChatMessage(const FString& Message)
+{
+	// 이 함수는 로컬에서 호출하는 함수
+	if (false == IsLocalController()) return;
+
+	FString msg = Message.TrimStartAndEnd();
+	if (true == msg.IsEmpty()) return;
+
+	msg = msg.Left(MaxGlobalChatMessageLength); // 채팅 최대 글자 수 제한
+
+	// 클라에서 서버로 이동
+	Server_SendGlobalChatMessage(msg);
+}
+
+void AActionPlayerController::Server_SendGlobalChatMessage_Implementation(const FString& Message)
+{
+	// 서버에서 실행되는 함수
+	if (false == HasAuthority()) return;
+
+	// 클라에서 검사했어도 서버에서 무조건 다시 검사해야 함
+	FString ValidMsg = Message.TrimStartAndEnd();
+
+	if (true == ValidMsg.IsEmpty()) return;
+	ValidMsg = ValidMsg.Left(MaxGlobalChatMessageLength); // 최대 길이 제한
+
+	FString SenderName = TEXT("Default(세팅 안 된 듯)"); // 이름 못 받아왔을 때 보여줄 기본값
+
+	// 채팅 친 사람의 이름은 클라이언트에게 전달받지 않고 서버가 직접 가져와요
+	APlayerState * SenderPlayerState = GetPlayerState<APlayerState>();
+	if (nullptr == SenderPlayerState)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Chat][Server] Sender PlayerState를 찾지 못했습니다."));
+		return;
+	}
+
+	AActionGameState* ActionGameState = GetWorld() ? GetWorld()->GetGameState<AActionGameState>() : nullptr;
+	if (nullptr == ActionGameState)
+	{
+		UE_LOG(LogTemp, Warning, TEXT(
+				"[Chat][Server] AActionGameState를 찾지 못했습니다. "
+				"GameMode의 Game State Class를 확인해 주세요."));
+		return;
+	}
+
+	// 서버의 GameState에 채팅을 하나 기록해요
+	ActionGameState->AddGlobalChatMessage(SenderPlayerState, ValidMsg);
 }
 
 UInventoryComponent* AActionPlayerController::GetPlayerInventory() const
