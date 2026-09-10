@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.09.08
+﻿/// 최초작성 : 2026.09.08
 /// 작 성 자 : 최 요 환
 /// 간단설명 : 아이템 획득 알림 스택의 행 하나(러스트 스타일)
 
@@ -22,7 +22,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPickupNotificationExpired, UPicku
  * 동작 확인 후 확정 — 합치는 방식은 "이미 떠있는 행 중 같은 아이템을 찾아 갱신+타이머 리셋"
  * 이라는 추가 로직이 필요해서 이쪽보다 복잡하다).
  *
- * Initialize()가 호출되면 (Lifetime - FadeOutDuration) 시점까지는 그대로 있다가, 남은
+ * InitializeNotification()가 호출되면 (Lifetime - FadeOutDuration) 시점까지는 그대로 있다가, 남은
  * FadeOutDuration 동안 RenderOpacity를 1→0으로 매 틱 보간해 서서히 투명해지며 사라진다.
  * Lifetime에 도달하면(오파시티 0) 스스로 OnExpired를 브로드캐스트만 하고, 실제로 화면 패널에서
  * 빼는 건 소유자(UMainHUDWidget)의 몫이다 — 이 위젯 자신은 자기가 어떤 컨테이너/배열에 들어있는지
@@ -43,7 +43,7 @@ class R1_API UPickupNotificationWidget : public UUserWidget
 
 public:
 	// 아이콘/텍스트를 채우고 페이드 카운트다운을 시작한다(0으로 두면 그 항목은 즉시로 취급).
-	void Initialize(UItemDataBase* ItemData, int32 GainedAmount, int32 NewTotalCount, float InLifetime, float InFadeOutDuration);
+	void InitializeNotification(UItemDataBase* ItemData, int32 GainedAmount, int32 NewTotalCount, float InLifetime, float InFadeOutDuration);
 
 	// Lifetime에 도달하면(페이드 완료) 브로드캐스트 — UMainHUDWidget이 구독해서 실제 제거를 처리한다.
 	UPROPERTY(BlueprintAssignable, Category = "Notification")

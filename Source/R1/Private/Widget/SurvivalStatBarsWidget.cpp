@@ -173,7 +173,7 @@ void USurvivalStatBarsWidget::AddPickupNotification(UItemDataBase* ItemData, int
 		return;
 	}
 
-	Notification->Initialize(ItemData, GainedAmount, NewTotalCount, PickupNotificationLifetime, PickupNotificationFadeOutDuration);
+	Notification->InitializeNotification(ItemData, GainedAmount, NewTotalCount, PickupNotificationLifetime, PickupNotificationFadeOutDuration);
 	Notification->OnExpired.AddDynamic(this, &USurvivalStatBarsWidget::RemovePickupNotification);
 
 	// 같은 아이템이어도 합치지 않고 매번 새 행 — 항상 맨 앞(최신/맨 위)에 꽂는다.
