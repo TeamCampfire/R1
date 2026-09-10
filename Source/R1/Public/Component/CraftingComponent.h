@@ -8,6 +8,7 @@ class UItemDataBase;
 class UInventoryComponent;
 class AWorkbench;
 class APlayerController;
+class AActionCharacter;
 class UCraftingRecipeCatalog;
 
 // 제작 주문 구조체
@@ -34,6 +35,10 @@ struct FCraftingOrder
 	// 작업대의 네트워크 Owner는 바꾸지 않음
 	UPROPERTY(NotReplicated)
 	TWeakObjectPtr<APlayerController> Requester;
+
+	// 제작 시간은 끝났지만 지급 또는 드롭에 실패해 완료 처리를 다시 기다리는 상태
+	UPROPERTY(NotReplicated)
+	bool bAwaitingDelivery = false;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCraftingChanged);
@@ -85,6 +90,9 @@ public:
 	UFUNCTION(Server, Reliable)
 	void Server_CancelOrder(const FGuid& OrderId, AWorkbench* Bench);
 
+	// 컨트롤러가 죽은 캐릭터를 놓기 전에 개인 제작 큐를 취소하고 결과와 재료를 반환
+	void CancelPersonalCraftingOnDeath(AActionCharacter* DeadCharacter);
+
 	// 파괴된 작업대의 미회수 결과물과 미완료 재료를 월드에 반환
 	void DropContents();
 
@@ -98,7 +106,7 @@ protected:
 
 private :
 
-	void TickCrafting();
+	void CompleteCurrentItem();
 	void StartNextItem();
 	void NotifyChanged();
 

@@ -16,6 +16,7 @@
 #include "Component/StatComponent.h"	
 #include "Component/InteractionComponent.h"
 #include "Component/InventoryComponent.h"
+#include "Component/CraftingComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "EnhancedInputComponent.h"
 #include "Character/ActionPlayerController.h"
@@ -626,6 +627,17 @@ void AActionCharacter::Die()
 		StopSleeping();
 
 	if (!HasAuthority()) return;
+
+	// UnPossess 전에
+	// 개인 제작 큐를 취소해 환불 재료와 지급 대기 중인 완성품을 이 캐릭터의 인벤토리에 넣고,
+	// 남은 수량은 곧 랙돌이 될 캐릭터 주변에 드롭
+	if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+	{
+		if (UCraftingComponent* Crafting = PlayerController->FindComponentByClass<UCraftingComponent>())
+		{
+			Crafting->CancelPersonalCraftingOnDeath(this);
+		}
+	}
 
 	MulticastDie();
 

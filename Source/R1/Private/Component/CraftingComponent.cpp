@@ -37,15 +37,10 @@ bool UCraftingComponent::IsRecipeAvailable(UItemDataBase* Item, bool bWorkbenchM
 void UCraftingComponent::BeginPlay()
 {
 	Super::BeginPlay();
+
 	if (GetRecipes().IsEmpty())
 	{
 		UE_LOG(LogTemp, Error, TEXT("Crafting recipes are missing. DA_CraftingRecipes."));
-	}
-
-	// 서버에서 제작 Tick 타이머 시작
-	if (GetOwner()->HasAuthority())
-	{
-		GetWorld()->GetTimerManager().SetTimer(CraftingTimer, this, &UCraftingComponent::TickCrafting, UpdateInterval, true);
 	}
 }
 
@@ -200,10 +195,16 @@ void UCraftingComponent::Server_Enqueue_Implementation(UItemDataBase* Item, int3
 
 void UCraftingComponent::StartNextItem()
 {
-	if (!Queue.IsEmpty() && Queue[0].Item)
-	{
-		Queue[0].FinishTime = GetServerTime() + FMath::Max(0.1f, Queue[0].Item->CraftingSeconds);
-	}
+	// 서버가 아니거나 제작큐가 비었거나 제작큐의 첫번째 아이템이 없을 때 종료
+	if (!GetOwner()->HasAuthority() || Queue.IsEmpty() || !Queue[0].Item)
+		return;
+
+	// 제작 완료 시간 알아오기
+	const float Duration = FMath::Max(0.1f, Queue[0].Item->CraftingSeconds);
+	Queue[0].FinishTime = GetServerTime() + Duration;
+
+	// Tick 타이머 시작
+	GetWorld()->GetTimerManager().SetTimer(CraftingTimer, this, &UCraftingComponent::CompleteCurrentItem, Duration, false);
 }
 
 bool UCraftingComponent::DropItem(UItemDataBase* Item, int32& Count) const
@@ -247,28 +248,57 @@ bool UCraftingComponent::GiveOrDrop(UItemDataBase* Item, int32& Count, APlayerCo
 // 제작 큐의 첫 번째 주문에서 아이템 1개를 완성 처리
 // - 개인 제작: 플레이어 인벤토리에 지급, 남은 수량은 월드에 드롭
 // - 작업대 제작: 주문자가 근처에 있으면 즉시 지급, 지급하지 못한 수량은 작업대의 완료 목록에 보관
-void UCraftingComponent::TickCrafting()
+void UCraftingComponent::CompleteCurrentItem()
 {
+	// 제작 중인 아이템의 제작 타이머가 끝나는 순간에 실행
+
 	// 처리할 주문이 없거나 유효한 아이템이 없으면 종료
 	if (Queue.IsEmpty() || !Queue[0].Item)
-		return;
-
-	// 첫 번째 주문의 아이템 1개가 아직 완성되지 않았으면 대기
-	if (GetServerTime() < Queue[0].FinishTime)
 		return;
 
 	AWorkbench* Bench = Cast<AWorkbench>(GetOwner());			// 작업대
 	APlayerController* Recipient = Queue[0].Requester.Get();	// 주문자
 	int32 Count = 1;	// 이번 Tick에서 완성할 아이템 수량
+	Queue[0].bAwaitingDelivery = true;	// 초기값으로 true
 
 	if (!Bench)
 	{
 		// 개인 제작
 
-		// 사망/리스폰 중에는 개인 제작을 보존하고 제작 완료 처리 보류
-		// 인벤토리에 들어가지 않는 수량은 플레이어 주변에 드롭
-		if (!CanPlayerCraft() || !GiveOrDrop(Queue[0].Item, Count, Recipient))
-			return;
+		if (CanPlayerCraft())
+		{
+			// 살아 있으면 인벤토리에 지급하고, 남은 수량은 플레이어 주변에 드롭
+			if (!GiveOrDrop(Queue[0].Item, Count, Recipient))
+			{
+				// 지급이나 드롭에 실패한 경우에만 0.1초 뒤에 다시 시도
+				GetWorld()->GetTimerManager().SetTimer(
+					CraftingTimer,
+					this,
+					&UCraftingComponent::CompleteCurrentItem,
+					UpdateInterval,
+					false
+				);
+
+				return;
+			}
+		}
+		else
+		{
+			// 사망/리스폰 상태라면 인벤토리를 거치지 않고 바로 드롭
+			if (!DropItem(Queue[0].Item, Count))
+			{
+				// 리스폰 중 Pawn이 없거나 픽업 생성에 실패한 경우 0.1초 뒤에 재시도
+				GetWorld()->GetTimerManager().SetTimer(
+					CraftingTimer,
+					this,
+					&UCraftingComponent::CompleteCurrentItem,
+					UpdateInterval,
+					false
+				);
+
+				return;
+			}
+		}
 	}
 	else
 	{
@@ -311,11 +341,159 @@ void UCraftingComponent::TickCrafting()
 	}
 
 	// 현재 주문의 남은 제작 수량을 감소시키고, 모두 완성됐으면 제거
+	Queue[0].bAwaitingDelivery = false;
 	if (--Queue[0].Remaining <= 0)
 		Queue.RemoveAt(0);
 
 	StartNextItem();	// 다음 아이템의 완성 예정 시각 설정
 	NotifyChanged();	// 변경 사실 알리기
+}
+
+void UCraftingComponent::CancelPersonalCraftingOnDeath(AActionCharacter* DeadCharacter)
+{
+	// 개인 제작 큐는 플레이어 컨트롤러의 CraftingComponent가 소유
+	// 서버에서 캐릭터를 UnPossess하기 전에 호출해야 죽은 캐릭터의 인벤토리와 위치 사용 가능
+	if (!GetOwner()->HasAuthority() || !DeadCharacter || Queue.IsEmpty())
+		return;
+
+	// 이 컴포넌트의 소유 컨트롤러가 실제로 DeadCharacter를 조종 중인지 확인
+	// 다른 캐릭터나 이미 UnPossess된 캐릭터에 반환하는 것 방지
+	APlayerController* Controller = Cast<APlayerController>(GetOwner());
+	UInventoryComponent* DeadInventory = DeadCharacter->FindComponentByClass<UInventoryComponent>();
+	if (!Controller || Controller->GetPawn() != DeadCharacter || !DeadInventory)
+		return;
+
+	// 모든 주문에서 반환할 완성품과 재료를 아이템 종류별로 합산
+	// 같은 재료를 사용하는 주문이 여러 개여도 반환 픽업은 아이템 종류별로 하나만 제작
+	TMap<UItemDataBase*, int32> ItemsToReturn;
+	auto AddReturnItem = [&ItemsToReturn](UItemDataBase* Item, int64 Count) -> bool
+	{
+		// 반환량이 0이면 추가할 필요가 없으므로 정상 처리
+		if (Count == 0)
+			return true;
+
+		// 잘못된 아이템, 음수 수량, int32에 저장할 수 없는 수량은 거부
+		if (!Item || Count < 0 || Count > MAX_int32)
+			return false;
+
+		// 같은 아이템의 기존 합계에 더할 때 발생할 수 있는 int32 오버플로 검사
+		int32& Total = ItemsToReturn.FindOrAdd(Item);
+		if (Count > MAX_int32 - Total)
+			return false;
+
+		Total += static_cast<int32>(Count);
+		return true;
+	};
+
+	// 큐의 모든 개인 제작 주문을 취소하며 실제 반환량을 계산
+	for (const FCraftingOrder& Order : Queue)
+	{
+		// CompleteCurrentItem 진입 후 지급이나 드롭에 실패한 1개는 제작 시간이 이미 끝난 완성품
+		// 이 수량은 재료로 되돌리지 않고 완성된 아이템 자체로 반환
+		const int32 CompletedCount = Order.bAwaitingDelivery ? 1 : 0;
+		if (!AddReturnItem(Order.Item, CompletedCount))
+			return;
+
+		// Remaining에는 지급 대기 중인 완성품도 포함되므로 CompletedCount만큼 감소
+		// 나머지 미완성 수량은 주문 등록 때 선불로 소비했던 재료로 환불
+		const int32 UnfinishedCount = Order.Remaining - CompletedCount;
+		if (UnfinishedCount <= 0)
+			continue;
+
+		// 같은 재료가 레시피에 여러 번 들어간 경우까지 합산한 개당 비용을 구하기
+		TMap<UItemDataBase*, int32> IngredientCosts;
+		if (!CollectIngredientCosts(Order.Item, IngredientCosts))
+			return;
+
+		for (const TPair<UItemDataBase*, int32>& Ingredient : IngredientCosts)
+		{
+			// 개당 재료 수량 × 미완성 제작 수량으로 환불량을 계산
+			// 곱셈은 int64로 수행하고 AddReturnItem에서 int32 범위를 검사
+			const int64 RefundCount = static_cast<int64>(Ingredient.Value) * UnfinishedCount;
+			if (!AddReturnItem(Ingredient.Key, RefundCount))
+				return;
+		}
+	}
+
+	// 반환할 각 아이템의 수량과 지연 스폰한 픽업 액터 정보를 임시 보관
+	struct FPreparedDeathReturn
+	{
+		UItemDataBase* Item = nullptr;
+		int32 Count = 0;
+		AItemPickup* DeferredPickup = nullptr;
+		FTransform SpawnTransform;
+	};
+
+	UWorld* World = GetWorld();
+	if (!World || ItemsToReturn.IsEmpty())
+		return;
+
+	TArray<FPreparedDeathReturn> PreparedReturns;
+	PreparedReturns.Reserve(ItemsToReturn.Num());
+
+	// 인벤토리에 들어가지 않은 아이템은 곧 랙돌이 될 캐릭터의 앞쪽에 드롭
+	const FVector BaseLocation = DeadCharacter->GetActorLocation()
+		+ DeadCharacter->GetActorForwardVector() * 100.f
+		+ FVector(0.f, 0.f, 50.f);
+
+	// 인벤토리를 먼저 변경한 뒤 픽업 생성이 실패하면 일부만 반환될 수 있음
+	// -> 이를 막기 위해 모든 반환 아이템의 픽업 액터를 지연 스폰 상태로 먼저 확보
+	for (const TPair<UItemDataBase*, int32>& Entry : ItemsToReturn)
+	{
+		FPreparedDeathReturn Prepared;
+		Prepared.Item = Entry.Key;
+		Prepared.Count = Entry.Value;
+
+		// 여러 픽업의 메시와 상호작용 범위가 같은 위치에 겹치지 않도록 원형으로 분산
+		const float Angle = PreparedReturns.Num() * (2.f * PI / FMath::Max(1, ItemsToReturn.Num()));
+		const FVector Offset(FMath::Cos(Angle) * 40.f, FMath::Sin(Angle) * 40.f, 0.f);
+		Prepared.SpawnTransform = FTransform(FRotator::ZeroRotator, BaseLocation + Offset);
+		Prepared.DeferredPickup = World->SpawnActorDeferred<AItemPickup>(
+			AItemPickup::StaticClass(),
+			Prepared.SpawnTransform,
+			nullptr,
+			nullptr,
+			ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+
+		if (!Prepared.DeferredPickup)
+		{
+			// 하나라도 준비하지 못하면 앞서 만든 지연 스폰 액터를 모두 제거
+			// -> 아직 인벤토리와 큐는 변경하지 않았으므로 부분 반환은 발생하지 않음
+			for (FPreparedDeathReturn& Existing : PreparedReturns)
+			{
+				if (Existing.DeferredPickup)
+					Existing.DeferredPickup->Destroy();
+			}
+			return;
+		}
+
+		PreparedReturns.Add(Prepared);
+	}
+
+	// 모든 드롭 액터를 준비한 뒤 죽은 캐릭터의 인벤토리에 먼저 반환
+	// 인벤토리에 들어가지 않은 수량이 있을 때만 해당 픽업 액터의 스폰을 완료
+	for (FPreparedDeathReturn& Prepared : PreparedReturns)
+	{
+		int32 Remainder = Prepared.Count;
+		DeadInventory->AddItem(Prepared.Item, Prepared.Count, Remainder);
+
+		if (Remainder > 0)
+		{
+			Prepared.DeferredPickup->InitializeFromItem(Prepared.Item, Remainder);
+			Prepared.DeferredPickup->FinishSpawning(Prepared.SpawnTransform);
+		}
+		else
+		{
+			// 전량이 인벤토리에 들어갔다면 미리 준비한 지연 스폰 액터 제거
+			Prepared.DeferredPickup->Destroy();
+		}
+	}
+
+	// 모든 반환이 끝난 뒤 제작 완료 타이머를 끄고 개인 제작 큐를 비우기
+	// 컴포넌트는 컨트롤러와 함께 리스폰 후에도 유지되므로 여기서 명시적으로 초기화
+	GetWorld()->GetTimerManager().ClearTimer(CraftingTimer);
+	Queue.Reset();
+	NotifyChanged();
 }
 
 // 지정한 작업대의 제작 완료품을 플레이어가 회수하도록 서버에 요청
@@ -518,28 +696,149 @@ void UCraftingComponent::Server_CancelOrder_Implementation(const FGuid& OrderId,
 // 작업대 파괴 시 완료 아이템과 아직 제작하지 않은 주문의 재료를 월드에 떨어뜨리기
 void UCraftingComponent::DropContents()
 {
+	// 제작 상태와 월드 아이템 생성은 서버에서만 처리
 	if (!GetOwner()->HasAuthority())
 		return;
 
-	for (FCraftingOrder& Order : CompletedOrders)
-		DropItem(Order.Item, Order.Remaining);
+	// 완료 목록과 제작 큐에서 드롭해야 할 완성품 및 환불 재료를 아이템 종류별로 합산
+	// 같은 아이템이 여러 주문에 포함되어 있어도 픽업 액터는 아이템 종류별로 하나만 만들기
+	TMap<UItemDataBase*, int32> ItemsToDrop;
+	auto AddDropItem = [&ItemsToDrop](UItemDataBase* Item, int64 Count) -> bool
+	{
+		// 드롭 수량이 0이면 추가할 필요가 없으므로 정상 처리
+		if (Count == 0)
+			return true;
 
+		// 잘못된 아이템, 음수 수량, int32에 저장할 수 없는 수량은 거부
+		if (!Item || Count < 0 || Count > MAX_int32)
+			return false;
+
+		// 같은 아이템의 기존 합계에 더할 때 발생할 수 있는 int32 오버플로도 검사
+		int32& Total = ItemsToDrop.FindOrAdd(Item);
+		if (Count > MAX_int32 - Total)
+			return false;
+
+		Total += static_cast<int32>(Count);
+		return true;
+	};
+
+	// CompletedOrders: 제작이 끝나 작업대에서 회수를 기다리던 완성품
+	// 남아 있는 수량을 재료로 되돌리지 않고 완성된 아이템 자체로 드롭
+	for (const FCraftingOrder& Order : CompletedOrders)
+	{
+		if (!AddDropItem(Order.Item, Order.Remaining))
+			return;
+	}
+
+	// 제작 큐의 주문은 제작이 끝난 수량과 아직 제작되지 않은 수량을 나누어 처리
 	for (const FCraftingOrder& Order : Queue)
 	{
+		// CompleteCurrentItem 진입 후 지급에 실패한 1개는 제작 시간이 이미 끝난 완성품
+		// 이 수량은 재료로 환불하지 않고 완성된 아이템 자체로 드롭한다.
+		const int32 CompletedCount = Order.bAwaitingDelivery ? 1 : 0;
+		if (!AddDropItem(Order.Item, CompletedCount))
+			return;
+
+		// Remaining에는 지급 대기 중인 완성품도 포함되므로 CompletedCount만큼 빼기
+		// 나머지 미완성 수량은 주문 등록 때 선불로 소비했던 재료로 반환
+		const int32 UnfinishedCount = Order.Remaining - CompletedCount;
+		if (UnfinishedCount <= 0)
+			continue;
+
+		// 같은 재료가 레시피에 여러 번 들어간 경우까지 합산한 개당 비용을 구하기
 		TMap<UItemDataBase*, int32> Costs;
-		if (!CollectIngredientCosts(Order.Item, Costs)) continue;
-		for (const auto& Cost : Costs)
+		if (!CollectIngredientCosts(Order.Item, Costs))
+			return;
+
+		for (const TPair<UItemDataBase*, int32>& Cost : Costs)
 		{
-			int32 Count = Cost.Value * Order.Remaining;
-			if (!DropItem(Cost.Key, Count))
-			{
-				UE_LOG(LogTemp, Error, TEXT("Failed to drop crafting contents from %s"), *GetOwner()->GetName());
-			}
+			// 개당 재료 수량 × 미완성 제작 수량으로 실제 반환량을 계산
+			// 곱셈은 int64로 수행하고 AddDropItem에서 int32 범위를 검사
+			const int64 RefundCount = static_cast<int64>(Cost.Value) * UnfinishedCount;
+			if (!AddDropItem(Cost.Key, RefundCount))
+				return;
 		}
 	}
 
+	// 반환할 내용물이 없다면 타이머와 제작 목록만 정리
+	if (ItemsToDrop.IsEmpty())
+	{
+		GetWorld()->GetTimerManager().ClearTimer(CraftingTimer);
+		Queue.Reset();
+		CompletedOrders.Reset();
+		return;
+	}
+
+	// 작업대가 파괴되는 현재 월드와 드롭 위치의 기준이 될 작업대 액터를 확인
+	UWorld* World = GetWorld();
+	AActor* Workbench = GetOwner();
+	if (!World || !Workbench)
+		return;
+
+	// 반환할 각 아이템의 수량과 지연 스폰한 픽업 액터 정보를 임시 보관
+	struct FPreparedWorkbenchDrop
+	{
+		UItemDataBase* Item = nullptr;
+		int32 Count = 0;
+		AItemPickup* DeferredPickup = nullptr;
+		FTransform SpawnTransform;
+	};
+
+	TArray<FPreparedWorkbenchDrop> PreparedDrops;
+	PreparedDrops.Reserve(ItemsToDrop.Num());
+
+	// 픽업은 파괴되는 작업대의 앞쪽과 위쪽을 기준으로 배치
+	const FVector BaseLocation = Workbench->GetActorLocation()
+		+ Workbench->GetActorForwardVector() * 100.f
+		+ FVector(0.f, 0.f, 50.f);
+
+	// 일부 픽업을 생성한 뒤 나머지 생성이 실패하면 내용물이 부분적으로만 드롭될 수 있음
+	// -> 이를 막기 위해 실제 드롭 전에 필요한 픽업 액터를 모두 지연 스폰 상태로 확보
+	for (const TPair<UItemDataBase*, int32>& Entry : ItemsToDrop)
+	{
+		FPreparedWorkbenchDrop Prepared;
+		Prepared.Item = Entry.Key;
+		Prepared.Count = Entry.Value;
+
+		// 여러 픽업의 메시와 상호작용 범위가 같은 위치에 겹치지 않도록 원형으로 분산
+		const float Angle = PreparedDrops.Num() * (2.f * PI / FMath::Max(1, ItemsToDrop.Num()));
+		const FVector Offset(FMath::Cos(Angle) * 40.f, FMath::Sin(Angle) * 40.f, 0.f);
+		Prepared.SpawnTransform = FTransform(FRotator::ZeroRotator, BaseLocation + Offset);
+		Prepared.DeferredPickup = World->SpawnActorDeferred<AItemPickup>(
+			AItemPickup::StaticClass(),
+			Prepared.SpawnTransform,
+			nullptr,
+			nullptr,
+			ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+
+		if (!Prepared.DeferredPickup)
+		{
+			// 하나라도 준비하지 못하면 앞서 만든 지연 스폰 액터를 모두 제거한다.
+			// 아직 FinishSpawning을 호출하지 않았으므로 실제 드롭은 발생하지 않는다.
+			for (FPreparedWorkbenchDrop& Existing : PreparedDrops)
+			{
+				if (Existing.DeferredPickup)
+					Existing.DeferredPickup->Destroy();
+			}
+			UE_LOG(LogTemp, Error, TEXT("Failed to prepare crafting drops from %s"), *Workbench->GetName());
+			return;
+		}
+
+		PreparedDrops.Add(Prepared);
+	}
+
+	// 모든 픽업이 준비된 뒤 아이템 데이터와 수량을 설정하고 실제 스폰을 완료
+	for (FPreparedWorkbenchDrop& Prepared : PreparedDrops)
+	{
+		Prepared.DeferredPickup->InitializeFromItem(Prepared.Item, Prepared.Count);
+		Prepared.DeferredPickup->FinishSpawning(Prepared.SpawnTransform);
+	}
+
+	// 모든 내용물을 드롭한 뒤 실행 중인 제작 타이머와 작업대의 제작 상태를 정리
+	GetWorld()->GetTimerManager().ClearTimer(CraftingTimer);
 	Queue.Reset();
 	CompletedOrders.Reset();
+	NotifyChanged();
 }
 
 void UCraftingComponent::NotifyChanged()
@@ -558,7 +857,7 @@ void UCraftingComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	// 컨트롤러 자체는 소유 클라이언트에만 존재
-	// 작업대는 서버와 연결된 클라이언트에게 공유.
+	// 작업대는 서버와 연결된 클라이언트에게 공유
 	DOREPLIFETIME(UCraftingComponent, Queue);
 	DOREPLIFETIME(UCraftingComponent, CompletedOrders);
 }
