@@ -37,15 +37,10 @@ bool UCraftingComponent::IsRecipeAvailable(UItemDataBase* Item, bool bWorkbenchM
 void UCraftingComponent::BeginPlay()
 {
 	Super::BeginPlay();
+
 	if (GetRecipes().IsEmpty())
 	{
 		UE_LOG(LogTemp, Error, TEXT("Crafting recipes are missing. DA_CraftingRecipes."));
-	}
-
-	// 서버에서 제작 Tick 타이머 시작
-	if (GetOwner()->HasAuthority())
-	{
-		GetWorld()->GetTimerManager().SetTimer(CraftingTimer, this, &UCraftingComponent::TickCrafting, UpdateInterval, true);
 	}
 }
 
@@ -200,10 +195,16 @@ void UCraftingComponent::Server_Enqueue_Implementation(UItemDataBase* Item, int3
 
 void UCraftingComponent::StartNextItem()
 {
-	if (!Queue.IsEmpty() && Queue[0].Item)
-	{
-		Queue[0].FinishTime = GetServerTime() + FMath::Max(0.1f, Queue[0].Item->CraftingSeconds);
-	}
+	// 서버가 아니거나 제작큐가 비었거나 제작큐의 첫번째 아이템이 없을 때 종료
+	if (!GetOwner()->HasAuthority() || Queue.IsEmpty() || !Queue[0].Item)
+		return;
+
+	// 제작 완료 시간 알아오기
+	const float Duration = FMath::Max(0.1f, Queue[0].Item->CraftingSeconds);
+	Queue[0].FinishTime = GetServerTime() + Duration;
+
+	// Tick 타이머 시작
+	GetWorld()->GetTimerManager().SetTimer(CraftingTimer, this, &UCraftingComponent::TickCrafting, Duration, false);
 }
 
 bool UCraftingComponent::DropItem(UItemDataBase* Item, int32& Count) const
@@ -249,12 +250,10 @@ bool UCraftingComponent::GiveOrDrop(UItemDataBase* Item, int32& Count, APlayerCo
 // - 작업대 제작: 주문자가 근처에 있으면 즉시 지급, 지급하지 못한 수량은 작업대의 완료 목록에 보관
 void UCraftingComponent::TickCrafting()
 {
+	// 제작 중인 아이템의 제작 타이머가 끝나는 순간에 실행
+
 	// 처리할 주문이 없거나 유효한 아이템이 없으면 종료
 	if (Queue.IsEmpty() || !Queue[0].Item)
-		return;
-
-	// 첫 번째 주문의 아이템 1개가 아직 완성되지 않았으면 대기
-	if (GetServerTime() < Queue[0].FinishTime)
 		return;
 
 	AWorkbench* Bench = Cast<AWorkbench>(GetOwner());			// 작업대
@@ -265,10 +264,40 @@ void UCraftingComponent::TickCrafting()
 	{
 		// 개인 제작
 
-		// 사망/리스폰 중에는 개인 제작을 보존하고 제작 완료 처리 보류
-		// 인벤토리에 들어가지 않는 수량은 플레이어 주변에 드롭
-		if (!CanPlayerCraft() || !GiveOrDrop(Queue[0].Item, Count, Recipient))
-			return;
+		if (CanPlayerCraft())
+		{
+			// 살아 있으면 인벤토리에 지급하고, 남은 수량은 플레이어 주변에 드롭
+			if (!GiveOrDrop(Queue[0].Item, Count, Recipient))
+			{
+				// 지급이나 드롭에 실패한 경우에만 0.1초 뒤에 다시 시도
+				GetWorld()->GetTimerManager().SetTimer(
+					CraftingTimer,
+					this,
+					&UCraftingComponent::TickCrafting,
+					UpdateInterval,
+					false
+				);
+
+				return;
+			}
+		}
+		else
+		{
+			// 사망/리스폰 상태라면 인벤토리를 거치지 않고 바로 드롭
+			if (!DropItem(Queue[0].Item, Count))
+			{
+				// 리스폰 중 Pawn이 없거나 픽업 생성에 실패한 경우 0.1초 뒤에 재시도
+				GetWorld()->GetTimerManager().SetTimer(
+					CraftingTimer,
+					this,
+					&UCraftingComponent::TickCrafting,
+					UpdateInterval,
+					false
+				);
+
+				return;
+			}
+		}
 	}
 	else
 	{
