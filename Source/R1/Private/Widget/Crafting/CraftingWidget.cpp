@@ -1,4 +1,4 @@
-﻿#include "Widget/CraftingWidget.h"
+﻿#include "Widget/Crafting/CraftingWidget.h"
 
 #include "Character/ActionPlayerController.h"
 #include "Component/CraftingComponent.h"

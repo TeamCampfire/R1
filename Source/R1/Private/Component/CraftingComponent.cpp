@@ -4,7 +4,7 @@
 #include "Component/InventoryComponent.h"
 #include "Component/StatComponent.h"
 #include "Data/Item/ItemDataBase.h"
-#include "Data/CraftingRecipeCatalog.h"
+#include "Data/Crafting/CraftingRecipeCatalog.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerController.h"
 #include "Interface/HealthInterface.h"

@@ -1,7 +1,7 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Widget/MainHUDWidget.h"
-#include "Widget/CraftingWidget.h"
+#include "Widget/Crafting/CraftingWidget.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "Widget/Inventory/InventoryWidget.h"
