@@ -8,6 +8,9 @@
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "Sound/SoundAttenuation.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
+#include "NiagaraComponent.h"
 
 ACampfire::ACampfire()
 {
@@ -20,6 +23,11 @@ ACampfire::ACampfire()
 
 	// 모닥불 기능
 	CampfireComponent = CreateDefaultSubobject<UCampfireComponent>(TEXT("CampfireComponent"));
+
+	// 모닥불 나이아가라
+	FireVFX = CreateDefaultSubobject<UNiagaraComponent>(TEXT("FireVFX"));
+	FireVFX->SetupAttachment(GetRootComponent());
+	FireVFX->bAutoActivate = false;
 }
 
 void ACampfire::BeginPlay()
@@ -98,6 +106,18 @@ void ACampfire::HandleCampfireStateChanged()
 	if (bWasLitForAudio && !bLit && ExtinguishSound)
 	{
 		UGameplayStatics::PlaySoundAtLocation(this, ExtinguishSound, GetActorLocation(), 1.f, 1.f, 0.f, WorldSoundAttenuation);
+	}
+
+	if (true == bLit && FireVFX)
+	{
+		//UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			//GetWorld(), FireVFX, GetActorLocation(), GetActorRotation(), GetActorScale3D());
+		FireVFX->Activate();
+	}
+
+	if (false == bLit)
+	{
+		FireVFX->Deactivate();
 	}
 
 	bWasLitForAudio = bLit;			// 점화 오디오 상태 업데이트: 이번에 처리한 점화 상태를 다음 상태와 비교하기 위해 저장
