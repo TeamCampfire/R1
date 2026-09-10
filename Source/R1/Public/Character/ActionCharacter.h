@@ -32,6 +32,7 @@ class UInteractionComponent;
 class UEquipmentComponent;
 class UItemDataBase;
 class AWheeledVehicleBase;
+class AHorse;
 
 UCLASS()
 class R1_API AActionCharacter : public ACharacter, public IStatInterface
@@ -103,8 +104,8 @@ public:
 	FORCEINLINE AWheeledVehicleBase* GetCurrentVehicle() const { return CurrentVehicle;}
 	FORCEINLINE void SetCurrentVehicle(AWheeledVehicleBase* InVehicle) { CurrentVehicle = InVehicle;}
 
-	FORCEINLINE AWheeledVehicleBase* GetCurrentHorse() const { return CurrentHorse;}
-	FORCEINLINE void SetCurrentHorse(AWheeledVehicleBase* InVehicle) { CurrentHorse = InVehicle;}
+	FORCEINLINE AHorse* GetCurrentHorse() const { return CurrentHorse;}
+	FORCEINLINE void SetCurrentHorse(AHorse* InVehicle) { CurrentHorse = InVehicle;}
 
 protected:
 	virtual bool CanJumpInternal_Implementation() const override;
@@ -336,7 +337,7 @@ protected:
 	TObjectPtr<AWheeledVehicleBase> CurrentVehicle;
 
 	UPROPERTY(Replicated)
-	TObjectPtr<AWheeledVehicleBase> CurrentHorse;
+	TObjectPtr<AHorse> CurrentHorse;
 
 	// 스탯 컴포넌트
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)

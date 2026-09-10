@@ -23,6 +23,7 @@
 #include "Data/Item/PlaceableItemData.h"
 #include "Data/Item/HeldItemData.h"
 #include "Vehicle/WheeledVehicleBase.h"
+#include "Vehicle/Horse.h"
 
 #include "InputMappingContext.h"
 #include "InputAction.h"
@@ -338,19 +339,7 @@ void AActionCharacter::SetIsInVehicle(bool bIsInVehicleNew, bool bIsDriver)
 	VehicleYawOffset = CurrentVehicle? CurrentVehicle->GetActorRotation().Yaw : 0.0f;
 	GetCapsuleComponent()->SetCollisionObjectType(bIsInVehicleNew? ECC_GameTraceChannel4 : ECC_Pawn);
 	GetMesh()->SetCollisionObjectType(bIsInVehicleNew? ECC_GameTraceChannel4 : ECC_Pawn);
-	/*GetCapsuleComponent()->SetCollisionEnabled(
-		bIsInVehicleNew?
-		ECollisionEnabled::NoCollision
-       :ECollisionEnabled::QueryAndPhysics);*/
 
-	//GetCapsuleComponent()->SetCollisionResponseToChannel(
-	//	ECC_GameTraceChannel4, // Vehicle
-	//	bIsInVehicleNew ? ECR_Ignore : ECR_Block
-	//);
-	//GetMesh()->SetCollisionResponseToChannel(
-	//	ECC_GameTraceChannel4,
-	//	ECR_Ignore
-	//);
 	bUseControllerRotationYaw = !bIsInVehicleNew;
 
 	SetReplicateMovement(!bIsInVehicleNew);

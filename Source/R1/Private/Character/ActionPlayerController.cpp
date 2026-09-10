@@ -14,6 +14,7 @@
 #include "Framework/GameMode/TestGameMode.h"
 #include "Widget/Multiplayer/MultiplayerMenuWidget.h"
 #include "Vehicle/WheeledVehicleBase.h"
+#include "Vehicle/Horse.h"
 #include "Widget/MainHUDWidget.h"
 
 #include "BuildingSystem/Component/BuildingPlacementComponent.h"
@@ -453,6 +454,14 @@ void AActionPlayerController::OnRep_Pawn()
         Cast<AWheeledVehicleBase>(GetPawn()))
     {
         Vehicle->AddVehicleInputMapping();
+        return;
+    }
+
+	// 말로 Possess된 경우
+    if (AHorse* Horse =
+        Cast<AHorse>(GetPawn()))
+    {
+		Horse->AddHorseInputMapping();
         return;
     }
 

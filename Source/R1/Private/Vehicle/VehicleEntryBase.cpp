@@ -1,6 +1,7 @@
 ﻿#include "Vehicle/VehicleEntryBase.h"
 #include "Vehicle/VehicleBase.h"
 #include "Vehicle/WheeledVehicleBase.h"
+#include "Vehicle/Horse.h"
 #include "Character/ActionPlayerController.h"
 #include "Character/ActionCharacter.h"
 
@@ -19,9 +20,15 @@ void AVehicleEntryBase::Interact_Implementation(APawn* Interactor)
 	if (!Interactor) return;
 	//UE_LOG(LogTemp, Warning, TEXT("=== VehicleEntryBase::Interact_Implementation === Interactor=%s"), *GetNameSafe(Interactor));
 	UE_LOG(LogTemp, Warning, TEXT("=== VehicleEntryBase::Interact_Implementation === Interactor=%s Vehicle=%s SeatIndex=%d"), *GetNameSafe(Interactor), *GetNameSafe(Vehicle), SeatIndex);
-	if (!Vehicle) return;
+	if (Vehicle)
+	{
+		Vehicle->Execute_EnterVehicle(Vehicle, Interactor, SeatIndex);
+	}
 
-	Vehicle->Execute_EnterVehicle(Vehicle, Interactor, SeatIndex);
+	if (Horse)
+	{
+		Horse->Execute_EnterVehicle(Horse, Interactor, SeatIndex);
+	}
 }
 
 // Called when the game starts or when spawned
@@ -29,6 +36,7 @@ void AVehicleEntryBase::BeginPlay()
 {
 	Super::BeginPlay();
 	Vehicle = Cast<AWheeledVehicleBase>(GetAttachParentActor());
+	Horse = Cast<AHorse>(GetAttachParentActor());
 }
 
 // Called every frame

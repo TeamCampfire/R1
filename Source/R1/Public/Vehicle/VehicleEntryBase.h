@@ -12,6 +12,7 @@
 
 class AVehicleBase;
 class AWheeledVehicleBase;
+class AHorse;
 
 UCLASS()
 class R1_API AVehicleEntryBase : public AActor, public IVehicleEntryInterface, public IInteractableInterface
@@ -34,6 +35,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Vehicle")
 	TObjectPtr<AWheeledVehicleBase> Vehicle;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Vehicle")
+	TObjectPtr<AHorse> Horse;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vehicle")
 	int32 SeatIndex = 0;
