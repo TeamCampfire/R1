@@ -249,11 +249,11 @@ void UCraftingWidget::RefreshQueue()
 			const FCraftingOrder& Order = Orders[Index];
 			if (!Order.Item)
 				continue;
-			\
+
 			// 현재 제작 중인 아이템인지
 			const bool bActive = !bCompleted && Index == 0 && Order.FinishTime > 0.f;
 			// 현재 제작 중인 아이템의 남은 시간
-			const float Seconds = bActive ? FMath::Max(0.f, Order.FinishTime - Source->GetServerTime());
+			const float Seconds = bActive ? FMath::Max(0.f, Order.FinishTime - Source->GetServerTime()) : 0.f;
 
 			UCraftingItemWidget* Tile = Cast<UCraftingItemWidget>(Panel->GetChildAt(Index));
 			if (Tile)
