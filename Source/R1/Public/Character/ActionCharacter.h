@@ -71,6 +71,17 @@ public:
 	UFUNCTION()
 	void OnRep_IsSitting();
 
+	void StartSleeping(const FTransform& SleepingBagTransform);
+	void StopSleeping();
+
+	UFUNCTION(Server, Reliable)
+	void ServerRequestWakeUp();
+
+	FORCEINLINE bool IsSleeping() const { return bIsSleeping; }
+
+	UFUNCTION()
+	void OnRep_IsSleeping();
+
 	FORCEINLINE bool IsSprinting() const { return bIsSprinting; }
 
 	FORCEINLINE bool IsSitting() const { return bIsSitting; }
@@ -159,60 +170,60 @@ protected:
 #pragma region IA
 
 	// 이동
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Action")
 	TObjectPtr<UInputAction> IA_Move;
 
 	// 회전
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Action")
 	TObjectPtr<UInputAction> IA_Look;
 
 	// 점프
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Action")
 	TObjectPtr<UInputAction> IA_Jump;
 
 	// 스프린트
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Action")
 	TObjectPtr<UInputAction> IA_Sprint;
 
 	// 크라우치
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Action")
 	TObjectPtr<UInputAction> IA_Crouch;
 
 	// 건축물 설치 확정 좌클릭
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Action")
 	TObjectPtr<UInputAction> IA_BuildingPlacement;
 
 	// 건축 파츠 회전 휠클릭
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Action")
 	TObjectPtr<UInputAction> IA_RotateBuildingPart;
 
 	// 상호작용
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Action")
 	TObjectPtr<UInputAction> IA_Interact;
 
 	/// 벨트슬롯 단축키
 	// 1
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Action")
 	TObjectPtr<UInputAction> IA_Use_BeltSlot_1;
 
 	// 2
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Action")
 	TObjectPtr<UInputAction> IA_Use_BeltSlot_2;
 
 	// 3
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Action")
 	TObjectPtr<UInputAction> IA_Use_BeltSlot_3;
 
 	// 4
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Action")
 	TObjectPtr<UInputAction> IA_Use_BeltSlot_4;
 
 	// 5
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Action")
 	TObjectPtr<UInputAction> IA_Use_BeltSlot_5;
 
 	// 6
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Action")
 	TObjectPtr<UInputAction> IA_Use_BeltSlot_6;
 	//------------------------------------------------------------------
 
@@ -298,9 +309,6 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
 	TObjectPtr<USkeletalMeshComponent> FirstPersonMesh;
 
-
-
-
 	/// 컴포넌트
 	// 인벤토리
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Component")
@@ -346,4 +354,12 @@ protected:
 
 	UPROPERTY()
 	float VehicleYawOffset = 0.0f;
+
+	
+	UPROPERTY(ReplicatedUsing = OnRep_IsSleeping, BlueprintReadOnly, Category = "State")
+	bool bIsSleeping = false;
+
+	// 수면 몽타주
+	UPROPERTY(EditDefaultsOnly, Category = "Animation")
+	TObjectPtr<UAnimMontage> SleepingMontage;
 };

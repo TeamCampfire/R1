@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Character/ActionCharacter.h"
@@ -280,6 +280,7 @@ void AActionCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(AActionCharacter, bIsSprinting);
 	DOREPLIFETIME(AActionCharacter, bIsSitting);
 	DOREPLIFETIME(AActionCharacter, CurrentVehicle);
+	DOREPLIFETIME(AActionCharacter, bIsSleeping);
 }
 
 void AActionCharacter::OnSecondaryActionPressed()
@@ -410,6 +411,58 @@ void AActionCharacter::OnRep_IsSitting()
 			TEXT("[LOCAL DRIVER] Hide Mesh - Character=%s"),
 			*GetNameSafe(this)
 		);
+	}
+}
+
+void AActionCharacter::StartSleeping(const FTransform& SleepingBagTransform)
+{
+	if (!HasAuthority()) return;
+	bIsSleeping = true;
+	OnRep_IsSleeping();
+
+	// 침낭의 위치로 이동
+	FVector Location = SleepingBagTransform.GetLocation() + FVector(0, 0, 88);
+	//Location.Z = GetActorLocation().Z;
+	FRotator Rotator = SleepingBagTransform.GetRotation().GetRightVector().Rotation();
+	SetActorLocationAndRotation(Location, Rotator);
+	//SetActorLocation(Location);
+
+	// 자는동안 이동 막기
+	GetCharacterMovement()->DisableMovement();
+	// 자는동안 몸 회전 막기
+	bUseControllerRotationYaw = false;
+}
+
+void AActionCharacter::StopSleeping()
+{
+	if (!HasAuthority()) return;
+	bIsSleeping = false;
+	OnRep_IsSleeping();
+
+	GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	bUseControllerRotationYaw = true;
+}
+
+void AActionCharacter::ServerRequestWakeUp_Implementation()
+{
+	StopSleeping();
+}
+
+void AActionCharacter::OnRep_IsSleeping()
+{
+	if (bIsSleeping)
+	{
+		if (SleepingMontage)
+		{
+			PlayAnimMontage(SleepingMontage);
+		}
+	}
+	else
+	{
+		if (SleepingMontage)
+		{
+			StopAnimMontage(SleepingMontage);
+		}
 	}
 }
 
@@ -792,6 +845,11 @@ void AActionCharacter::OnRotateBuildingPartPressed()
 
 void AActionCharacter::OnInteractPressed()
 {
+	if (bIsSleeping)
+	{
+		ServerRequestWakeUp();
+		return;
+	}
 
 	if (bIsSitting && CurrentVehicle)
 	{
