@@ -156,16 +156,16 @@ void AActionCharacter::BeginPlay()
 			}
 
 			int32 Remain = 0;
-			//for debug
-			if (Item->DisplayName.ToString().Contains(TEXT("나무")))
-			{
-				InventoryComponent->AddItem(Item,1000, Remain);
+			////for debug
+			//if (Item->DisplayName.ToString().Contains(TEXT("나무")) || Item->DisplayName.ToString().Contains(TEXT("돌조각")))
+			//{
+			//	InventoryComponent->AddItem(Item,1000, Remain);
 
-			}
-			else
-			{
-				InventoryComponent->AddItem(Item, 1, Remain);
-			}
+			//}
+			//else
+			//{
+			//	InventoryComponent->AddItem(Item, 1, Remain);
+			//}
 		}
 
 	}
