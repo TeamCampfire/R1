@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.30
+﻿/// 최초작성 : 2026.08.30
 /// 작 성 자 : 주 형 진
 
 // Fill out your copyright notice in the Description page of Project Settings.
@@ -205,6 +205,18 @@ protected:
 	void PopFishingInputContext();
 
 protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<class UAudioComponent> MinigameAudioComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<class UAudioComponent> StressAudioComponent;
+
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fishing|Audio")
+	TObjectPtr<USoundBase> MiniGameLoopSound;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fishing|Audio")
+	TObjectPtr<USoundBase> RodStressLoopSound;      
 
 	// 낚싯대 끝 ➔ 찌를 잇는 낚싯줄 케이블
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")

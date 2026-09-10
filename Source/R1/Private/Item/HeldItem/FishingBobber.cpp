@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.30
+﻿/// 최초작성 : 2026.08.30
 /// 작 성 자 : 주 형 진
 
 // Fill out your copyright notice in the Description page of Project Settings.
@@ -169,9 +169,9 @@ void AFishingBobber::OnEnterWater(AWaterBody* WaterBody, const FVector& SurfaceL
 	DrawDebugCircle(GetWorld(), SurfaceLocation + FVector(0.f, 0.f, 2.f), 25.0f, 24, FColor::Cyan, false, 1.2f, 0, 3.0f, FVector(1, 0, 0), FVector(0, 1, 0), false);
 	DrawDebugCircle(GetWorld(), SurfaceLocation + FVector(0.f, 0.f, 2.f), 45.0f, 32, FColor::Emerald, false, 1.5f, 0, 2.0f, FVector(1, 0, 0), FVector(0, 1, 0), false);
 
-	if (WaterSplashSound)
+	if (BobberLandSound)
 	{
-		UGameplayStatics::PlaySoundAtLocation(GetWorld(), WaterSplashSound, SurfaceLocation);
+		UGameplayStatics::PlaySoundAtLocation(GetWorld(), BobberLandSound, SurfaceLocation);
 	}
 
 	/*
@@ -196,6 +196,11 @@ void AFishingBobber::SetBiting(bool bBiting)
 	// 입질 시작 시 첨벙 이펙트/사운드 및 수면 첨벙 파문
 	if (bIsBiting)
 	{
+		if (bIsBiting && FishBiteSound)
+		{
+			UGameplayStatics::PlaySoundAtLocation(GetWorld(), FishBiteSound, GetActorLocation());
+		}
+
 		const FVector BiteLoc = GetActorLocation();
 		if (WaterSplashFX)
 		{
@@ -205,9 +210,9 @@ void AFishingBobber::SetBiting(bool bBiting)
 		DrawDebugCircle(GetWorld(), BiteLoc + FVector(0.f, 0.f, 2.f), 35.0f, 24, FColor(0, 220, 255), false, 1.0f, 0, 4.0f, FVector(1, 0, 0), FVector(0, 1, 0), false);
 		DrawDebugCircle(GetWorld(), BiteLoc + FVector(0.f, 0.f, 2.f), 60.0f, 32, FColor(50, 150, 255), false, 1.2f, 0, 2.5f, FVector(1, 0, 0), FVector(0, 1, 0), false);
 
-		if (WaterSplashSound)
+		if (FishBiteSound)
 		{
-			UGameplayStatics::PlaySoundAtLocation(GetWorld(), WaterSplashSound, BiteLoc);
+			UGameplayStatics::PlaySoundAtLocation(GetWorld(), FishBiteSound, BiteLoc);
 		}
 	}
 }

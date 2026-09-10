@@ -1,7 +1,5 @@
-/// 최초작성 : 2026.08.30
+﻿/// 최초작성 : 2026.08.30
 /// 작 성 자 : 주 형 진
-
-// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Item/HeldItem/FishingRod.h"
 #include "R1/R1.h"
@@ -23,7 +21,7 @@
 #include "InputAction.h"
 #include "Data/Item/ItemDataBase.h"
 #include "Net/UnrealNetwork.h"
-
+#include "Components/AudioComponent.h"
 
 AFishingRod::AFishingRod()
 {
@@ -50,6 +48,9 @@ AFishingRod::AFishingRod()
 	{
 		FishRewardItemData = RawMeatFinder.Object;
 	}
+
+	MinigameAudioComponent = CreateDefaultSubobject<UAudioComponent>(TEXT("MiniGameLoop"));
+	StressAudioComponent = CreateDefaultSubobject<UAudioComponent>(TEXT("CableStressLoop"));
 }
 
 void AFishingRod::BeginPlay()
@@ -653,6 +654,18 @@ void AFishingRod::Input_CastOrHook()
 	// 3. 입질(Biting) 중 좌클릭 -> 챔질(Hooking) 성공! ➔ 미니게임 돌입
 	else if (CurrentState == EFishingState::Biting)
 	{
+		if (MinigameAudioComponent && MiniGameLoopSound)
+		{
+			MinigameAudioComponent->SetSound(MiniGameLoopSound);
+			MinigameAudioComponent->FadeIn(0.5f);
+		}
+		if (StressAudioComponent && RodStressLoopSound)
+		{
+			StressAudioComponent->SetSound(RodStressLoopSound);
+			StressAudioComponent->Play();
+			StressAudioComponent->SetVolumeMultiplier(0.0f); // 초기에는 무음
+		}
+
 		GetWorld()->GetTimerManager().ClearTimer(ReactionTimerHandle);
 		GetWorld()->GetTimerManager().ClearTimer(BiteTimerHandle);
 
@@ -1095,6 +1108,18 @@ void AFishingRod::UpdateMinigame(float DeltaTime)
 
 	CurrentTension = FMath::Clamp(CurrentTension, 0.0f, 100.0f);
 
+	if (StressAudioComponent && StressAudioComponent->IsPlaying())
+	{
+		// 장력(0~100)이 올라갈수록 소리가 커짐
+		const float TensionPct = GetTensionPercent(); // 0.0 ~ 1.0
+
+		// 릴을 감는 중이거나 장력이 30% 이상일 때 소리 출력
+		const float TargetVolume = bIsReelingInput ? FMath::Lerp(0.3f, 1.2f, TensionPct) : (TensionPct * 0.8f);
+		const float TargetPitch = FMath::Lerp(0.9f, 1.35f, TensionPct);
+		StressAudioComponent->SetVolumeMultiplier(TargetVolume);
+		StressAudioComponent->SetPitchMultiplier(TargetPitch);
+	}
+
 	// ★ 핵심: 장력 100% 도달 시 낚싯줄 끊어짐 (실패!)
 	if (CurrentTension >= 100.0f)
 	{
@@ -1193,6 +1218,10 @@ void AFishingRod::UpdateMinigame(float DeltaTime)
 void AFishingRod::FinishFishing(bool bSuccess, UItemDataBase* OptionalRewardItem, int32 OptionalRewardCount)
 {
 	if (CurrentState == EFishingState::Idle) return;
+
+	if (MinigameAudioComponent) MinigameAudioComponent->FadeOut(0.4f, 0.0f);
+	if (StressAudioComponent) StressAudioComponent->FadeOut(0.2f, 0.0f);
+
 
 	if (OptionalRewardItem)
 	{

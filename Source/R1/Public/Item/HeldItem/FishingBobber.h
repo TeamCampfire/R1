@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.30
+﻿/// 최초작성 : 2026.08.30
 /// 작 성 자 : 주 형 진
 
 // Fill out your copyright notice in the Description page of Project Settings.
@@ -85,9 +85,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fishing|FX")
 	TObjectPtr<UNiagaraSystem> WaterSplashFX;
 
-	// 착수 사운드
+	// FishingBobber.h
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fishing|Audio")
-	TObjectPtr<USoundBase> WaterSplashSound;
+	TObjectPtr<USoundBase> BobberLandSound;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fishing|Audio")
+	TObjectPtr<USoundBase> FishBiteSound;
 
 	// 입질 시 찌가 들어가는 깊이 (cm): 15cm -> 28cm로 시각적으로 확실히 물속에 잠기게 함
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fishing|Tuning")
@@ -100,6 +103,7 @@ protected:
 	// 찰랑거림 속도
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fishing|Tuning")
 	float BobbingSpeed = 3.5f;
+
 
 private:
 	UPROPERTY()
