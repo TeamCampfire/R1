@@ -25,59 +25,6 @@
 #include "Widget/PickupNotificationWidget.h"
 #include "Components/PanelWidget.h"
 
-void UMainHUDWidget::OpenCraftingPanel(UCraftingComponent* Crafting, AWorkbench* Bench)
-{
-	if (!CachedController)
-	{
-		UE_LOG(LogTemp, Error, TEXT("No CachedController"));
-	}
-	if (!CachedController->IsLocalController())
-	{
-		UE_LOG(LogTemp, Error, TEXT("No IsLocalController"));
-	}
-	if (!Crafting)
-	{
-		UE_LOG(LogTemp, Error, TEXT("No Crafting"));
-	}
-	if (!CraftingWidget)
-	{
-		UE_LOG(LogTemp, Error, TEXT("No CraftingWidget"));
-	}
-	if (!CachedController || !CachedController->IsLocalController() || !Crafting || !CraftingWidget)
-		return;
-
-	CloseCraftingPanel();
-	if (IsInventoryPanelOpen())
-	{
-		ToggleInventoryPanel();
-		CachedController->SetInventoryInputState(false);
-	}
-
-	// HUD에 배치된 제작창 재사용
-	// 매번 현재 제작 대상 연결
-	CraftingWidget->BindCrafting(Crafting, Bench);
-	CraftingWidget->SetIsFocusable(true);
-	CraftingWidget->SetVisibility(ESlateVisibility::Visible);
-	CachedController->ApplyUIInputState(true);
-	CraftingWidget->SetKeyboardFocus();
-}
-
-void UMainHUDWidget::CloseCraftingPanel()
-{
-	if (!IsCraftingPanelOpen()) return;
-
-	CraftingWidget->SetVisibility(ESlateVisibility::Collapsed);
-	CraftingWidget->UnbindCrafting();
-	if (CachedController) CachedController->ApplyUIInputState(false);
-}
-
-bool UMainHUDWidget::IsCraftingPanelOpen() const
-{
-	return CraftingWidget
-		&& CraftingWidget->GetVisibility() != ESlateVisibility::Collapsed
-		&& CraftingWidget->GetVisibility() != ESlateVisibility::Hidden;
-}
-
 void UMainHUDWidget::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
@@ -104,9 +51,12 @@ void UMainHUDWidget::NativeOnInitialized()
 	{
 		InventoryWidget->SetVisibility(ESlateVisibility::Collapsed);
 	}
-	if (CampfireWidget) CampfireWidget->SetVisibility(ESlateVisibility::Collapsed);
 
-	// 게임 시작 시 제작창 보이지 않도록 숨김 처리
+	// 게임 시작 시 모닥불 UI가 보이지 않도록 숨김 처리
+	if (CampfireWidget)
+		CampfireWidget->SetVisibility(ESlateVisibility::Collapsed);
+
+	// 게임 시작 시 제작창이 보이지 않도록 숨김 처리
 	if (CraftingWidget)
 		CraftingWidget->SetVisibility(ESlateVisibility::Collapsed);
 
@@ -547,4 +497,57 @@ void UMainHUDWidget::RefreshPickupNotificationContainer()
 			PickupNotificationContainer->AddChild(Notification);
 		}
 	}
+}
+
+void UMainHUDWidget::OpenCraftingPanel(UCraftingComponent* Crafting, AWorkbench* Bench)
+{
+	if (!CachedController)
+	{
+		UE_LOG(LogTemp, Error, TEXT("No CachedController"));
+	}
+	if (!CachedController->IsLocalController())
+	{
+		UE_LOG(LogTemp, Error, TEXT("No IsLocalController"));
+	}
+	if (!Crafting)
+	{
+		UE_LOG(LogTemp, Error, TEXT("No Crafting"));
+	}
+	if (!CraftingWidget)
+	{
+		UE_LOG(LogTemp, Error, TEXT("No CraftingWidget"));
+	}
+	if (!CachedController || !CachedController->IsLocalController() || !Crafting || !CraftingWidget)
+		return;
+
+	CloseCraftingPanel();
+	if (IsInventoryPanelOpen())
+	{
+		ToggleInventoryPanel();
+		CachedController->SetInventoryInputState(false);
+	}
+
+	// HUD에 배치된 제작창 재사용
+	// 매번 현재 제작 대상 연결
+	CraftingWidget->BindCrafting(Crafting, Bench);
+	CraftingWidget->SetIsFocusable(true);
+	CraftingWidget->SetVisibility(ESlateVisibility::Visible);
+	CachedController->ApplyUIInputState(true);
+	CraftingWidget->SetKeyboardFocus();
+}
+
+void UMainHUDWidget::CloseCraftingPanel()
+{
+	if (!IsCraftingPanelOpen()) return;
+
+	CraftingWidget->SetVisibility(ESlateVisibility::Collapsed);
+	CraftingWidget->UnbindCrafting();
+	if (CachedController) CachedController->ApplyUIInputState(false);
+}
+
+bool UMainHUDWidget::IsCraftingPanelOpen() const
+{
+	return CraftingWidget
+		&& CraftingWidget->GetVisibility() != ESlateVisibility::Collapsed
+		&& CraftingWidget->GetVisibility() != ESlateVisibility::Hidden;
 }

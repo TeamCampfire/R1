@@ -34,15 +34,6 @@ class R1_API UMainHUDWidget : public UUserWidget
 
 public:
 
-	// 개인 제작과 작업대 제작은 같은 창에 데이터 원본만 바꿔 연결
-	void OpenCraftingPanel(class UCraftingComponent* Crafting, class AWorkbench* Bench);
-
-	UFUNCTION(BlueprintCallable, Category = "Crafting")
-	void CloseCraftingPanel();
-
-	UFUNCTION(BlueprintPure, Category = "Crafting")
-	bool IsCraftingPanelOpen() const;
-
 	// 인벤토리 패널(장비+메인)을 열려있으면 닫고, 닫혀있으면 연다. 전환 후 열림 상태를 돌려준다.
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	bool ToggleInventoryPanel();
@@ -99,6 +90,15 @@ public:
 	// 주석 참고).
 	UFUNCTION(BlueprintCallable, Category = "Notification")
 	void AddPickupNotification(UItemDataBase* ItemData, int32 GainedAmount, int32 NewTotalCount);
+
+	// 개인 제작과 작업대 제작은 같은 창에 데이터 원본만 바꿔 연결
+	void OpenCraftingPanel(class UCraftingComponent* Crafting, class AWorkbench* Bench);
+
+	UFUNCTION(BlueprintCallable, Category = "Crafting")
+	void CloseCraftingPanel();
+
+	UFUNCTION(BlueprintPure, Category = "Crafting")
+	bool IsCraftingPanelOpen() const;
 
 public:
 	// 플레이어 컨트롤러 캐싱
