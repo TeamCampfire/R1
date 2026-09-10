@@ -159,7 +159,7 @@ void AActionCharacter::BeginPlay()
 			//for debug
 			if (Item->DisplayName.ToString().Contains(TEXT("나무")))
 			{
-				InventoryComponent->AddItem(Item, 200, Remain);
+				InventoryComponent->AddItem(Item,1000, Remain);
 
 			}
 			else
