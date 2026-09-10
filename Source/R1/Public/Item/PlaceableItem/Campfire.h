@@ -71,6 +71,9 @@ protected :
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Campfire", meta = (ClampMin = "0"))
 	float InteractionDistance = 350.f;	// 상호작용 가능 거리
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Campfire|FX")
+	TObjectPtr<class UNiagaraComponent> FireVFX; // 연소 나이아가라
 	
 private:
 
