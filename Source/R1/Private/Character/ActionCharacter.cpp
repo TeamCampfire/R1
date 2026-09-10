@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Character/ActionCharacter.h"
@@ -686,7 +686,8 @@ void AActionCharacter::OnLookInput(const FInputActionValue& InValue)
 
 void AActionCharacter::OnSprintPressed()
 {
-	if (IsUIBlockingGameplayInput()) return;
+	/// UI열려도 동작하도록 주석처리
+	//if (IsUIBlockingGameplayInput()) return;	// UI가 열려있는 동안엔 스프린트 입력을 무시
 
 	// 도구 액션 중이거나 크라우치 모드에는 스프린트 안함
 	if (bIsCrouched || (HeldItemComponent && HeldItemComponent->BlocksCharacterMovement())) return;
@@ -730,7 +731,9 @@ void AActionCharacter::OnSprintReleased()
 
 void AActionCharacter::OnCrouchPressed()
 {
-	if (IsUIBlockingGameplayInput()) return;
+	/// UI열려도 동작하도록 주석처리
+	//if (IsUIBlockingGameplayInput()) return;	// UI가 열려있는 동안엔 크라우치 입력을 무시
+
 	if (HeldItemComponent && HeldItemComponent->BlocksCharacterMovement()) return;
 
 	if (CrouchInputMode == ECrouchInputMode::Toggle)
@@ -768,7 +771,8 @@ void AActionCharacter::OnCrouchReleased()
 
 void AActionCharacter::OnJumpPressed()
 {
-	if (IsUIBlockingGameplayInput()) return;
+	/// UI열려도 동작하도록 주석처리
+	//if (IsUIBlockingGameplayInput()) return;	// UI가 열려있는 동안엔 점프 입력을 무시
 	if (HeldItemComponent && HeldItemComponent->BlocksCharacterMovement()) return;
 	Jump();
 }
