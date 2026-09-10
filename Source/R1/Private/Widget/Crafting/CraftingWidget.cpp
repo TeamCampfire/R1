@@ -42,7 +42,7 @@ void UCraftingWidget::BindCrafting(UCraftingComponent* InCrafting, AWorkbench* I
 
 	Selected = nullptr;
 	SelectedIcon->SetVisibility(ESlateVisibility::Hidden);
-	SelectedNameText->SetText(FText::FromString("아이템을 선택하세요"));
+	SelectedNameText->SetText(FText::FromString(TEXT("아이템을 선택하세요")));
 	DescriptionText->SetText(FText::GetEmpty());
 
 	DurationText->SetText(FText::GetEmpty());
@@ -51,7 +51,7 @@ void UCraftingWidget::BindCrafting(UCraftingComponent* InCrafting, AWorkbench* I
 	SearchText.Reset();
 	SearchBox->SetText(FText::GetEmpty());
 
-	TitleText->SetText(bWorkbenchMode ? FText::FromString("작업대 제작") : FText::FromString("제작"));
+	TitleText->SetText(bWorkbenchMode ? FText::FromString(TEXT("작업대 제작")) : FText::FromString(TEXT("제작")));
 
 	CollectButton->SetVisibility(bWorkbenchMode ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 
@@ -167,11 +167,11 @@ void UCraftingWidget::Refresh()
 
 	StatusText->SetText(
 		!Selected
-		? FText::FromString("아이템을 선택하세요")
+		? FText::FromString(TEXT("아이템을 선택하세요"))
 		: Maximum == 0
-			? FText::FromString("재료가 부족하거나 제작 조건을 충족하지 못했습니다.")
+			? FText::FromString(TEXT("재료가 부족하거나 제작 조건을 충족하지 못했습니다."))
 			: Source && !Source->HasQueueSpace()
-				? FText::FromString("제작 큐가 가득 찼습니다. 완료된 아이템을 회수하세요.")
+			? FText::FromString(TEXT("제작 큐가 가득 찼습니다. 완료된 아이템을 회수하세요."))
 				: FText::GetEmpty()
 	);
 
@@ -313,7 +313,7 @@ void UCraftingWidget::HandleRecipeClicked(UItemDataBase* Item)
 
 	DescriptionText->SetText(Item ? Item->Description : FText::GetEmpty());
 
-	DurationText->SetText(Item ? FText::Format(NSLOCTEXT("Crafting", "Duration", "개당 {0}초"), FText::AsNumber(Item->CraftingSeconds)) : FText::GetEmpty());
+	DurationText->SetText(Item ? FText::Format(FText::FromString(TEXT("개당 {0}초")), FText::AsNumber(Item->CraftingSeconds)) : FText::GetEmpty());
 
 	Refresh();
 }

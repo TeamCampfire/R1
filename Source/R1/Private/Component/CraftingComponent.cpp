@@ -326,7 +326,7 @@ void UCraftingComponent::Server_CollectCompleted_Implementation(AWorkbench* Benc
 	UCraftingComponent* BenchCraftingComp = Bench->GetCraftingComponent();
 
 	// 작업대에 제작 컴포넌트가 없으면 회수 불가
-	if (BenchCraftingComp)
+	if (!BenchCraftingComp)
 		return;
 
 	// 작업대의 제작 컴포넌트에 보관된 완료품을 요청한 플레이어에게 지급
