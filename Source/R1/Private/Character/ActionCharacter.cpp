@@ -803,9 +803,12 @@ void AActionCharacter::OnInteractPressed()
 		return;
 	}
 
-	InteractionComponent->TryInteract();
+	// BP_PlayerCharacter의 상속 컴포넌트 템플릿이 깨져서 멤버 포인터가 널로 읽히는 환경 문제가
+	// 있어(OnUseBeltSlotPressed 참고) InteractionComponent가 null일 수 있다 — 가드 없이 호출하면
+	// TryInteract() 진입 시점에 크래시난다.
+	if (false == IsValid(InteractionComponent)) return;
 
-	//UE_LOG(LogTemp, Log, TEXT("TryInteract()"));
+	InteractionComponent->TryInteract();
 }
 
 void AActionCharacter::OnUseBeltSlotPressed(int32 BeltIndex)
