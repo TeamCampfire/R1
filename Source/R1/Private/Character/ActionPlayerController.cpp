@@ -30,7 +30,9 @@
 
 AActionPlayerController::AActionPlayerController()
 {
+	// 제작 컴포넌트 생성
 	CraftingComponent = CreateDefaultSubobject<UCraftingComponent>(TEXT("CraftingComponent"));
+
 	// 빌딩 배치 컴포넌트 생성
 	BuildingPlacementComponent = CreateDefaultSubobject<UBuildingPlacementComponent>(TEXT("BuildingPlacementComp"));
 }
@@ -149,7 +151,6 @@ void AActionPlayerController::BeginPlay()
 void AActionPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
-	InputComponent->BindKey(EKeys::Q, IE_Pressed, this, &AActionPlayerController::ToggleCrafting);
 
 	if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(InputComponent))
 	{
@@ -159,6 +160,9 @@ void AActionPlayerController::SetupInputComponent()
 		// 인벤토리 토글 — 컨트롤러에 바인딩해서 어떤 폰을 조종 중이든(캐릭터든 나중의 탈것이든)
 		// 항상 눌리게 한다(IA_InventoryToggle 선언부 주석 참고).
 		EIC->BindAction(IA_InventoryToggle, ETriggerEvent::Started, this, &AActionPlayerController::OnInventoryTogglePressed);
+
+		// Q: 제작 UI 토글
+		EIC->BindAction(IA_CraftingToggle, ETriggerEvent::Started, this, &AActionPlayerController::OnCraftingTogglePressed);
 	}
 }
 
@@ -519,8 +523,9 @@ void AActionPlayerController::ServerTestInflictDamage_Implementation()
 }
 //------------------------------------------------------------------------------------------------------------------------------------------
 
-// Q 키로 개인 제작 화면을 토글하며 작업대 없는 제작은 nullptr로 구분
-void AActionPlayerController::ToggleCrafting()
+// Q 키 입력
+// 개인 제작 화면을 토글하며, 작업대 없는 제작은 nullptr로 구분
+void AActionPlayerController::OnCraftingTogglePressed()
 {
 	AMainHUD* HUD = GetHUD<AMainHUD>();
 	UMainHUDWidget* MainWidget = HUD ? HUD->GetMainHudWidget() : nullptr;
@@ -530,7 +535,7 @@ void AActionPlayerController::ToggleCrafting()
 		return;
 	}
 
-	// Q 입력은 로컬 UI만 작동
+	// Q 입력으로 UI 열기는 로컬에서만 작동
 	// 실제 제작 요청은 제작 컴포넌트의 서버 RPC를 사용
 	Client_OpenCrafting_Implementation(nullptr);
 }
@@ -558,6 +563,7 @@ void AActionPlayerController::Client_OpenCrafting_Implementation(AWorkbench* Ben
 		return;
 	}
 
+	// 소유 클라이언트의 로컬 컨트롤러에서만 제작 UI 열기
 	if (!IsLocalController())
 		return;
 

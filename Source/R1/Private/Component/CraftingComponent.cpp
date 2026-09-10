@@ -21,9 +21,10 @@ UCraftingComponent::UCraftingComponent()
 
 const TArray<TObjectPtr<UItemDataBase>>& UCraftingComponent::GetRecipes() const
 {
-	// 아이템이 제작대 BP를 참조할 수 있으므로 생성자에서는 목록을 로드하지 않는다.
+	// 아이템이 제작대 BP를 참조할 수 있으므로 생성자에서는 목록을 로드하지 않음
 	if (!RecipeCatalog)
 		const_cast<UCraftingComponent*>(this)->RecipeCatalog = CatalogAsset.LoadSynchronous();
+
 	static const TArray<TObjectPtr<UItemDataBase>> Empty;
 	return RecipeCatalog ? RecipeCatalog->Recipes : Empty;
 }
@@ -82,6 +83,9 @@ bool UCraftingComponent::CanUseWorkbench(AWorkbench* Bench) const
 
 float UCraftingComponent::GetServerTime() const
 {
+	// 네트워크에서 일관된 완료 시각을 계산하도록 GameState의 동기화된 서버 시간을 우선 사용
+	// GameState가 아직 없으면 현재 World 시간을 대신 사용
+
 	const AGameStateBase* GameState = GetWorld()->GetGameState();
 
 	return GameState ? GameState->GetServerWorldTimeSeconds() : GetWorld()->GetTimeSeconds();
@@ -118,7 +122,7 @@ int32 UCraftingComponent::GetMaximum(UItemDataBase* Item, AWorkbench* Bench) con
 	if (!CanPlayerCraft() || !PlayerInventory || !Item)
 		return 0;
 
-	// 맨손 레시피도 작업대를 지정했다면 거리를 검사한다.
+	// 맨손 레시피도 작업대를 지정했다면 거리 검사
 	if (Bench && !CanUseWorkbench(Bench))
 		return 0;
 
@@ -133,6 +137,7 @@ int32 UCraftingComponent::GetMaximum(UItemDataBase* Item, AWorkbench* Bench) con
 		return 0;
 
 	int32 Maximum = MAX_int32;	// 가지고 있는 아이템으로 최대 제작 가능 수량
+
 	// 보유한 재료들 수를 필요한 재료들 수로 나눈 것의 최솟값과 한 번에 만들 수 있는 최대 아이템 수 중 작은 값
 	for (const auto& Ingredient : Required)
 	{
@@ -237,43 +242,64 @@ bool UCraftingComponent::GiveOrDrop(UItemDataBase* Item, int32& Count, APlayerCo
 	return Count <= 0 || DropItem(Item, Count);
 }
 
-// 아이템 회수
-// - 개인 제작: 지급 가능할 때까지 기다리기
-// - 작업대 제작: 즉시 지급하지 못한 결과를 회수 대기로 보관
+// 제작 큐의 첫 번째 주문에서 아이템 1개를 완성 처리
+// - 개인 제작: 플레이어 인벤토리에 지급, 남은 수량은 월드에 드롭
+// - 작업대 제작: 주문자가 근처에 있으면 즉시 지급, 지급하지 못한 수량은 작업대의 완료 목록에 보관
 void UCraftingComponent::TickCrafting()
 {
-	if (Queue.IsEmpty() || !Queue[0].Item || GetServerTime() < Queue[0].FinishTime)
+	// 처리할 주문이 없거나 유효한 아이템이 없으면 종료
+	if (Queue.IsEmpty() || !Queue[0].Item)
 		return;
 
-	AWorkbench* Bench = Cast<AWorkbench>(GetOwner());
-	APlayerController* Recipient = Queue[0].Requester.Get();
-	int32 Count = 1;
+	// 첫 번째 주문의 아이템 1개가 아직 완성되지 않았으면 대기
+	if (GetServerTime() < Queue[0].FinishTime)
+		return;
+
+	AWorkbench* Bench = Cast<AWorkbench>(GetOwner());			// 작업대
+	APlayerController* Recipient = Queue[0].Requester.Get();	// 주문자
+	int32 Count = 1;	// 이번 Tick에서 완성할 아이템 수량
+
 	if (!Bench)
 	{
-		// 사망/리스폰 중에는 개인 제작을 보존하고 지급 가능한 시점에 재시도한다.
+		// 개인 제작
+
+		// 사망/리스폰 중에는 개인 제작을 보존하고 제작 완료 처리 보류
+		// 인벤토리에 들어가지 않는 수량은 플레이어 주변에 드롭
 		if (!CanPlayerCraft() || !GiveOrDrop(Queue[0].Item, Count, Recipient))
 			return;
 	}
 	else
 	{
+		// 제작대
+		// 주문자의 개인 제작 컴포넌트를 찾아 생존 여부와 작업대 사용 가능 거리 검사
+
 		const UCraftingComponent* Personal = Recipient ? Recipient->FindComponentByClass<UCraftingComponent>() : nullptr;
+
+		// 주문자가 살아있고, 제작대 근처에 있으면 주문자에게 즉시 지급
 		if (Personal && Personal->CanPlayerCraft() && Personal->CanUseWorkbench(Bench))
 		{
 			GiveOrDrop(Queue[0].Item, Count, Recipient);
 		}
 
+		// 주문자에게 지급되지 않은 수량은 작업대의 회수 대기 목록에 보관
 		if (Count > 0)
 		{
+			// 같은 제작 주문에서 이미 완성된 항목이 있는지 찾기
 			FCraftingOrder* Completed = CompletedOrders.FindByPredicate(
-				[this](const FCraftingOrder& Order) { return Order.Id == Queue[0].Id; });
+				[this](const FCraftingOrder& Order)
+				{
+					return Order.Id == Queue[0].Id;
+				}
+			);
+
 			if (Completed)
 			{
-				// 이미 있는 완료 주문 증가
+				// 같은 주문에 완성된 주문이 있으면 이미 있는 회수 대기 목록 증가
 				Completed->Remaining += Count;
 			}
 			else
 			{
-				// 완료 주문들에 새로 추가
+				// 첫 완성품이면 회수 대기 목록에 새로 추가
 				FCraftingOrder Output = Queue[0];
 				Output.Remaining = Count;
 				Output.FinishTime = 0.f;
@@ -281,34 +307,54 @@ void UCraftingComponent::TickCrafting()
 			}
 		}
 	}
+
+	// 현재 주문의 남은 제작 수량을 감소시키고, 모두 완성됐으면 제거
 	if (--Queue[0].Remaining <= 0)
 		Queue.RemoveAt(0);
 
-	StartNextItem();
-	NotifyChanged();
+	StartNextItem();	// 다음 아이템의 완성 예정 시각 설정
+	NotifyChanged();	// 변경 사실 알리기
 }
 
+// 지정한 작업대의 제작 완료품을 플레이어가 회수하도록 서버에 요청
 void UCraftingComponent::Server_CollectCompleted_Implementation(AWorkbench* Bench)
 {
+	// 플레이어가 제작 기능을 사용할 수 없거나 해당 작업대와 상호작용할 수 없는 상태면 회수 요청 거부
 	if (!CanPlayerCraft() || !CanUseWorkbench(Bench))
 		return;
 
-	Bench->GetCraftingComponent()->CollectCompleted(Cast<APlayerController>(GetOwner()));
+	UCraftingComponent* BenchCraftingComp = Bench->GetCraftingComponent();
+
+	// 작업대에 제작 컴포넌트가 없으면 회수 불가
+	if (BenchCraftingComp)
+		return;
+
+	// 작업대의 제작 컴포넌트에 보관된 완료품을 요청한 플레이어에게 지급
+	BenchCraftingComp->CollectCompleted(Cast<APlayerController>(GetOwner()));
 }
 
+// 완료 목록에 보관된 아이템을 지정한 플레이어에게 지급
 void UCraftingComponent::CollectCompleted(APlayerController* Recipient)
 {
+	// 제작 상태와 아이템 지급을 서버에서만 처리
 	if (!GetOwner()->HasAuthority())
 		return;
 
+	// 뒤에서부터 순회하여 항목 삭제로 인한 배열 인덱스 변경 방지
 	for (int32 Index = CompletedOrders.Num() - 1; Index >= 0; --Index)
 	{
 		FCraftingOrder& Order = CompletedOrders[Index];
+
+		// 플레이어 인벤토리에 지급하고, 들어가지 않는 수량은 월드에 드롭
+		// 지급 또는 드롭된 수량만큼 Order.Remaining 감소
 		GiveOrDrop(Order.Item, Order.Remaining, Recipient);
+
+		// 모든 수량이 처리된 완료 주문은 목록에서 제거
 		if (Order.Remaining <= 0)
 			CompletedOrders.RemoveAt(Index);
 	}
 
+	// 완료 목록 변경 사실을 서버와 UI에 알림
 	NotifyChanged();
 }
 

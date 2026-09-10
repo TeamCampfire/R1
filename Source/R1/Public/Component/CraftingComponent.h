@@ -52,25 +52,31 @@ public:
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	// BP마다 목록을 설정하지 않고 공통 카탈로그 사용
+	// BP마다 목록을 따로 설정하지 않고 공통 카탈로그의 제작 레시피를 반환
 	const TArray<TObjectPtr<UItemDataBase>>& GetRecipes() const;
 
-	// 화면 표시와 서버 요청 검증에서 같은 등록 여부/제작대 조건 사용
+	// 화면 표시와 서버 요청 검증에서 같은 등록 여부와 제작대 조건 확인
 	UFUNCTION(BlueprintPure, Category = "Crafting")
 	bool IsRecipeAvailable(UItemDataBase* Item, bool bWorkbenchMode) const;
 
+	// 현재 진행 중이거나 대기 중인 제작 주문 반환
 	const TArray<FCraftingOrder>& GetQueue() const { return Queue; }
+
+	// 작업대에서 제작을 마치고 회수를 기다리는 주문 반환
 	const TArray<FCraftingOrder>& GetCompletedOrders() const { return CompletedOrders; }
+
+	// 진행 중인 주문과 회수 대기 주문을 합쳐 새 주문을 받을 자리가 있는지 확인
 	bool HasQueueSpace() const;
 
+	// 현재 보유 재료와 제작 조건을 기준으로 선택 아이템의 최대 제작 가능 수량 반환
 	UFUNCTION(BlueprintPure, Category = "Crafting")
 	int32 GetMaximum(UItemDataBase* Item, AWorkbench* Bench) const;
 
-	// 반드시 플레이어 소유 컴포넌트를 통해 요청한
+	// 플레이어 소유 컴포넌트를 통해 제작 주문을 서버에 요청
 	UFUNCTION(Server, Reliable)
 	void Server_Enqueue(UItemDataBase* Item, int32 Count, AWorkbench* Bench);
 
-	// 제업대에서 제작 완료된 아이템을 플레이어가 회수하도록 서버에 요청하는 RPC
+	// 작업대에서 제작 완료된 아이템을 플레이어가 회수하도록 서버에 요청하는 RPC
 	UFUNCTION(Server, Reliable)
 	void Server_CollectCompleted(AWorkbench* Bench);
 
@@ -79,7 +85,10 @@ public:
 
 protected:
 
+	// 타이머 시작
 	virtual void BeginPlay() override;
+
+	// 타이머 해제
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private :
@@ -102,7 +111,7 @@ private :
 
 public :
 
-	static constexpr int32 MaxQueueSize = 64;	// 최대 제작 가능 아이템 개수
+	static constexpr int32 MaxQueueSize = 64;	// 진행 큐와 완료 목록을 합친 최대 주문 수
 
 	UPROPERTY(BlueprintAssignable, Category = "Crafting")
 	FOnCraftingChanged OnCraftingChanged;	// 제작 큐나 완료 목록 변경 시 발동
@@ -111,25 +120,25 @@ public :
 	UInventoryComponent* Inventory() const;
 	bool CollectIngredientCosts(UItemDataBase* Item, TMap<UItemDataBase*, int32>& OutCosts) const;
 
-	// 소프트 참조로 패키징 의존성을 유지하면서 CDO 생성 중 순환 로딩 피함
-	// 아이템 레시피 경로 보관
+	// 공통 제작 레시피 카탈로그를 필요할 때 로드하기 위한 소프트 참조
+	// 생성자에서 즉시 로드하지 않아 CDO 생성 중 순환 로딩을 피함
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Crafting")
 	TSoftObjectPtr<UCraftingRecipeCatalog> CatalogAsset;
 
 protected :
 
 	UPROPERTY(ReplicatedUsing = OnRep_Crafting, BlueprintReadOnly, Category = "Crafting")
-	TArray<FCraftingOrder> Queue;	// 제작 큐
+	TArray<FCraftingOrder> Queue;	// 제작 큐 (배열로 구현)
 
 	UPROPERTY(ReplicatedUsing = OnRep_Crafting, BlueprintReadOnly, Category = "Crafting")
-	TArray<FCraftingOrder> CompletedOrders;	// 완료된 주문
+	TArray<FCraftingOrder> CompletedOrders;	// 작업대에서 회수를 기다리는 완료 주문
 
 	UPROPERTY(EditDefaultsOnly, Category = "Crafting", meta = (ClampMin = "0.05"))
-	float UpdateInterval = 0.1f;	// 제작 큐 갱신 주기
+	float UpdateInterval = 0.1f;	// 서버에서 제작 완료 여부를 검사하는 주기
 
 private:
 
-	// 만들 수 있는 아이템 목록 캐싱
+	// CatalogAsset에서 로드한 공통 레시피 카탈로그의 런타임 캐시
 	UPROPERTY(Transient)
 	TObjectPtr<UCraftingRecipeCatalog> RecipeCatalog;
 

@@ -80,8 +80,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
 	EPickupMode DefaultPickupMode = EPickupMode::LookAndPress;
 
-	// 제작에 필요한 재료 목록(재료 아이템 + 수량). 장비/도구뿐 아니라 소비/기타 아이템도
-	// 제작 가능할 수 있어(붕대, 침낭 등) 서브클래스가 아니라 공통 베이스에 둔다.
+	// 제작에 필요한 재료 목록(재료 아이템 + 수량)
+	// 장비/도구뿐 아니라 소비/기타 아이템도 제작 가능할 수 있어(붕대, 침낭 등)
+	// 서브클래스가 아니라 공통 베이스에 둔다.
 	// 비어있으면 제작 불가(월드/상자 획득 전용) 아이템으로 취급.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item|Crafting")
 	TArray<FCraftIngredient> CraftingCost;
@@ -98,7 +99,7 @@ public:
 
 private:
 
-	// Category가 Equipment/HeldItem/Placeable이면 MaxStackSize를 1로 강제한다 — 디자이너가
-	// 실수로 다른 값을 넣거나 에디터에서 Category만 바꿔도 즉시(에디터)/로드 시(런타임) 정정된다.
+	// Category가 Equipment/HeldItem/Placeable이면 MaxStackSize를 1로 강제
+	// — 디자이너가 실수로 다른 값을 넣거나 에디터에서 Category만 바꿔도 즉시(에디터)/로드 시(런타임) 정정
 	void EnforceStackRulesForCategory();
 };

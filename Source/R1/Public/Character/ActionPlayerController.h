@@ -36,8 +36,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Crafting")
 	void CloseCrafting();
 
-	void ToggleCrafting();
-
 	// 모닥불 UI 열기와 아래 서버 RPC들은 공유 액터 조작을 플레이어 소유 컨트롤러로 중계
 	UFUNCTION(Client, Reliable)
 	void Client_OpenCampfire(class ACampfire* Campfire);
@@ -196,6 +194,12 @@ protected:
 	// SetInventoryInputState/SetOptionsInputState가 공유하는 "현재 열려있는 UI 패널 개수" —
 	// 0→1로 바뀔 때만 게임 입력을 끄고, 1→0으로 바뀔 때만 게임 입력을 복구한다.
 	int32 OpenUIPanelCount = 0;
+
+	// 제작창 토글
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UInputAction> IA_CraftingToggle;
+
+	void OnCraftingTogglePressed();	// 제작창 토글
 
 	// 플레이어 리스폰 지점
 	UPROPERTY()

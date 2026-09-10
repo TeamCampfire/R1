@@ -33,10 +33,12 @@ bool AWorkbench::CanInteract_Implementation(APawn* Interactor) const
 		&& FVector::DistSquared(Interactor->GetActorLocation(), GetActorLocation()) <= FMath::Square(InteractionDistance);
 }
 
-// \서버의 거리 검사 후 해당 작업대의 제작 화면을 요청자에게 엶
+// 서버의 거리 검사 후 해당 작업대의 제작 화면을 요청자에게 엶
 void AWorkbench::Interact_Implementation(APawn* Interactor)
 {
-	if (!HasAuthority() || !CanInteract_Implementation(Interactor)) return;
+	if (!HasAuthority() || !CanInteract_Implementation(Interactor))
+		return;
+
 	if (AActionPlayerController* Controller = Cast<AActionPlayerController>(Interactor->GetController()))
 	{
 		Controller->Client_OpenCrafting(this);

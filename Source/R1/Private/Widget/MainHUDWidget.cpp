@@ -51,7 +51,8 @@ void UMainHUDWidget::OpenCraftingPanel(UCraftingComponent* Crafting, AWorkbench*
 		CachedController->SetInventoryInputState(false);
 	}
 
-	// HUD에 배치된 제작창을 재사용하고 매번 현재 제작 대상을 연결한다.
+	// HUD에 배치된 제작창 재사용
+	// 매번 현재 제작 대상 연결
 	CraftingWidget->BindCrafting(Crafting, Bench);
 	CraftingWidget->SetIsFocusable(true);
 	CraftingWidget->SetVisibility(ESlateVisibility::Visible);
@@ -102,8 +103,10 @@ void UMainHUDWidget::NativeOnInitialized()
 		InventoryWidget->SetVisibility(ESlateVisibility::Collapsed);
 	}
 	if (CampfireWidget) CampfireWidget->SetVisibility(ESlateVisibility::Collapsed);
-	// 초기 숨김은 열린 패널을 닫는 동작이 아니므로 입력 카운트를 변경하지 않는다.
-	if (CraftingWidget) CraftingWidget->SetVisibility(ESlateVisibility::Collapsed);
+
+	// 게임 시작 시 제작창 보이지 않도록 숨김 처리
+	if (CraftingWidget)
+		CraftingWidget->SetVisibility(ESlateVisibility::Collapsed);
 
 	// 게임을 시작했을 때 이전 디자인용 테스트 문구가 화면에 표시되지 않도록 숨겨요
 	if (true == IsValid(Border_BuildingPlacementMessage))
