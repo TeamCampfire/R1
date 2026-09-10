@@ -19,8 +19,7 @@
 #include "Item/PlaceableItem/Campfire/Campfire.h"
 #include "Component/InteractionComponent.h"
 #include "GameFramework/Pawn.h"
-#include "Widget/PickupNotificationWidget.h"
-#include "Components/PanelWidget.h"
+#include "Widget/SurvivalStatBarsWidget.h"
 
 void UMainHUDWidget::NativeOnInitialized()
 {
@@ -402,47 +401,10 @@ void UMainHUDWidget::HideBuildingDurability()
 
 void UMainHUDWidget::AddPickupNotification(UItemDataBase* ItemData, int32 GainedAmount, int32 NewTotalCount)
 {
-	if (!PickupNotificationContainer || !PickupNotificationWidgetClass || !ItemData || GainedAmount <= 0)
+	if (!SurvivalStatBarsWidget)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("[PickupNotif] SurvivalStatBarsWidget not bound on MainHUDWidget — check the widget name in WBP_MainHUD matches the UPROPERTY name."));
 		return;
 	}
-
-	UPickupNotificationWidget* Notification = CreateWidget<UPickupNotificationWidget>(this, PickupNotificationWidgetClass);
-	if (!Notification)
-	{
-		return;
-	}
-
-	Notification->Initialize(ItemData, GainedAmount, NewTotalCount, PickupNotificationLifetime, PickupNotificationFadeOutDuration);
-	Notification->OnExpired.AddDynamic(this, &UMainHUDWidget::RemovePickupNotification);
-
-	// 같은 아이템이어도 합치지 않고 매번 새 행 — 항상 맨 앞(최신/맨 위)에 꽂는다.
-	ActivePickupNotifications.Insert(Notification, 0);
-	RefreshPickupNotificationContainer();
-}
-
-void UMainHUDWidget::RemovePickupNotification(UPickupNotificationWidget* Notification)
-{
-	ActivePickupNotifications.RemoveSingle(Notification);
-
-	// Notification을 지우기만 하면 나머지 행들이 그자리에 남아 있어 빈 공간이 생기므로,
-	// 컨테이너를 새로 갱신하여 남은 행들을 아래로 내린다.
-	RefreshPickupNotificationContainer();
-}
-
-void UMainHUDWidget::RefreshPickupNotificationContainer()
-{
-	if (!PickupNotificationContainer)
-	{
-		return;
-	}
-
-	PickupNotificationContainer->ClearChildren();
-	for (UPickupNotificationWidget* Notification : ActivePickupNotifications)
-	{
-		if (Notification)
-		{
-			PickupNotificationContainer->AddChild(Notification);
-		}
-	}
+	SurvivalStatBarsWidget->AddPickupNotification(ItemData, GainedAmount, NewTotalCount);
 }
