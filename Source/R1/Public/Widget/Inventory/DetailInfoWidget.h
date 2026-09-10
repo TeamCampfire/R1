@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.31
+﻿/// 최초작성 : 2026.08.31
 /// 작 성 자 : 최 요 환
 /// 간단설명 : 인벤토리에서 선택된 슬롯의 아이템 상세 정보(이름/설명/아이콘/스탯/액션/분할)를 보여주는 위젯
 
@@ -18,6 +18,7 @@ class USlider;
 class UPanelWidget;
 class UWidget;
 class UDragDropOperation;
+class UHorizontalBox;
 struct FEquipmentStatModifier;
 struct FItemEffect;
 enum class EEquipmentStatType : uint8;
@@ -143,6 +144,15 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UImage> IconImage;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UHorizontalBox> StackTextContainer;
+	
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> CurrentStackText;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> MaxStackText;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UPanelWidget> InfoRowsContainer;

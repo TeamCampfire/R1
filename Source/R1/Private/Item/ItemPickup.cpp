@@ -98,7 +98,10 @@ void AItemPickup::AddThrowImpulse(const FVector& Impulse)
 {
 	if (Mesh)
 	{
-		Mesh->AddImpulse(Impulse);
+		// bVelChange=true — 질량으로 나눠지는 진짜 임펄스가 아니라 속도 변화량 그대로 적용한다.
+		// 아이템마다 PickupMesh 부피/질량이 제각각이라(대부분 Override Mass 미지정), 질량 비례
+		// 임펄스로는 무거운 메시일수록 던지는 속도가 거의 0에 수렴해 "그냥 떨어지는" 것처럼 보인다.
+		Mesh->AddImpulse(Impulse, NAME_None, true);
 	}
 }
 

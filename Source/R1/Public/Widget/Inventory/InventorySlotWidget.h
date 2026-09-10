@@ -50,9 +50,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(FOnInventorySlotDroppedCross, int3
  * WBP에서 아래 위젯을 정확히 이 이름 + 타입으로 배치하면 자동 바인딩된다:
  * - RootBorder      : 루트. 반투명 회색 배경.
  * - IconImage       : 아이템 아이콘. 아이콘이 없는 아이템은 자동으로 숨겨진다.
- * - CountBox        : 수량 표시 묶음(현재/최대) 컨테이너 — 빈 슬롯이면 통째로 숨김.
+ * - CountBox        : 수량 표시 컨테이너 — 빈 슬롯이거나 스택 불가 아이템(MaxStackSize <= 1)이면 통째로 숨김.
  * - CountText       : 현재 스택 수량.
- * - MaxStackText    : 최대 스택 수량.
  * - SelectionBorder : 하이라이트 테두리 하나를 두 가지 용도로 겸용한다 —
  *                     드래그 중인 아이템이 이 슬롯 위에 올라와 있으면 노란색(우선),
  *                     아니면 이 슬롯이 클릭으로 "선택"된 상태면 파란색.
@@ -150,9 +149,6 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> CountText;
-
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
-	TObjectPtr<UTextBlock> MaxStackText;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UBorder> SelectionBorder;

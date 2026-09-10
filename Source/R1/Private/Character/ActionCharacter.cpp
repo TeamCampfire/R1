@@ -804,7 +804,8 @@ void AActionCharacter::OnLookInput(const FInputActionValue& InValue)
 
 void AActionCharacter::OnSprintPressed()
 {
-	if (IsUIBlockingGameplayInput()) return;
+	/// UI열려도 동작하도록 주석처리
+	//if (IsUIBlockingGameplayInput()) return;	// UI가 열려있는 동안엔 스프린트 입력을 무시
 
 	// 도구 액션 중이거나 크라우치 모드에는 스프린트 안함
 	if (bIsCrouched || (HeldItemComponent && HeldItemComponent->BlocksCharacterMovement())) return;
@@ -848,7 +849,9 @@ void AActionCharacter::OnSprintReleased()
 
 void AActionCharacter::OnCrouchPressed()
 {
-	if (IsUIBlockingGameplayInput()) return;
+	/// UI열려도 동작하도록 주석처리
+	//if (IsUIBlockingGameplayInput()) return;	// UI가 열려있는 동안엔 크라우치 입력을 무시
+
 	if (HeldItemComponent && HeldItemComponent->BlocksCharacterMovement()) return;
 
 	if (CrouchInputMode == ECrouchInputMode::Toggle)
@@ -886,7 +889,8 @@ void AActionCharacter::OnCrouchReleased()
 
 void AActionCharacter::OnJumpPressed()
 {
-	if (IsUIBlockingGameplayInput()) return;
+	/// UI열려도 동작하도록 주석처리
+	//if (IsUIBlockingGameplayInput()) return;	// UI가 열려있는 동안엔 점프 입력을 무시
 	if (HeldItemComponent && HeldItemComponent->BlocksCharacterMovement()) return;
 	Jump();
 }
@@ -922,9 +926,12 @@ void AActionCharacter::OnInteractPressed()
 		return;
 	}
 
-	InteractionComponent->TryInteract();
+	// BP_PlayerCharacter의 상속 컴포넌트 템플릿이 깨져서 멤버 포인터가 널로 읽히는 환경 문제가
+	// 있어(OnUseBeltSlotPressed 참고) InteractionComponent가 null일 수 있다 — 가드 없이 호출하면
+	// TryInteract() 진입 시점에 크래시난다.
+	if (false == IsValid(InteractionComponent)) return;
 
-	//UE_LOG(LogTemp, Log, TEXT("TryInteract()"));
+	InteractionComponent->TryInteract();
 }
 
 void AActionCharacter::OnUseBeltSlotPressed(int32 BeltIndex)

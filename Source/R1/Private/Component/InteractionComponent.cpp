@@ -7,6 +7,7 @@
 #include "Camera/CameraComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Item/PlaceableItem/Campfire.h"
+#include "CollisionShape.h"
 
 // Sets default values for this component's properties
 UInteractionComponent::UInteractionComponent()
@@ -148,16 +149,72 @@ void UInteractionComponent::UpdateTargeting()
 	FCollisionQueryParams Params;
 	Params.AddIgnoredActor(OwnerPawn);
 
-	FHitResult Hit;
-	AActor* NewTarget = nullptr;
-	if (GetWorld() && GetWorld()->LineTraceSingleByChannel(Hit, Start, End, TraceChannel, Params))
+	if (!GetWorld())
 	{
-		if (AActor* HitActor = Hit.GetActor())
+		return;
+	}
+
+	// 1단계: InteractionAssistRadius만큼 구를 스윕해서 후보를 넓게 모은다(반경이 0 이하면 얇은
+	// 라인 멀티 트레이스와 동일 — assist 기능을 끈 것과 같다). 이 반경 "안"에 실제로 걸린
+	// 액터만 후보가 되므로, 이후 정밀 판정에서도 이 범위 밖의 엉뚱한 대상이 뽑힐 일은 없다.
+	TArray<FHitResult> SweepHits;
+	if (InteractionAssistRadius > 0.f)
+	{
+		GetWorld()->SweepMultiByChannel(SweepHits, Start, End, FQuat::Identity, TraceChannel, FCollisionShape::MakeSphere(InteractionAssistRadius), Params);
+	}
+	else
+	{
+		GetWorld()->LineTraceMultiByChannel(SweepHits, Start, End, TraceChannel, Params);
+	}
+
+	// 인터랙터블만 추려 중복 제거(같은 액터가 여러 폴리곤에 걸릴 수 있음). Sweep/LineTraceMulti
+	// 결과는 거리순 정렬이라 Candidates도 가까운 순서 그대로 유지된다.
+	TArray<AActor*> Candidates;
+	for (const FHitResult& EachHit : SweepHits)
+	{
+		// Multi 트레이스는 블로킹 히트뿐 아니라 오버랩 히트도 함께 돌려준다. AItemPickup의
+		// InteractionSphere(반경 120cm, AutoOnOverlap 자동 획득용 — OverlapAllDynamic 프로파일)가
+		// 여기 걸리면 조준과 무관하게 100cm 넘게 떨어진 아이템까지 후보로 잡혀버리므로, 실제로
+		// 콜리전을 막아선(블로킹) 히트만 후보로 인정한다.
+		if (!EachHit.bBlockingHit)
 		{
-			if (HitActor->Implements<UInteractableInterface>())
+			continue;
+		}
+
+		AActor* HitActor = EachHit.GetActor();
+		if (HitActor && HitActor->Implements<UInteractableInterface>())
+		{
+			Candidates.AddUnique(HitActor);
+		}
+	}
+
+	AActor* NewTarget = nullptr;
+	if (Candidates.Num() == 1)
+	{
+		NewTarget = Candidates[0];
+	}
+	else if (Candidates.Num() > 1)
+	{
+		// 2단계: 후보가 2개 이상 겹쳤을 때만 Complex Collision(심플 콜리전이 아니라 실제 렌더
+		// 메시 삼각형 기준) 정밀 라인트레이스로 크로스헤어가 진짜 가리키는 하나를 고른다.
+		FCollisionQueryParams PreciseParams = Params;
+		PreciseParams.bTraceComplex = true;
+
+		FHitResult PreciseHit;
+		if (GetWorld()->LineTraceSingleByChannel(PreciseHit, Start, End, TraceChannel, PreciseParams))
+		{
+			AActor* HitActor = PreciseHit.GetActor();
+			if (HitActor && Candidates.Contains(HitActor))
 			{
 				NewTarget = HitActor;
 			}
+		}
+
+		// 정밀 트레이스가 후보 중 누구도 못 맞히면(다들 가장자리에 애매하게 걸친 경우) 가장
+		// 가까운 후보로 폴백한다.
+		if (!NewTarget)
+		{
+			NewTarget = Candidates[0];
 		}
 	}
 

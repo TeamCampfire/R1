@@ -11,6 +11,7 @@
 #include "Components/Button.h"
 #include "Components/Slider.h"
 #include "Components/PanelWidget.h"
+#include "Components/HorizontalBox.h"
 #include "Data/Item/ItemDataBase.h"
 #include "Data/Item/EquipmentItemData.h"
 #include "Data/Item/HeldItemData.h"
@@ -170,6 +171,28 @@ void UDetailInfoWidget::RefreshDisplay()
 		{
 			IconImage->SetVisibility(ESlateVisibility::Collapsed);
 		}
+	}
+
+	if (StackTextContainer)
+	{
+		if (Selected.ItemData->MaxStackSize > 1)
+		{
+			StackTextContainer->SetVisibility(ESlateVisibility::HitTestInvisible);
+		}
+		else
+		{
+			StackTextContainer->SetVisibility(ESlateVisibility::Collapsed);
+		}
+	}
+
+	if (CurrentStackText)
+	{
+		CurrentStackText->SetText(FText::AsNumber(Selected.StackCount));
+	}
+
+	if (MaxStackText)
+	{
+		MaxStackText->SetText(FText::AsNumber(Selected.ItemData->MaxStackSize));
 	}
 
 	// 분할 드래그 아이콘도 IconImage와 동일하게 선택된 아이템의 아이콘을 그대로 보여준다.

@@ -79,6 +79,12 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interaction")
 	TEnumAsByte<ECollisionChannel> TraceChannel = ECC_Visibility;
 
+	// 크로스헤어가 메시를 픽셀 단위로 정확히 스치지 않아도 조준되게 하는 여유 반경.
+	// 0이면 기존과 동일한 얇은 라인 트레이스, 0보다 크면 이 반지름의 구를 스윕한다
+	// (러스트에서 작은 픽업 아이템이 크로스헤어 근처만 가도 잡히는 느낌).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interaction")
+	float InteractionAssistRadius = 3.f;
+
 	// 타겟 갱신시 브로드캐스트할 델리게이트
 	UPROPERTY(BlueprintAssignable, Category = "Interaction")
 	FOnInteractableTargetChanged OnInteractableTargetChanged;
