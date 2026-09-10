@@ -225,12 +225,22 @@ void UCraftingWidget::RefreshQueue()
 		const TArray<FCraftingOrder>& Orders = bCompleted ? Source->GetCompletedOrders() : Source->GetQueue();
 
 		while (Panel->GetChildrenCount() > Orders.Num())
+		{
 			Panel->RemoveChildAt(Panel->GetChildrenCount() - 1);
+		}
 
 		while (Panel->GetChildrenCount() < Orders.Num())
 		{
 			UCraftingItemWidget* Tile = CreateWidget<UCraftingItemWidget>(GetOwningPlayer(), ItemWidgetClass);
-			if (!Tile) break;
+			if (!Tile)
+				break;
+
+			// 진행 중인 제작 타일만 취소 요청 연결
+			if (!bCompleted)
+			{
+				Tile->OnCancelRequested.AddDynamic(this, &UCraftingWidget::HandleCancelOrder);
+			}
+
 			Panel->AddChildToWrapBox(Tile);
 		}
 
@@ -252,7 +262,7 @@ void UCraftingWidget::RefreshQueue()
 			if (Tile)
 			{
 				Tile->SetItem(Order.Item);
-				Tile->SetQueueState(Order.Remaining, Seconds, bCompleted);
+				Tile->SetQueueState(Order.Id, Order.Remaining, Seconds, bCompleted);
 			}
 		}
 	}
@@ -360,4 +370,12 @@ void UCraftingWidget::HandleClose()
 {
 	if (AActionPlayerController* Controller = Cast<AActionPlayerController>(GetOwningPlayer()))
 		Controller->CloseCrafting();
+}
+
+void UCraftingWidget::HandleCancelOrder(FGuid OrderId)
+{
+	if (Crafting)
+	{
+		Crafting->Server_CancelOrder(OrderId, BoundBench.Get());
+	}
 }

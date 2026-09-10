@@ -71,6 +71,10 @@ private:
 	UFUNCTION()
 	void HandleClose();
 
+	// 제작 취소 처리
+	UFUNCTION()
+	void HandleCancelOrder(FGuid OrderId);
+
 	// 검색 비교가 공백과 대소문자의 영향을 받지 않도록 문자열 정규화
 	static FString NormalizeSearchText(const FString& Text);
 

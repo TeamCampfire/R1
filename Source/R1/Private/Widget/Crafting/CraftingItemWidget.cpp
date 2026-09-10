@@ -9,13 +9,20 @@ void UCraftingItemWidget::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
 
+	//
 	ItemButton->OnClicked.AddDynamic(this, &UCraftingItemWidget::HandleClicked);
+
+	// 제작 취소 버튼 바인딩
+	CancelButton->OnClicked.AddDynamic(this, &UCraftingItemWidget::HandleCancelClicked);
 }
 
 void UCraftingItemWidget::SetItem(UItemDataBase* InItem)
 {
 	if (Item == InItem)
 		return;
+
+	// 처음에는 취소 버튼 숨기기
+	CancelButton->SetVisibility(ESlateVisibility::Collapsed);
 
 	Item = InItem;
 	ItemIcon->SetBrushFromTexture(Item ? Item->Icon.LoadSynchronous() : nullptr);
@@ -39,8 +46,10 @@ void UCraftingItemWidget::SetRecipeState(bool bCraftable, bool bSelected)
 	RemainingTimeText->SetVisibility(ESlateVisibility::Collapsed);
 }
 
-void UCraftingItemWidget::SetQueueState(int32 Count, float Seconds, bool bCompleted)
+void UCraftingItemWidget::SetQueueState(const FGuid& OrderId, int32 Count, float Seconds, bool bCompleted)
 {
+	BoundOrderId = OrderId;
+
 	// 큐에 아이템 정보 설정
 	ItemButton->SetIsEnabled(true);
 	ItemButton->SetVisibility(ESlateVisibility::HitTestInvisible);
@@ -56,10 +65,21 @@ void UCraftingItemWidget::SetQueueState(int32 Count, float Seconds, bool bComple
 		? FText::FromString(TEXT("회수 대기"))
 		: FText::Format(FText::FromString(TEXT("{0}초")), FText::AsNumber(FMath::CeilToInt(Seconds)))
 	);
+
+	// 진행 중이거나 대기 중인 주문에서만 취소 버튼 표시
+	// 제작 진행/대기 타일 전체를 취소 버튼으로 사용
+	CancelButton->SetVisibility(bCompleted ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
 }
 
 void UCraftingItemWidget::HandleClicked()
 {
 	if (Item)
 		OnItemClicked.Broadcast(Item);
+}
+
+
+void UCraftingItemWidget::HandleCancelClicked()
+{
+	if (BoundOrderId.IsValid())
+		OnCancelRequested.Broadcast(BoundOrderId);
 }

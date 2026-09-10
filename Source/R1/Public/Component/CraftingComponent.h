@@ -80,6 +80,11 @@ public:
 	UFUNCTION(Server, Reliable)
 	void Server_CollectCompleted(AWorkbench* Bench);
 
+	// 지정한 제작 주문 취소
+	// 아직 제작되지 않은 수량의 재료는 반환
+	UFUNCTION(Server, Reliable)
+	void Server_CancelOrder(const FGuid& OrderId, AWorkbench* Bench);
+
 	// 파괴된 작업대의 미회수 결과물과 미완료 재료를 월드에 반환
 	void DropContents();
 

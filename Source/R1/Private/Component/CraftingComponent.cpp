@@ -108,6 +108,8 @@ bool UCraftingComponent::CollectIngredientCosts(UItemDataBase* Item, TMap<UItemD
 			return false;
 
 		int32& Total = OutCosts.FindOrAdd(Material);
+
+		// Total이 정수 범위를 벗어나게 되면 실패 처리
 		if (Total > MAX_int32 - Cost.Amount)
 			return false;
 
@@ -356,6 +358,161 @@ void UCraftingComponent::CollectCompleted(APlayerController* Recipient)
 
 	// 완료 목록 변경 사실을 서버와 UI에 알림
 	NotifyChanged();
+}
+
+// 제작 큐에 들어간 주문 취소
+void UCraftingComponent::Server_CancelOrder_Implementation(const FGuid& OrderId, AWorkbench* Bench)
+{
+	// 제작 기능 사용 불가 상태일 때는 실행하지 않음
+	if (!CanPlayerCraft())
+		return;
+
+	// 작업대 주문: 거리와 작업대 유효성 검사
+	if (Bench && !CanUseWorkbench(Bench))
+		return;
+
+	// 작업대 주문인 경우에는 작업대의 제작 컴포넌트 사용
+	// 작업대 주문이 아니면 플레이어 컨트롤러의 제작 컴포넌트 사용
+	UCraftingComponent* TargetComp = Bench ? Bench->GetCraftingComponent() : this;
+	if (!TargetComp)
+		return;
+
+	// Queue 원소 순회하면서 람다 조건이 처음으로 참이 되는 원소의 인덱스 반환
+	// 일치하는 주문 없으면 INDEX_NONE(-1) 반환
+	const int32 OrderIndex = TargetComp->Queue.IndexOfByPredicate(
+		[&OrderId](const FCraftingOrder& Order)
+		{
+			return Order.Id == OrderId;
+		}
+	);
+
+	if (OrderIndex == INDEX_NONE)
+		return;
+
+	FCraftingOrder& Order = TargetComp->Queue[OrderIndex];
+
+	// 작업대의 공유 큐에서는 다른 플레이어의 주문을 취소하지 못하게 검사
+	APlayerController* RequestingController = Cast<APlayerController>(GetOwner());
+
+	// 작업대의 공유 큐에서는 자신이 요청한 주문만 취소 가능
+	if (!RequestingController || (Bench && Order.Requester.Get() != RequestingController))
+		return;
+
+	// 주문 아이템이 유효하지 않거나, 남은 제작 수량이 없으면 종료
+	if (!Order.Item || Order.Remaining <= 0)
+		return;
+
+	// 제작 중인 주문의 레시피, 주문 수량 찾기
+	TMap<UItemDataBase*, int32> IngredientCosts;
+	if (!CollectIngredientCosts(Order.Item, IngredientCosts))
+		return;
+
+	/* 아직 완성되지 않은 아이템 수량만큼 재료 반환 */
+	// 모든 반환 대상 아이템에 대해 반환할 수량이 없거나, 반환해야 하는 수량이 int32의 범위를 벗어나면 실패 처리
+	for (const TPair<UItemDataBase*, int32>& Ingredient : IngredientCosts)
+	{
+		const int64 RefundCount64 = static_cast<int64>(Ingredient.Value) * static_cast<int64>(Order.Remaining);
+
+		// 반환할 재료가 없거나 반환해야 하는 개수가 int32의 범위를 넘어가면 반환 불가 처리
+		if (RefundCount64 <= 0 || RefundCount64 > MAX_int32)
+			return;
+	}
+
+	UInventoryComponent* PlayerInventory = Inventory();
+	APawn* RequestingPawn = RequestingController->GetPawn();
+
+	UWorld* World = GetWorld();
+	const AActor* DropOrigin = Bench ? Cast<AActor>(Bench) : Cast<AActor>(RequestingPawn);	// 인벤토리에 들어가지 않고 남은 아이템들을 드롭할 위치의 기준이 되는 액터 기억
+
+	if (!PlayerInventory || !World || !DropOrigin)
+		return;
+
+	struct FPreparedRefund
+	{
+		UItemDataBase* Item = nullptr;
+		int32 Count = 0;
+		AItemPickup* DeferredPickup = nullptr;
+		FTransform SpawnTransform;
+	};
+
+	// 반환 대상 기억용 배열
+	TArray<FPreparedRefund> PreparedRefunds;
+	PreparedRefunds.Reserve(IngredientCosts.Num());
+
+	// 인벤토리에 들어가지 않고 남은 아이템을 떨어뜨릴 위치
+	const FVector BaseLocation = DropOrigin->GetActorLocation()
+		+ DropOrigin->GetActorForwardVector() * 100.f
+		+ FVector(0.f, 0.f, 50.f);
+
+	// 실제 인벤토리를 변경하기 전에 모든 재료의 드롭 액터를 지연 스폰 상태로 확보
+	for (const TPair<UItemDataBase*, int32>& Ingredient : IngredientCosts)
+	{
+		FPreparedRefund Prepared;
+		Prepared.Item = Ingredient.Key;
+		Prepared.Count = static_cast<int32>(static_cast<int64>(Ingredient.Value) * static_cast<int64>(Order.Remaining));
+
+		// 여러 종류의 재료 픽업이 정확히 같은 위치에 겹쳐서 생성되지 않도록 분산
+		const float Angle = PreparedRefunds.Num() * (2.f * PI / FMath::Max(1, IngredientCosts.Num()));
+		const FVector Offset(FMath::Cos(Angle) * 40.f, FMath::Sin(Angle) * 40.f, 0.f);
+
+		Prepared.SpawnTransform = FTransform(FRotator::ZeroRotator, BaseLocation + Offset);
+		Prepared.DeferredPickup = World->SpawnActorDeferred<AItemPickup>(
+			AItemPickup::StaticClass(),
+			Prepared.SpawnTransform,
+			nullptr,
+			nullptr,
+			ESpawnActorCollisionHandlingMethod::AlwaysSpawn
+		);
+
+		// 반환 예정 드롭 액터의 사전 생성이 하나라도 실패하면 앞서 준비한 모든 반환 예정 드롭 액터를 제거하고 취소 처리 중단
+		if (!Prepared.DeferredPickup)
+		{
+			for (FPreparedRefund& Existing : PreparedRefunds)
+			{
+				if (Existing.DeferredPickup)
+					Existing.DeferredPickup->Destroy();
+			}
+			return;
+		}
+
+		PreparedRefunds.Add(Prepared);
+	}
+
+	// 드롭 액터가 모두 준비된 뒤 인벤토리에 반환하고, 남은 수량만 월드 픽업으로 완성
+	// 아이템 종류별로 각각 실행
+	for (FPreparedRefund& Prepared : PreparedRefunds)
+	{
+		int32 RemainingRefund = Prepared.Count;
+
+		// 인벤토리에 반환
+		// InventoryComponent::AddItem()에서 RemainingRefund를 참조하여 인벤토리에 넣고 남은 수량으로 변경시켜줌
+		PlayerInventory->AddItem(Prepared.Item, Prepared.Count, RemainingRefund);
+
+		if (RemainingRefund > 0)
+		{
+			// 인벤토리에 안 들어가고 남은 수량 처리
+			Prepared.DeferredPickup->InitializeFromItem(Prepared.Item, RemainingRefund);
+			Prepared.DeferredPickup->FinishSpawning(Prepared.SpawnTransform);
+		}
+		else
+		{
+			// 모든 재료가 인벤토리에 들어갔으면 준비해둔 드롭 액터 제거
+			Prepared.DeferredPickup->Destroy();
+		}
+	}
+
+	// 제작 취소한 주문을 Crafting Component에서 제거
+	TargetComp->Queue.RemoveAt(OrderIndex);
+
+	// 현재 제작 중이던 주문을 취소했다면 다음 주문 제작 시작
+	// 현재 제작 중이던 주문의 OrderIndex는 항상 0 (제작 큐는 Queue 방식으로 작동하기 때문)
+	const bool bCanceledActiveOrder = OrderIndex == 0;
+	if (bCanceledActiveOrder)
+	{
+		TargetComp->StartNextItem();
+	}
+
+	TargetComp->NotifyChanged();
 }
 
 // 작업대 파괴 시 완료 아이템과 아직 제작하지 않은 주문의 재료를 월드에 떨어뜨리기
