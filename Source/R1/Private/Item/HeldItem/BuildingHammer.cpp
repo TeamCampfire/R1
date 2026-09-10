@@ -45,13 +45,13 @@ void ABuildingHammer::PerformBuildingHit()
 			FCollisionQueryParams Params;
 			Params.AddIgnoredActor(this);
 
+				UE_LOG(LogTemp, Display, TEXT("test2"));
 			if (GetWorld()->LineTraceSingleByChannel(OutHitRes, StartPos, EndPos, ECC_Visibility, Params))
 			{
-				UE_LOG(LogTemp, Display, TEXT("test2"));
+					UE_LOG(LogTemp, Display, TEXT("test3"));
 				// 건축물을 공격한 경우
 				if (ABuildingActor* BuildingActor = Cast<ABuildingActor>(OutHitRes.GetActor()))
 				{
-					UE_LOG(LogTemp, Display, TEXT("test3"));
 					// 건물에 데미지를 준다.
 					Server_ApplyBuildingDamage(BuildingActor, 50.f);
 				}
