@@ -97,17 +97,19 @@ void UInventorySlotWidget::Refresh(const FItemInstance& Instance)
 
 		if (CountBox)
 		{
-			CountBox->SetVisibility(ESlateVisibility::HitTestInvisible);
+			if (Instance.ItemData->MaxStackSize > 1)
+			{
+				CountBox->SetVisibility(ESlateVisibility::HitTestInvisible);
+			}
+			else
+			{
+				CountBox->SetVisibility(ESlateVisibility::Collapsed);
+			}
 		}
 
 		if (CountText)
 		{
 			CountText->SetText(FText::AsNumber(Instance.StackCount));
-		}
-
-		if (MaxStackText)
-		{
-			MaxStackText->SetText(FText::AsNumber(Instance.ItemData->MaxStackSize));
 		}
 
 		SetToolTipText(Instance.ItemData->DisplayName);
