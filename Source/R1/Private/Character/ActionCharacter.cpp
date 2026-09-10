@@ -23,6 +23,7 @@
 #include "Data/Item/PlaceableItemData.h"
 #include "Data/Item/HeldItemData.h"
 #include "Vehicle/WheeledVehicleBase.h"
+#include "Item/SleepingBag.h"
 
 #include "InputMappingContext.h"
 #include "InputAction.h"
@@ -155,16 +156,16 @@ void AActionCharacter::BeginPlay()
 			}
 
 			int32 Remain = 0;
-			//for debug
-			if (Item->DisplayName.ToString().Contains(TEXT("나무")))
-			{
-				InventoryComponent->AddItem(Item, 200, Remain);
+			////for debug
+			//if (Item->DisplayName.ToString().Contains(TEXT("나무")) || Item->DisplayName.ToString().Contains(TEXT("돌조각")))
+			//{
+			//	InventoryComponent->AddItem(Item,1000, Remain);
 
-			}
-			else
-			{
-				InventoryComponent->AddItem(Item, 1, Remain);
-			}
+			//}
+			//else
+			//{
+			//	InventoryComponent->AddItem(Item, 1, Remain);
+			//}
 		}
 
 	}
@@ -214,14 +215,16 @@ void AActionCharacter::Tick(float DeltaTime)
 
 		VehicleYawOffset = CurrentVehicleYaw;
 	}
-	
-	const float LocalOffset = CurrentWorldEyeHeight - GetActorLocation().Z; // 현재 캡슐 위치 기준으로 역산
-	FirstPersonCamera->SetRelativeLocation(FVector(
-		FirstPersonCamera->GetRelativeLocation().X, 
-		FirstPersonCamera->GetRelativeLocation().Y,
-		LocalOffset
-	));
-	
+
+	if (!bIsSleeping)
+	{
+		const float LocalOffset = CurrentWorldEyeHeight - GetActorLocation().Z; // 현재 캡슐 위치 기준으로 역산
+		FirstPersonCamera->SetRelativeLocation(FVector(
+			FirstPersonCamera->GetRelativeLocation().X,
+			FirstPersonCamera->GetRelativeLocation().Y,
+			LocalOffset
+		));
+	}
 }
 
 // Called to bind functionality to input
@@ -430,23 +433,30 @@ void AActionCharacter::OnRep_IsSitting()
 	}
 }
 
-void AActionCharacter::StartSleeping(const FTransform& SleepingBagTransform)
+void AActionCharacter::StartSleeping(AActor* InActor)
 {
-	if (!HasAuthority()) return;
-	bIsSleeping = true;
-	OnRep_IsSleeping();
+	if (ASleepingBag* SleepingBag = Cast<ASleepingBag>(InActor))
+	{
+		if (!HasAuthority()) return;
+		bIsSleeping = true;
+		OnRep_IsSleeping();
+		CurrentSleepingBag = SleepingBag;
 
-	// 침낭의 위치로 이동
-	FVector Location = SleepingBagTransform.GetLocation() + FVector(0, 0, 88);
-	//Location.Z = GetActorLocation().Z;
-	FRotator Rotator = SleepingBagTransform.GetRotation().GetRightVector().Rotation();
-	SetActorLocationAndRotation(Location, Rotator);
-	//SetActorLocation(Location);
+		// 침낭의 위치로 이동
+		FVector Location = SleepingBag->GetActorLocation() + FVector(-30, 20, 100);
+		//Location.Z = GetActorLocation().Z;
+		FRotator Rotator = SleepingBag->GetActorForwardVector().Rotation();
+		SetActorLocationAndRotation(Location, Rotator);
+		//SetActorLocation(Location);
 
-	// 자는동안 이동 막기
-	GetCharacterMovement()->DisableMovement();
-	// 자는동안 몸 회전 막기
-	bUseControllerRotationYaw = false;
+		if (AController* C = GetController())
+		{
+			C->SetControlRotation(Rotator);
+		}
+		// 자는동안 이동 막기
+		GetCharacterMovement()->DisableMovement();
+	}
+	
 }
 
 void AActionCharacter::StopSleeping()
@@ -455,8 +465,14 @@ void AActionCharacter::StopSleeping()
 	bIsSleeping = false;
 	OnRep_IsSleeping();
 
+	if (ASleepingBag* SleepingBag = Cast<ASleepingBag>(CurrentSleepingBag))
+	{
+		SleepingBag->ClearOccupant(this);
+		CurrentSleepingBag = nullptr;
+	}
+
 	GetCharacterMovement()->SetMovementMode(MOVE_Walking);
-	bUseControllerRotationYaw = true;
+
 }
 
 void AActionCharacter::ServerRequestWakeUp_Implementation()
@@ -471,6 +487,25 @@ void AActionCharacter::OnRep_IsSleeping()
 		if (SleepingMontage)
 		{
 			PlayAnimMontage(SleepingMontage);
+
+			
+
+			// 1인칭 팔 지우기
+			FirstPersonMesh->SetVisibility(false);
+
+			// 자는동안 몸 회전 막기
+			bUseControllerRotationYaw = false;
+			FirstPersonCamera->bUsePawnControlRotation = false;
+
+			CameraPosCache = FirstPersonCamera->GetRelativeLocation();
+			CameraRotCache = FirstPersonCamera->GetRelativeRotation();
+
+			FirstPersonCamera->AttachToComponent(
+				GetMesh(),
+				FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+				FName(TEXT("HeadCamera"))
+			);
+			FirstPersonCamera->SetRelativeLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
 		}
 	}
 	else
@@ -478,6 +513,17 @@ void AActionCharacter::OnRep_IsSleeping()
 		if (SleepingMontage)
 		{
 			StopAnimMontage(SleepingMontage);
+			FirstPersonMesh->SetVisibility(true);
+
+			bUseControllerRotationYaw = true;
+			FirstPersonCamera->bUsePawnControlRotation = true;
+
+			FirstPersonCamera->AttachToComponent(
+				GetCapsuleComponent(),
+				FAttachmentTransformRules::SnapToTargetNotIncludingScale
+			);
+
+			FirstPersonCamera->SetRelativeLocationAndRotation(CameraPosCache, CameraRotCache);
 		}
 	}
 }
@@ -576,6 +622,9 @@ void AActionCharacter::Server_GrantHarvestReward_Implementation(UItemDataBase* I
 
 void AActionCharacter::Die()
 {
+	if (bIsSleeping)
+		StopSleeping();
+
 	if (!HasAuthority()) return;
 
 	MulticastDie();
@@ -741,7 +790,7 @@ void AActionCharacter::OnLookInput(const FInputActionValue& InValue)
 {
 	// UI가 열려있는 동안엔 마우스가 커서 조작용이라 시야 회전에 쓰면 안 된다(이동은 계속 받되
 	// 카메라만 막는다) — IsUIBlockingGameplayInput 참고.
-	if (IsUIBlockingGameplayInput())
+	if (bIsSleeping || IsUIBlockingGameplayInput())
 	{
 		return;
 	}

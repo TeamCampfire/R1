@@ -79,6 +79,31 @@ struct FBuildingResourceCost
 	int32 RequiredCount = 1; // 설치 시 필요 수량
 };
 
+USTRUCT(BlueprintType)
+struct FBuildingEffect
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<class UNiagaraSystem> NiagaraSystem = nullptr; // 설치 시 재생할 나이아가라 시스템
+
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<USoundBase> Sound = nullptr; // 설치 시 재생할 사운드
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	FName PlayNiagaraSystemSocketName; // 설치 시 재생할 위치 소켓, 세팅 안 했을 땐 메시 바닥 중앙을 사용
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	FVector LocalOffset = FVector::ZeroVector; // 소켓 또는 메시 바닥 중앙을 기준으로 적용할 로컬 위치 보정
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	FRotator RotationOffset = FRotator::ZeroRotator; // 나이아가라 방향 보정값
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	FVector ScaleMultiplier = FVector::OneVector; // 나이아가라 크기 배율값
+};
+
 /**
  건축 파츠 하나의 데이터 애셋
  */
@@ -90,7 +115,9 @@ class R1_API UBuildingPartDefinition : public UPrimaryDataAsset
 public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|Visual")
 	TObjectPtr<UStaticMesh> PartMesh; // 파츠를 표현할 메시
-	//TODO 추후 SoftObjectPtr로 변경
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|Effect")
+	FBuildingEffect PlacementEffect; // 건축할 떄 효과
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Building|State", meta = (ClampMin = 0))
 	int32 MaxDurability; // 파츠의 최대 내구도

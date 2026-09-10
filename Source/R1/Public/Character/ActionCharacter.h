@@ -71,7 +71,7 @@ public:
 	UFUNCTION()
 	void OnRep_IsSitting();
 
-	void StartSleeping(const FTransform& SleepingBagTransform);
+	void StartSleeping(AActor* InActor);
 	void StopSleeping();
 
 	UFUNCTION(Server, Reliable)
@@ -362,4 +362,12 @@ protected:
 	// 수면 몽타주
 	UPROPERTY(EditDefaultsOnly, Category = "Animation")
 	TObjectPtr<UAnimMontage> SleepingMontage;
+
+	// 현재 수면중인 침낭
+	UPROPERTY()
+	TObjectPtr<AActor> CurrentSleepingBag;
+
+private:
+	FVector CameraPosCache;
+	FRotator CameraRotCache;
 };

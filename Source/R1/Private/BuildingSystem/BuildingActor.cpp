@@ -4,6 +4,13 @@
 #include "Data/Item/ItemDataBase.h"
 #include "Item/ItemPickup.h"
 
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
+
 ABuildingActor::ABuildingActor()
 {
  	PrimaryActorTick.bCanEverTick = false;
@@ -405,6 +412,39 @@ bool ABuildingActor::ApplyBuildingDamage(float DamageAmount)
 	return DemolishAndDropResources();
 }
 
+void ABuildingActor::PlayPlacementEffect(UBuildingPartDefinition* Definition, UStaticMeshComponent* PartComponent)
+{
+	if (false == HasAuthority()) return;
+	if (false == IsValid(Definition) || false == IsValid(PartComponent)) return;
+
+	const FBuildingEffect& Effect = Definition->PlacementEffect;
+	if (false == IsValid(Effect.NiagaraSystem) && false == IsValid(Effect.Sound)) return;
+
+	FTransform EffectTransform;
+	if (false == TryBuildPlacementEffectTransform(Definition, PartComponent, EffectTransform)) return;
+
+	MulticastPlayPlacementEffect(Definition, EffectTransform);
+}
+
+void ABuildingActor::MulticastPlayPlacementEffect_Implementation(UBuildingPartDefinition* Definition, const FTransform& EffectTransform)
+{
+	if (NM_DedicatedServer == GetNetMode()) return;
+	if (false == IsValid(Definition) || EffectTransform.ContainsNaN()) return;
+
+	const FBuildingEffect& Effect = Definition->PlacementEffect;
+
+	// Niagara 재생
+	if (true == IsValid(Effect.NiagaraSystem))
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			GetWorld(), Effect.NiagaraSystem, EffectTransform.GetLocation(), EffectTransform.Rotator(), EffectTransform.GetScale3D());
+	}
+
+	// 효과음 재생
+	if (true == IsValid(Effect.Sound))
+		UGameplayStatics::PlaySoundAtLocation(this, Effect.Sound, EffectTransform.GetLocation());
+}
+
 bool ABuildingActor::BuildDemolitionRefunds(TMap<class UItemDataBase*, int32>& OutRefunds) const
 {
 	OutRefunds.Reset();
@@ -427,4 +467,38 @@ bool ABuildingActor::BuildDemolitionRefunds(TMap<class UItemDataBase*, int32>& O
 		}
 	}
 	return true;
+}
+
+bool ABuildingActor::TryBuildPlacementEffectTransform(const UBuildingPartDefinition* Definition,
+	const UStaticMeshComponent* PartComponent, FTransform& OutEffectTransform) const
+{
+	OutEffectTransform = FTransform::Identity;
+
+	if (false == IsValid(Definition) || false == IsValid(PartComponent) ||
+		false == IsValid(PartComponent->GetStaticMesh()))
+		return false;
+
+	FTransform NiagaraTransform;
+	FName AttachSocketName = Definition->PlacementEffect.PlayNiagaraSystemSocketName;
+
+	// 부착할 소켓 이름이 유효하고, 메시에 해당 소켓 이름이 있음 -> 소켓 위치에 나이아가라 재생
+	if (false == AttachSocketName.IsNone() && PartComponent->DoesSocketExist(AttachSocketName)) // 월드 기준 소켓 트랜스폼 가져옴
+		NiagaraTransform = PartComponent->GetSocketTransform(AttachSocketName, ERelativeTransformSpace::RTS_World);
+
+	// 메시의 바닥 중앙에..
+	else
+	{
+		FBoxSphereBounds LocalBounds = PartComponent->GetStaticMesh()->GetBounds();
+		//. X, Y는 중앙에 위치하지만 Z는 바닥이어야 하기 때문에 메시 절반의 크기를 빼 바닥의 위치를 구해요
+		FVector LocalBottomCenterLocation(LocalBounds.Origin.X, LocalBounds.Origin.Y, LocalBounds.Origin.Z - LocalBounds.BoxExtent.Z);
+
+		NiagaraTransform = PartComponent->GetComponentTransform();
+		NiagaraTransform.SetLocation(NiagaraTransform.TransformPosition(LocalBottomCenterLocation));
+	}
+
+	// 오프셋 적용
+	FTransform NiagaraOffsetTransform(Definition->PlacementEffect.RotationOffset, Definition->PlacementEffect.LocalOffset, Definition->PlacementEffect.ScaleMultiplier);
+
+	OutEffectTransform = NiagaraOffsetTransform * NiagaraTransform;
+	return (false == OutEffectTransform.ContainsNaN());
 }
