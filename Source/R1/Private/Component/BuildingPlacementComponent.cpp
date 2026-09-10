@@ -133,6 +133,7 @@ void UBuildingPlacementComponent::StartPlacement(UBuildingPartDefinition* Defini
 	}
 
 	// PreviewActor 세팅
+	PreviewActor->SetActorRotation(FRotator::ZeroRotator);
 	PreviewActor->SetDefinition(SelectedDefinition);
 
 	bIsPlacing = true; // 배치 ing...
@@ -1224,6 +1225,8 @@ void UBuildingPlacementComponent::ShowPreviewAtLocation(const FVector& InPreview
 	// TERRAIN 타입은 월드 수평이 아니라 맞힌 지면의 경사를 따라 프리뷰를 정렬해요
 	if (true == IsValid(SelectedDefinition) && SelectedDefinition->PlacementType == EBuildingPlacementType::TERRAIN)
 		PreviewActor->SetActorRotation(BuildTerrainPlacementRotation(InSurfaceNormal));
+	else
+		PreviewActor->SetActorRotation(FRotator::ZeroRotator); // 건축 파츠들은 반듯하게 배치하기 위해 초기화 해줘요
 
 	// 현재 맞힌 곳이 실제 설치 가능한 지면(옵젝타입:BuildableGround)인지 검사해서 결과를 얻어요
 	const bool bIsSurfaceValid = IsBuildableSurface(SelectedDefinition.Get(), SupportingComponent);
