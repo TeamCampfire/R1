@@ -221,7 +221,6 @@ protected:
 
 	UPROPERTY(ReplicatedUsing = OnRep_bAlive)
 	bool bAlive = false;
-private:
 
 public:
 	//UPROPERTY(BlueprintAssignable, Category = "Stat|Stamina")

@@ -16,6 +16,7 @@
 #include "Component/StatComponent.h"	
 #include "Component/InteractionComponent.h"
 #include "Component/InventoryComponent.h"
+#include "Component/WarehouseInventoryComponent.h"
 #include "Component/CraftingComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "EnhancedInputComponent.h"
@@ -104,6 +105,7 @@ AActionCharacter::AActionCharacter()
 	/// 컴포넌트 생성
 	InteractionComponent = CreateDefaultSubobject<UInteractionComponent>(TEXT("Interact"));
 	InventoryComponent = CreateDefaultSubobject<UInventoryComponent>(TEXT("Inventory"));
+	CorpseStorageComponent = CreateDefaultSubobject<UWarehouseInventoryComponent>(TEXT("CorpseStorage"));
 	HeldItemComponent = CreateDefaultSubobject<UHeldItemComponent>(TEXT("HeldItemComponent"));
 }
 
@@ -121,7 +123,7 @@ void AActionCharacter::BeginPlay()
 			PC->PlayerCameraManager->ViewPitchMin = ViewPicthMin;
 		}
 	}
-	if (StatComponent)
+	if (HasAuthority() && StatComponent)
 	{
 		StatComponent->InitializeStat();
 	}
@@ -639,6 +641,9 @@ void AActionCharacter::Die()
 		}
 	}
 
+	// 제작 큐 반환 후, 인벤토리에 있던 아이템을 전부 시체 창고에 옮기기
+	MoveInventoryToCorpseStorage();
+
 	MulticastDie();
 
 }
@@ -707,17 +712,87 @@ void AActionCharacter::MulticastDie_Implementation()
 
 	// 캡슐 컴포넌트 충돌 끄기
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
 	// 애니메이션 중지
 	//GetMesh()->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 	//GetMesh()->Stop();
 	GetMesh()->SetAnimInstanceClass(nullptr);
+
 	// 메쉬 랙돌 전환
 	GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
+	GetMesh()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	GetMesh()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+
 	GetMesh()->SetSimulatePhysics(true);
 	// 컨트롤러 연결 해제
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
 		PC->UnPossess();
+	}
+}
+
+void AActionCharacter::MoveInventoryToCorpseStorage()
+{
+	// 서버가 수행, 이미 시체 창고 이관/준비 됐는지, 인벤토리 컴포넌트 있는지, 시체용 창고 컴포넌트 있는지
+	if (!HasAuthority() || bCorpseInventoryPrepared || !InventoryComponent || !CorpseStorageComponent)
+		return;
+
+	bCorpseInventoryPrepared = true;	// 사망 아이템이 중복 이관되지 않도록 표시
+
+	/* 시체 창고 슬롯 수 변경 */
+	// 시체 창고에 필요한 슬롯 수 = 메인 인벤토리 슬롯 수 + 벨트 슬롯 수 + 장비 슬롯 수
+	const int32 RequiredSlotCount = InventoryComponent->MainSlots.Num() + InventoryComponent->BeltSlots.Num() + InventoryComponent->EquipmentSlots.Num();
+	CorpseStorageComponent->StorageSlotCount = FMath::Max(CorpseStorageComponent->StorageSlotCount, RequiredSlotCount);	// 원래 창고 슬롯 수랑 인벤토리 전체 슬롯 수 중 큰 값으로 최종 슬롯 수 결정
+	CorpseStorageComponent->StorageSlots.SetNum(CorpseStorageComponent->StorageSlotCount);	// 시체 창고 실제 슬롯 수 변경
+
+	/* 인벤토리에 있는 아이템들을 시체 창고에 옮기기 */
+	int32 CorpseSlotIndex = 0;	// 현재 보고 있는 시체 창고 슬롯 인덱스
+
+	// 현재 함수 안에서 메인+벨트+장비 배열에만 반복 사용하기 때문에 람다로 아이템 이동 구현
+	auto MoveSlots = [this, &CorpseSlotIndex](EInventorySlotCategory Category, const TArray<FItemInstance>& Slots)
+	{
+		// Slots에 들어온 배열 순회
+		for (int32 SourceIndex = 0; SourceIndex < Slots.Num(); ++SourceIndex)
+		{
+			const FItemInstance Item = Slots[SourceIndex];	// 현재 슬롯에 있는 아이템 복사
+			if (!Item.IsValid())
+				continue;	// 현재 슬롯의 아이템이 유효하지 않으면 다음 슬롯 검사
+
+			CorpseStorageComponent->SetSlotItem(CorpseSlotIndex++, Item);									// 현재 보고 있는 시체 창고 슬롯 채우기 (서버 권한 및 변경 이벤트 발생)
+			InventoryComponent->SetSlotItem(FInventorySlotRef{ Category, SourceIndex }, FItemInstance());	// 현재 보고 있는 원래 인벤토리 슬롯 비우기 (서버 권한 및 변경 이벤트 발생)
+		}
+	};
+
+	MoveSlots(EInventorySlotCategory::Main, InventoryComponent->MainSlots);				// 인벤토리_메인 아이템 이동
+	MoveSlots(EInventorySlotCategory::Belt, InventoryComponent->BeltSlots);				// 인벤토리_벨트 아이템 이동
+	MoveSlots(EInventorySlotCategory::Equipment, InventoryComponent->EquipmentSlots);	// 인벤토리_장비 아이템 이동
+}
+
+FText AActionCharacter::GetInteractionDisplayName_Implementation() const
+{
+	return FText::FromString(TEXT("시체"));	// 액터 이름 대신 시체 문구 보이기
+}
+
+bool AActionCharacter::CanInteract_Implementation(APawn* Interactor) const
+{
+	// 스스로이거나 캐릭터가 살아있거나 시체 창고가 없는 경우에는 상호작용 불가
+	if (!Interactor || Interactor == this || !StatComponent || StatComponent->IsAlive() || !CorpseStorageComponent)
+		return false;
+
+	// 거리 확인 (제곱인 상태로 비교하는 게 빠름)
+	return FVector::DistSquared(Interactor->GetActorLocation(), GetActorLocation()) <= FMath::Square(CorpseStorageComponent->MaxInteractDistance);
+}
+
+void AActionCharacter::Interact_Implementation(APawn* Interactor)
+{
+	// 권한 및 상호작용 가능 여부 확인
+	if (!HasAuthority() || !CanInteract_Implementation(Interactor))
+		return;
+
+	// 시체 창고 열기
+	if (AActionPlayerController* PC = Cast<AActionPlayerController>(Interactor->GetController()))
+	{
+		PC->Client_OpenWarehouse(CorpseStorageComponent);
 	}
 }
 

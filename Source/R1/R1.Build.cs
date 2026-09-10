@@ -24,9 +24,9 @@ public class R1 : ModuleRules
 			"OnlineSubsystem",		// 세션 관리
 			"OnlineSubsystemUtils",	// 세션 관리
 			"NavigationSystem",
-			"AIModule"
+			"AIModule",
+			"DeveloperSettings"		// 프로젝트 설정에서 게임 시작 맵 관리
 		});
-
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "GameplayTags" });
 		
