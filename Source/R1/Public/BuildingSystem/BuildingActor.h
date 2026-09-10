@@ -77,11 +77,23 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Building")
 	bool ApplyBuildingDamage(float DamageAmount);
 
+	// 서버에서 파츠가 설치 완료되고 효과들 실행해야 한다고 알려주는 함수
+	void PlayPlacementEffect(UBuildingPartDefinition* Definition, UStaticMeshComponent* PartComponent);
+
+protected:
+	// (모든 클라이언트) 설치 완료 효과를 실제로 실행하는 함수
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastPlayPlacementEffect(UBuildingPartDefinition* Definition, const FTransform& EffectTransform);
 private:
 	// PlacedParts 전체를 순회해 파츠별 ResourceCosts를 합산 계산하는 함수
 	// 예 : Foundation 목재 25 + Wall 목재 50  → 목재 75개로 하나의 환급 항목 생성
 	// 비용 데이터가 잘못된 파츠가 하나라도 있으면 false를 반환하여 건물을 삭제하지 못함 !
 	bool BuildDemolitionRefunds(TMap<class UItemDataBase*, int32>& OutRefunds) const;
+
+	// 건축 파츠가 추가될 때 나오는 나이아가라 시스템 위치 계산 시도 함수
+	// 데이터에 위치 소켓이 있었으면 소켓 Transform을 사용하고, 없으면 메시의 로컬 Bounds 바닥 중앙을 사용
+	bool TryBuildPlacementEffectTransform(const UBuildingPartDefinition* Definition,
+		const UStaticMeshComponent* PartComponent, FTransform& OutEffectTransform) const;
 	//  ===================================================================================
 
 protected:

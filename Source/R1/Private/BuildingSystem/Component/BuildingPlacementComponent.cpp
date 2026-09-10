@@ -468,6 +468,9 @@ void UBuildingPlacementComponent::ServerPlaceSnappedPart_Implementation(UBuildin
 	if (Definition->PlacementType == EBuildingPlacementType::FOUNDATION)
 		TargetBuilding->ResolveAdjacentFoundationConnections(NewPlacedPart->PartID, FoundationConnectionAnchorTolerance);
 
+	// 설치가 최종 확정된 새 파츠의 효과 재생
+	TargetBuilding->PlayPlacementEffect(Definition, NewPart);
+
 	TargetBuilding->ForceNetUpdate();
 
 	UE_LOG(LogTemp, Log, TEXT("[UBuildingPlacementComponent::ServerPlaceSnappedPart] : 스냅 파츠 설치 완료. Socket=%s"),*SocketName.ToString());
@@ -1148,6 +1151,9 @@ void UBuildingPlacementComponent::ServerPlaceNewBuilding_Implementation(UBuildin
 		NewBuilding->Destroy(); // 파츠가 없는 빈껍데기 액터를 남기지 않음
 		return;
 	}
+
+	// 설치가 최종 확정된 새 건축물의 효과 재생
+	NewBuilding->PlayPlacementEffect(Definition, NewPart);
 
 	UE_LOG(LogTemp, Log, TEXT("ServerPlaceNewBuilding: 건축물 설치 완료. Location=%s"), *SafePlacementTransform.GetLocation().ToString());
 }
