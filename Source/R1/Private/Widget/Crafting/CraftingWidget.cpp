@@ -244,25 +244,22 @@ void UCraftingWidget::RefreshQueue()
 			Panel->AddChildToWrapBox(Tile);
 		}
 
-		float PrecedingSeconds = 0.f;
 		for (int32 Index = 0; Index < Orders.Num(); ++Index)
 		{
 			const FCraftingOrder& Order = Orders[Index];
 			if (!Order.Item)
 				continue;
 
-			const float Duration = FMath::Max(0.1f, Order.Item->CraftingSeconds);
-
-			// 선두 주문: 복제된 완료 시각을 사용
-			// 대기 주문: (앞선 주문들의 남은 시간 + 자신의 제작 시간)으로 화면에 표시할 예상 대기 시간을 계산
-			const float Seconds = Order.FinishTime > 0.f ? FMath::Max(0.f, Order.FinishTime - Source->GetServerTime()) : PrecedingSeconds + Duration;
-			PrecedingSeconds = Seconds + (Order.Remaining - 1) * Duration;
+			// 현재 제작 중인 아이템인지
+			const bool bActive = !bCompleted && Index == 0 && Order.FinishTime > 0.f;
+			// 현재 제작 중인 아이템의 남은 시간
+			const float Seconds = bActive ? FMath::Max(0.f, Order.FinishTime - Source->GetServerTime()) : 0.f;
 
 			UCraftingItemWidget* Tile = Cast<UCraftingItemWidget>(Panel->GetChildAt(Index));
 			if (Tile)
 			{
 				Tile->SetItem(Order.Item);
-				Tile->SetQueueState(Order.Id, Order.Remaining, Seconds, bCompleted);
+				Tile->SetQueueState(Order.Id, Order.Remaining, Seconds, bCompleted, bActive);
 			}
 		}
 	}

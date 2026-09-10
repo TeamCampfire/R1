@@ -23,7 +23,7 @@ public:
 
 	void SetItem(UItemDataBase* InItem);
 	void SetRecipeState(bool bCraftable, bool bSelected);
-	void SetQueueState(const FGuid& OrderId, int32 Count, float Seconds, bool bCompleted);
+	void SetQueueState(const FGuid& OrderId, int32 Count, float Seconds, bool bCompleted, bool bActive);
 
 private :
 	UFUNCTION()

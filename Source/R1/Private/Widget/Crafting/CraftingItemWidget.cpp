@@ -46,7 +46,7 @@ void UCraftingItemWidget::SetRecipeState(bool bCraftable, bool bSelected)
 	RemainingTimeText->SetVisibility(ESlateVisibility::Collapsed);
 }
 
-void UCraftingItemWidget::SetQueueState(const FGuid& OrderId, int32 Count, float Seconds, bool bCompleted)
+void UCraftingItemWidget::SetQueueState(const FGuid& OrderId, int32 Count, float Seconds, bool bCompleted, bool bActive)
 {
 	BoundOrderId = OrderId;
 
@@ -59,12 +59,22 @@ void UCraftingItemWidget::SetQueueState(const FGuid& OrderId, int32 Count, float
 	CountText->SetVisibility(ESlateVisibility::HitTestInvisible);
 	CountText->SetText(FText::Format(FText::FromString(TEXT("×{0}")), FText::AsNumber(Count)));
 
-	RemainingTimeText->SetVisibility(ESlateVisibility::HitTestInvisible);
-	RemainingTimeText->SetText(
-		bCompleted
-		? FText::FromString(TEXT("회수 대기"))
-		: FText::Format(FText::FromString(TEXT("{0}초")), FText::AsNumber(FMath::CeilToInt(Seconds)))
-	);
+	if (bCompleted)
+	{
+		RemainingTimeText->SetVisibility(ESlateVisibility::HitTestInvisible);
+		RemainingTimeText->SetText(FText::FromString(TEXT("회수 대기")));
+	}
+	else if (bActive)
+	{
+		RemainingTimeText->SetVisibility(ESlateVisibility::HitTestInvisible);
+		RemainingTimeText->SetText(FText::Format(FText::FromString(TEXT("{0}초")), FText::AsNumber(FMath::CeilToInt(Seconds))));
+	}
+	else
+	{
+		// 대기: 아직 제작 차례가 오지 않은 주문
+		RemainingTimeText->SetVisibility(ESlateVisibility::Collapsed);	// 남은 시간 안 보이게
+		RemainingTimeText->SetText(FText::GetEmpty());					// 안 보이더라도 텍스트 비워두기
+	}
 
 	// 진행 중이거나 대기 중인 주문에서만 취소 버튼 표시
 	// 제작 진행/대기 타일 전체를 취소 버튼으로 사용
