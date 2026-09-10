@@ -1,4 +1,4 @@
-﻿#include "BuildingSystem/Component/BuildingPlacementComponent.h"
+﻿#include "Component/BuildingPlacementComponent.h"
 
 #include "Engine/OverlapResult.h"
 #include "Engine/StaticMeshSocket.h"

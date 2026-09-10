@@ -16,7 +16,7 @@
 #include "Vehicle/WheeledVehicleBase.h"
 #include "Widget/MainHUDWidget.h"
 
-#include "BuildingSystem/Component/BuildingPlacementComponent.h"
+#include "Component/BuildingPlacementComponent.h"
 #include "Data/Building/BuildingPartDefinition.h"
 #include "Data/Item/PlaceableItemData.h"
 #include "Component/InventoryComponent.h"
