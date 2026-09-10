@@ -408,6 +408,8 @@ void UDetailInfoWidget::NativeOnDragDetected(const FGeometry& InGeometry, const 
 	}
 
 	UInventoryDragDropOperation* DragOp = NewObject<UInventoryDragDropOperation>(this);
+
+	// 상세창의 분할 드래그에도 출처와 아이템을 넣어 모닥불이 허용 여부와 지정 수량 처리 가능하게 가공
 	DragOp->SourceType = EItemDragSourceType::PlayerInventory;
 	DragOp->DraggedItemData = Selected.ItemData;
 	DragOp->SourceSlotRef = Inventory->SelectedSlotRef;

@@ -14,6 +14,7 @@
 #include "Character/ActionCharacter.h"
 #include "Data/Item/PlaceableItemData.h"
 #include "Item/PlaceableItemBase.h"
+#include "Item/PlaceableItem/Campfire.h"
 
 UBuildingPlacementComponent::UBuildingPlacementComponent()
 {
@@ -604,6 +605,12 @@ void UBuildingPlacementComponent::ServerPlacePlaceable_Implementation(FGuid Requ
 	UE_LOG(LogTemp, Log, TEXT("[ServerPlacePlaceable] : Placeable 설치 완료. Item=%s, Location=%s"),
 		*GetNameSafe(ItemData),
 		*SafePlacementTransform.GetLocation().ToString());
+
+	// 모닥불 설치와 아이템 소비가 성공한 지점에서 설치 사운드를 알림
+	if (ACampfire* Campfire = Cast<ACampfire>(NewPlaceable))
+	{
+		Campfire->NotifyPlacementSucceeded();
+	}
 
 	SendResult(true);
 }

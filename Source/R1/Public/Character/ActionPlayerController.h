@@ -10,13 +10,14 @@
 
 #include "Interface/RespawnPointInterface.h"
 #include "Component/InventoryComponent.h"
-#include "Item/PlaceableItem/Campfire/CampfireTypes.h"
+#include "CommonHeader/CampfireTypes.h"
 #include "ActionPlayerController.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPossessedCharChange);
 
 class UInputMappingContext;
 class UInputAction;
+class UCraftingComponent;
 struct FInventorySlotRef;
 /**
  * 
@@ -27,6 +28,15 @@ class R1_API AActionPlayerController : public APlayerController
 	GENERATED_BODY()
 	
 public:
+
+	// Bench가 nullptr이면 기본 제작 화면 열기
+	UFUNCTION(Client, Reliable)
+	void Client_OpenCrafting(class AWorkbench* Bench);
+
+	UFUNCTION(BlueprintCallable, Category = "Crafting")
+	void CloseCrafting();
+
+	// 모닥불 UI 열기와 아래 서버 RPC들은 공유 액터 조작을 플레이어 소유 컨트롤러로 중계
 	UFUNCTION(Client, Reliable)
 	void Client_OpenCampfire(class ACampfire* Campfire);
 
@@ -172,6 +182,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UInputMappingContext> DefaultMappingContext = nullptr;
 
+	// 제작 대기열은 화면과 분리하여 창을 닫아도 유지
+	// 개인 제작 큐를 컨트롤러에 두고, 작업대 제작 요청도 이 컴포넌트를 통해 서버에 전달
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Crafting")
+	TObjectPtr<UCraftingComponent> CraftingComponent;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Building", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<class UBuildingPlacementComponent> BuildingPlacementComponent; // 건축물 설치 컴포넌트
 	// UI 입력 맵핑 컨텍스트(인벤토리 토글 등) — BeginPlay에 한 번 추가되면 제거되지 않는다.
@@ -199,8 +214,13 @@ protected:
 
 	// SetInventoryInputState/SetOptionsInputState가 공유하는 "현재 열려있는 UI 패널 개수" —
 	// 0→1로 바뀔 때만 게임 입력을 끄고, 1→0으로 바뀔 때만 게임 입력을 복구한다.
-	void ApplyUIInputState(bool bOpen);
 	int32 OpenUIPanelCount = 0;
+
+	// 제작창 토글
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UInputAction> IA_CraftingToggle;
+
+	void OnCraftingTogglePressed();	// 제작창 토글
 
 	// 플레이어 리스폰 지점
 	UPROPERTY()
@@ -211,6 +231,9 @@ protected:
 	TObjectPtr<UInputAction> IA_ChatOpen;
 
 public:
+
+	// HUD에서 실제 패널이 열리거나 닫힐 때 한 번씩 호출
+	void ApplyUIInputState(bool bOpen);
 
 	// 컨트롤러 연결 캐릭터 변경 시 호출되는 델리게이트
 	FOnPossessedCharChange OnPossessedCharChange;

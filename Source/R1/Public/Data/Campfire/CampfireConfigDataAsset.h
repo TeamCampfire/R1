@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
@@ -26,12 +26,13 @@ struct R1_API FCampfireFuelRecipe
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TObjectPtr<UItemDataBase> BeforeItem;
 
-	// 비어 있으면 연료만 소비하고 부산물은 생성하지 않는다.
+	// 비어 있으면 연료만 소비하고 부산물은 생성하지 않음
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TObjectPtr<UItemDataBase> AfterItem;
 };
 
-/** 허용 조리 재료와 연료를 변환 전/후 아이템 쌍으로 관리하는 모닥불 설정. */
+/** 허용 조리 재료와 연료를 변환 전/후 아이템 쌍으로 관리하는 모닥불 설정 */
+// DA_Campfire_Default에서 허용 요리/연료와 변환 결과, 처리 시간을 설정하는 데이터 형식
 UCLASS(BlueprintType)
 class R1_API UCampfireConfigDataAsset : public UPrimaryDataAsset
 {

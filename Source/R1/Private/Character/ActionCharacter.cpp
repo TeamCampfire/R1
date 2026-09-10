@@ -136,19 +136,35 @@ void AActionCharacter::BeginPlay()
 	}
 
 	
+	// 디버깅용 기본 아이템 지급 중 인벤토리 누락은 중단하고 비어 있는 아이템 항목은 건너뛰어 크래시 방지
 	if (DefaultItems.Num() > 0)
 	{
-		int32 remain;
-		for (auto& Item : DefaultItems)
+		if (!IsValid(InventoryComponent))
 		{
-				//for debug
+			UE_LOG(LogTemp, Error, TEXT("%s has no valid InventoryComponent."), *GetName());
+			return;
+		}
+
+		for (int32 Index = 0; Index < DefaultItems.Num(); ++Index)
+		{
+			UItemDataBase* Item = DefaultItems[Index];
+			if (!IsValid(Item))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("%s DefaultItems[%d] is empty."), *GetName(), Index);
+				continue;
+			}
+
+			int32 Remain = 0;
+			//for debug
 			if (Item->DisplayName.ToString().Contains(TEXT("나무")))
 			{
-				InventoryComponent->AddItem(Item,200, remain);
+				InventoryComponent->AddItem(Item, 200, Remain);
 
 			}
 			else
-				InventoryComponent->AddItem(Item,1, remain);
+			{
+				InventoryComponent->AddItem(Item, 1, Remain);
+			}
 		}
 
 	}

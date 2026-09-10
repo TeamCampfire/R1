@@ -137,7 +137,7 @@ struct FItemEffect
 	float TickInterval = 1.f;
 };
 
-// 제작 재료 하나(재료 아이템 + 수량). UItemDataBase::CraftingCost 배열의 원소로 쓴다.
+// 제작 재료 하나(재료 아이템 + 수량). UItemDataBase::CraftingCost 배열의 원소로 사용
 USTRUCT(BlueprintType)
 struct FCraftIngredient
 {

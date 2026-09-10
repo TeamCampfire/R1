@@ -80,11 +80,22 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
 	EPickupMode DefaultPickupMode = EPickupMode::LookAndPress;
 
-	// 제작에 필요한 재료 목록(재료 아이템 + 수량). 장비/도구뿐 아니라 소비/기타 아이템도
-	// 제작 가능할 수 있어(붕대, 침낭 등) 서브클래스가 아니라 공통 베이스에 둔다.
+	// 제작에 필요한 재료 목록(재료 아이템 + 수량)
+	// 장비/도구뿐 아니라 소비/기타 아이템도 제작 가능할 수 있어(붕대, 침낭 등)
+	// 서브클래스가 아니라 공통 베이스에 둔다.
 	// 비어있으면 제작 불가(월드/상자 획득 전용) 아이템으로 취급.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item|Crafting")
 	TArray<FCraftIngredient> CraftingCost;
+
+	// 이후 제작 시스템에서 추가한 개당 제작 시간
+	// 큐 완료 시각 계산에 사용
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item|Crafting", meta = (ClampMin = "0.1"))
+	float CraftingSeconds = 5.f;
+
+	// 작업대가 필요한 레시피를 개인 제작에서 제외
+	// 서버의 제작 조건 검사에 사용
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item|Crafting")
+	bool bRequiresWorkbench = false;
 
 	// 사용 시 적용되는 효과 목록. 원래 UConsumableItemData 전용이었으나, 붕대처럼 손에 들고
 	// 좌클릭으로 소모하며 효과를 적용하는 UHeldItemData 아이템도 필요해져 공통 베이스로
