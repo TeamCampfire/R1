@@ -6,7 +6,7 @@
 #include "GameFramework/Pawn.h"
 #include "Camera/CameraComponent.h"
 #include "Components/PrimitiveComponent.h"
-#include "Item/PlaceableItem/Campfire/Campfire.h"
+#include "Item/PlaceableItem/Campfire.h"
 
 // Sets default values for this component's properties
 UInteractionComponent::UInteractionComponent()
@@ -19,6 +19,7 @@ UInteractionComponent::UInteractionComponent()
 	SetIsReplicatedByDefault(true);
 }
 
+// 현재 상호작용 중인 모닥불 UI의 대상 액터를 저장
 void UInteractionComponent::SetActiveCampfire(ACampfire* Campfire)
 {
 	ActiveCampfire = Campfire;

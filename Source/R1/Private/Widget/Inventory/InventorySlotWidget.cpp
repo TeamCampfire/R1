@@ -288,6 +288,7 @@ bool UInventorySlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDrag
 
 	if (UInventoryDragDropOperation* DragOp = Cast<UInventoryDragDropOperation>(InOperation))
 	{
+		// 모닥불 출처 드롭을 일반 인벤토리 이동과 구분하여 전용 델리게이트로 전달
 		if (DragOp->SourceType == EItemDragSourceType::Campfire)
 		{
 			// 모닥불 -> 인벤토리

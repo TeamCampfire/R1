@@ -142,6 +142,8 @@ void UBeltBarWidget::HandleSlotRightClicked(FInventorySlotRef SlotRef)
 	{
 		UInteractionComponent* Interaction = PC->GetPawn()
 			? PC->GetPawn()->FindComponentByClass<UInteractionComponent>() : nullptr;
+
+		// 열린 모닥불이 있으면 벨트 우클릭으로 해당 모닥불에 빠르게 넣기
 		if (ACampfire* Campfire = Interaction ? Interaction->GetActiveCampfire() : nullptr)
 		{
 			PC->Server_QuickMoveInventoryToCampfire(Campfire, SlotRef);
@@ -171,8 +173,8 @@ void UBeltBarWidget::HandleSlotRightClicked(FInventorySlotRef SlotRef)
 	Inventory->Server_QuickMoveItem(SlotRef);
 }
 
-void UBeltBarWidget::HandleCampfireItemDropped(ACampfire* Campfire, FCampfireSlotRef FromSlot,
-	FInventorySlotRef ToSlot, int32 Count, bool bAutoHalfSplitOnEmptyTarget)
+// 아이템 이동: 모닥불에서 벨트로 드롭한 아이템을 컨트롤러의 서버 이동 RPC로 전달
+void UBeltBarWidget::HandleCampfireItemDropped(ACampfire* Campfire, FCampfireSlotRef FromSlot, FInventorySlotRef ToSlot, int32 Count, bool bAutoHalfSplitOnEmptyTarget)
 {
 	if (AActionPlayerController* PC = Cast<AActionPlayerController>(GetOwningPlayer()))
 	{

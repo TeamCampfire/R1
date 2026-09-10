@@ -23,6 +23,7 @@ class ACampfire;
 class UPickupNotificationWidget;
 class UItemDataBase;
 class UPanelWidget;
+class USoundBase;
 /**
  * 
  */
@@ -32,6 +33,16 @@ class R1_API UMainHUDWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
+
+	// 개인 제작과 작업대 제작은 같은 창에 데이터 원본만 바꿔 연결
+	void OpenCraftingPanel(class UCraftingComponent* Crafting, class AWorkbench* Bench);
+
+	UFUNCTION(BlueprintCallable, Category = "Crafting")
+	void CloseCraftingPanel();
+
+	UFUNCTION(BlueprintPure, Category = "Crafting")
+	bool IsCraftingPanelOpen() const;
+
 	// 인벤토리 패널(장비+메인)을 열려있으면 닫고, 닫혀있으면 연다. 전환 후 열림 상태를 돌려준다.
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	bool ToggleInventoryPanel();
@@ -95,6 +106,7 @@ public:
 	TObjectPtr<AActionPlayerController> CachedController;
 
 protected:
+
 	//~ Begin UUserWidget Interface
 	virtual void NativeOnInitialized() override;
 	virtual void NativeDestruct() override;
@@ -105,6 +117,9 @@ protected:
 	// 멀어지면 자동으로 닫는다(월드를 돌아다니며 조작하지 못하게 막는 InventoryComponent 서버
 	// 검증과는 별개로, UI 자체도 따라와서 계속 열려있는 게 부자연스러워서 클라이언트에서 처리).
 	void CheckWarehouseAutoClose();
+
+	// 열린 모닥불의 유효성과 사용 거리를 확인
+	// -> 유효하지 않으면 UI 세션을 자동 종료
 	void CheckCampfireAutoClose();
 
 	// 현재 표시 중인 건축 안내 메시지를 숨기는 함수
@@ -147,18 +162,30 @@ protected:
 	TObjectPtr<UInventoryWidget> InventoryWidget;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UBeltBarWidget> BeltBarWidget;
+
+	// 모닥불 위젯
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UCampfireWidget> CampfireWidget;
 
 	bool bCampfireSessionOpen = false;
-	TWeakObjectPtr<ACampfire> OpenCampfireActor;
 
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
-	TObjectPtr<UBeltBarWidget> BeltBarWidget;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Campfire|Audio")
+	TObjectPtr<USoundBase> CampfireOpenSound;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Campfire|Audio")
+	TObjectPtr<USoundBase> CampfireCloseSound;
+
+	TWeakObjectPtr<ACampfire> OpenCampfireActor;
 
 	// 창고 패널 — WBP_MainHUD에 이 이름 + UWarehouseWidget 타입으로 배치하면 자동 바인딩된다.
 	// 인벤토리/벨트와 달리 기본적으로 숨겨진 채 시작해서 상호작용으로 열 때만 보인다.
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UWarehouseWidget> WarehouseWidget;
+
+	// 메인 HUD의 CraftingWidget 이름으로 배치한 제작창
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<class UCraftingWidget> CraftingWidget;
 
 	// 건축 메시지 관련
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidget))

@@ -9,7 +9,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Component/InventoryComponent.h"
-#include "Item/PlaceableItem/Campfire/CampfireTypes.h"
+#include "CommonHeader/CampfireTypes.h"
 #include "InventoryWidget.generated.h"
 
 class UInventoryComponent;
@@ -59,6 +59,7 @@ public:
 	UDetailInfoWidget* GetDetailInfoWidget() const { return DetailInfoWidget; }
 
 	// 모닥불 활성 관련 함수
+	// 메인 인벤토리 우클릭의 이동 대상 모닥불을 지정하며, UI 종료 시 해제
 	void SetActiveCampfire(ACampfire* Campfire);
 	void ClearActiveCampfire() { ActiveCampfire.Reset(); }
 
@@ -126,10 +127,9 @@ private:
 	UFUNCTION()
 	void HandleSlotDragCancelled(FInventorySlotRef SlotRef);
 
-	// 모닥불에 있는 아이템 버리기
+	// 모닥불에서 드롭한 아이템을 지정한 인벤토리 슬롯으로 이동
 	UFUNCTION()
-	void HandleCampfireItemDropped(ACampfire* Campfire, FCampfireSlotRef FromSlot,
-		FInventorySlotRef ToSlot, int32 Count, bool bAutoHalfSplitOnEmptyTarget);
+	void HandleCampfireItemDropped(ACampfire* Campfire, FCampfireSlotRef FromSlot, FInventorySlotRef ToSlot, int32 Count, bool bAutoHalfSplitOnEmptyTarget);
 
 	// 언바인딩용으로 보관. 소유 폰이 사라지는 경우도 있어 약한 참조로 들고 있는다.
 	TWeakObjectPtr<UInventoryComponent> BoundInventory;

@@ -2,6 +2,8 @@
 
 
 #include "Character/ActionPlayerController.h"
+#include "Component/CraftingComponent.h"
+#include "Item/PlaceableItem/Workbench.h"
 #include "Character/ActionCharacter.h"
 #include "Component/StatComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -20,14 +22,17 @@
 #include "Data/Building/BuildingPartDefinition.h"
 #include "Data/Item/PlaceableItemData.h"
 #include "Component/InventoryComponent.h"
-#include "Item/PlaceableItem/Campfire/Campfire.h"
-#include "Item/PlaceableItem/Campfire/CampfireComponent.h"
+#include "Item/PlaceableItem/Campfire.h"
+#include "Component/CampfireComponent.h"
 #include "Interface/InteractableInterface.h"
 #include "Widget/Chatting/ChatWidget.h"
 #include "Framework/GameState/ActionGameState.h"
 
 AActionPlayerController::AActionPlayerController()
 {
+	// 제작 컴포넌트 생성
+	CraftingComponent = CreateDefaultSubobject<UCraftingComponent>(TEXT("CraftingComponent"));
+
 	// 빌딩 배치 컴포넌트 생성
 	BuildingPlacementComponent = CreateDefaultSubobject<UBuildingPlacementComponent>(TEXT("BuildingPlacementComp"));
 }
@@ -85,6 +90,7 @@ UInventoryComponent* AActionPlayerController::GetPlayerInventory() const
 	return GetPawn() ? GetPawn()->FindComponentByClass<UInventoryComponent>() : nullptr;
 }
 
+// 모닥불 이동 및 점화 RPC에서 현재 폰과 상호작용 가능 거리를 공통으로 검사
 bool AActionPlayerController::CanUseCampfire(ACampfire* Campfire) const
 {
 	return GetPawn() && IsValid(Campfire)
@@ -99,10 +105,12 @@ void AActionPlayerController::Client_OpenCampfire_Implementation(ACampfire* Camp
 	}
 }
 
+// 공유 모닥불의 서버 재고 변경을 플레이어 컨트롤러에 중계 요청
 void AActionPlayerController::Server_MoveInventoryToCampfire_Implementation(ACampfire* Campfire,
 	FInventorySlotRef From, FCampfireSlotRef To, int32 Count, bool bHalfSplit)
 {
-	if (CanUseCampfire(Campfire)) Campfire->GetCampfireComponent()->MoveFromInventory(GetPlayerInventory(), From, To, Count, bHalfSplit);
+	if (CanUseCampfire(Campfire))
+		Campfire->GetCampfireComponent()->MoveFromInventory(GetPlayerInventory(), From, To, Count, bHalfSplit);
 }
 
 void AActionPlayerController::Server_MoveCampfireToInventory_Implementation(ACampfire* Campfire,
@@ -203,6 +211,9 @@ void AActionPlayerController::SetupInputComponent()
 
 		// 채팅창 키 바인딩
 		EIC->BindAction(IA_ChatOpen, ETriggerEvent::Started, this, &AActionPlayerController::OnChatOpenPressed);
+
+		// Q: 제작 UI 토글
+		EIC->BindAction(IA_CraftingToggle, ETriggerEvent::Started, this, &AActionPlayerController::OnCraftingTogglePressed);
 	}
 }
 
@@ -574,6 +585,7 @@ void AActionPlayerController::OnGameMenuTogglePressed()
 
 void AActionPlayerController::OnInventoryTogglePressed()
 {
+	CloseCrafting();
 	// 캐릭터가 죽은 동안(사망 직후 UnPossess ~ 부활 전, 또는 살아있어도 bAlive=false인 짧은
 	// 순간)엔 인벤토리 토글을 무시한다 — 죽은 화면에서 인벤토리 패널을 열어봐야 HUDPanel 자체가
 	// Collapsed라 보이지도 않으면서 OpenUIPanelCount/커서 상태만 어긋나게 된다.
@@ -610,3 +622,55 @@ void AActionPlayerController::ServerTestInflictDamage_Implementation()
 	StatComp->Execute_InflictDamage(StatComp, 50.0f);
 }
 //------------------------------------------------------------------------------------------------------------------------------------------
+
+// Q 키 입력
+// 개인 제작 화면을 토글하며, 작업대 없는 제작은 nullptr로 구분
+void AActionPlayerController::OnCraftingTogglePressed()
+{
+	AMainHUD* HUD = GetHUD<AMainHUD>();
+	UMainHUDWidget* MainWidget = HUD ? HUD->GetMainHudWidget() : nullptr;
+	if (MainWidget && MainWidget->IsCraftingPanelOpen())
+	{
+		CloseCrafting();
+		return;
+	}
+
+	// Q 입력으로 UI 열기는 로컬에서만 작동
+	// 실제 제작 요청은 제작 컴포넌트의 서버 RPC를 사용
+	Client_OpenCrafting_Implementation(nullptr);
+}
+
+// 닫기 요청: HUD에 창 정리 위임
+void AActionPlayerController::CloseCrafting()
+{
+	AMainHUD* HUD = GetHUD<AMainHUD>();
+	if (UMainHUDWidget* MainWidget = HUD ? HUD->GetMainHudWidget() : nullptr)
+		MainWidget->CloseCraftingPanel();
+}
+
+// 제작 가능 상태 확인, 개인 제작 컴포넌트와 선택 작업대를 HUD에 전달
+void AActionPlayerController::Client_OpenCrafting_Implementation(AWorkbench* Bench)
+{
+	AActionCharacter* PossessedCharacter = Cast<AActionCharacter>(GetPawn());
+
+	// 죽은 상태에서는 제작창 열기 방지
+	const IHealthInterface* Health =
+		PossessedCharacter
+		? Cast<IHealthInterface>(PossessedCharacter->GetStatComponent())
+		: nullptr;
+	if (!Health || !Health->IsAlive())
+	{
+		return;
+	}
+
+	// 소유 클라이언트의 로컬 컨트롤러에서만 제작 UI 열기
+	if (!IsLocalController())
+		return;
+
+	// 제작 데이터와 작업대를 전달하고 창 관리는 HUD에 위임
+	AMainHUD* HUD = GetHUD<AMainHUD>();
+	if (UMainHUDWidget* MainWidget = HUD ? HUD->GetMainHudWidget() : nullptr)
+	{
+		MainWidget->OpenCraftingPanel(CraftingComponent, Bench);
+	}
+}
