@@ -22,8 +22,13 @@ void ABuildingHammer::PerformBuildingHit()
 {
 	// 몽타주 노티파이는 다른 클라이언트의 복제 캐릭터에서도 발생할 수 있기 떄문에
 	// 실제 공격 요청은 이 해머를 직접 조작하는 로컬 플레이어만 진행
+
+	UE_LOG(LogTemp, Display, TEXT("test0"));
+
 	if (false == IsValid(OwnerCharacter) || false == OwnerCharacter->IsLocallyControlled() || false == IsValid(ItemData))
 		return;
+
+	UE_LOG(LogTemp, Display, TEXT("test1"));
 
 	// 카메라 중앙에서 라인트레이스를 해서 범위 내에 세워진 건물이 있는지 확인
 	if (APlayerController* PC = Cast<APlayerController>(OwnerCharacter->GetController()))
@@ -40,8 +45,10 @@ void ABuildingHammer::PerformBuildingHit()
 			FCollisionQueryParams Params;
 			Params.AddIgnoredActor(this);
 
+				UE_LOG(LogTemp, Display, TEXT("test2"));
 			if (GetWorld()->LineTraceSingleByChannel(OutHitRes, StartPos, EndPos, ECC_Visibility, Params))
 			{
+					UE_LOG(LogTemp, Display, TEXT("test3"));
 				// 건축물을 공격한 경우
 				if (ABuildingActor* BuildingActor = Cast<ABuildingActor>(OutHitRes.GetActor()))
 				{
