@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.09.07
+﻿/// 최초작성 : 2026.09.07
 /// 작 성 자 : 최 요 환
 /// 간단설명 : 빈병/채워진병 두 상태만 오가는 물병 HeldItem
 
@@ -67,6 +67,12 @@ protected:
 	// 채워진 상태의 아이템 정의 — 채운 직후 이걸로 전환한다.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WaterBottle")
 	TObjectPtr<UHeldItemData> FilledBottleData;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WaterBottle|FX")
+	TObjectPtr<USoundBase> DrinkSound;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WaterBottle|FX")
+	TObjectPtr<USoundBase> FillSound;
 
 	// 한 번 마실 때 회복되는 수분(Hydration) 양 — UStatComponent::ApplyItemEffect(RestoreThirst)로 전달.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WaterBottle")

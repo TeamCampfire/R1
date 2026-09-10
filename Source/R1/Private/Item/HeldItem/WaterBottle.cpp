@@ -10,6 +10,8 @@
 #include "WaterBodyActor.h"
 #include "Engine/OverlapResult.h"
 #include "DrawDebugHelpers.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
 
 AWaterBottle::AWaterBottle()
 {
@@ -31,6 +33,18 @@ void AWaterBottle::OnPrimaryActionStarted()
 	// ItemData(FilledBottleData)에 PrimaryMontage가 지정돼 있으면 베이스가 재생해준다.
 	Super::OnPrimaryActionStarted();
 
+
+	if (DrinkSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(
+			this,
+			DrinkSound,
+			GetActorLocation(), // 사운드가 울릴 월드 위치
+			1.0f,               // 볼륨 배율
+			1.0f                // 피치 배율
+		);
+	}
+
 	Server_DrinkWater();
 }
 
@@ -43,6 +57,18 @@ void AWaterBottle::OnSecondaryActionStarted()
 	}
 
 	Super::OnSecondaryActionStarted();
+
+
+	if (FillSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(
+			this,
+			FillSound,
+			GetActorLocation(), // 사운드가 울릴 월드 위치
+			1.0f,               // 볼륨 배율
+			1.0f                // 피치 배율
+		);
+	}
 
 	Server_FillWater();
 }

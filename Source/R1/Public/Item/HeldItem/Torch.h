@@ -38,6 +38,8 @@ protected:
 
 	virtual void OnItemStateChanged(bool bNewState) override;
 
+	virtual void OnUnequipped() override;
+
 protected:
 	// 전용 몽타주
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Torch|Animation")
@@ -65,4 +67,12 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Torch|FX")
 	TObjectPtr<UPointLightComponent> TorchFireLight;
 
+
+	// 연소음 재생용 오디오 컴포넌트
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Torch|Audio")
+	TObjectPtr<UAudioComponent> BurnAudioComponent;
+
+	// 지속 연소음 (S_Torch_Burn 지정 - Looping 켜진 사운드)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Torch|Audio")
+	TObjectPtr<USoundBase> BurningSound;
 };

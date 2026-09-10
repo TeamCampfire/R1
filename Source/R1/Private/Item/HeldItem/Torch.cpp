@@ -5,6 +5,7 @@
 #include "Character/ActionCharacter.h"
 #include "NiagaraComponent.h"
 #include "Components/PointLightComponent.h"
+#include "Components/AudioComponent.h"
 
 ATorch::ATorch()
 	:Super()
@@ -25,6 +26,10 @@ ATorch::ATorch()
 	TorchFireLight->SetLightColor(FLinearColor(1.f, 0.6f, 0.2f));
 	TorchFireLight->SetIntensity(3500.0f);
 	TorchFireLight->SetAttenuationRadius(800.0f);
+
+	BurnAudioComponent = CreateDefaultSubobject<UAudioComponent>(TEXT("BurnAudioComp"));
+	BurnAudioComponent->SetupAttachment(ItemMesh3P);
+	BurnAudioComponent->bAutoActivate = false;
 }
 
 void ATorch::OnPrimaryActionStarted()
@@ -140,6 +145,19 @@ void ATorch::InitItemVisual(UHeldItemData* InItemData)
 		}
 	}
 
+	if (BurnAudioComponent)
+	{
+		USceneComponent* AttachTarget = (OwnerCharacter && OwnerCharacter->IsLocallyControlled() && ItemMesh1P) ? ItemMesh1P : ItemMesh3P;
+		if (AttachTarget)
+		{
+			BurnAudioComponent->AttachToComponent(AttachTarget, FAttachmentTransformRules::SnapToTargetNotIncludingScale, SocketName);
+		}
+		if (BurningSound)
+		{
+			BurnAudioComponent->SetSound(BurningSound);
+		}
+	}
+
 }
 
 void ATorch::Server_ToggleState_Implementation()
@@ -167,13 +185,24 @@ void ATorch::OnItemStateChanged(bool bNewState)
 		if (FlameFxComponent3P) FlameFxComponent3P->Activate(true);
 		if (FlameFxComponent1P) FlameFxComponent1P->Activate(true);
 		if (TorchFireLight) TorchFireLight->SetVisibility(true);
+		if (BurnAudioComponent) BurnAudioComponent->Play();
 	}
 	else
 	{
 		if (FlameFxComponent3P) FlameFxComponent3P->Deactivate();
 		if (FlameFxComponent1P) FlameFxComponent1P->Deactivate();
 		if (TorchFireLight) TorchFireLight->SetVisibility(false);
+		if (BurnAudioComponent) BurnAudioComponent->Stop();
 	}
+}
+
+void ATorch::OnUnequipped()
+{
+	if (BurnAudioComponent)
+	{
+		BurnAudioComponent->Stop();
+	}
+	Super::OnUnequipped();
 }
 
 
