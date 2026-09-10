@@ -146,6 +146,10 @@ void AWheeledVehicleBase::Tick(float DeltaTime)
 
 		DriverCamera->SetRelativeRotation(CurrentRotation);
 	}
+	if (!DriverCharacter)
+	{
+		ChaosVehicleMovement->SetThrottleInput(0.0f);
+	}
 }
 
 void AWheeledVehicleBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -172,6 +176,10 @@ void AWheeledVehicleBase::EnterVehicle_Implementation(APawn* VehicleCharacter, i
 		return;
 	}
 
+	GetMesh()->SetCollisionResponseToChannel(
+		ECC_GameTraceChannel4,
+		ECR_Ignore
+	);
 	SeatOccupants[InSeatIndex] = VehicleChar;
 
 	// 운전석
@@ -250,6 +258,11 @@ void AWheeledVehicleBase::ExitVehicle_Implementation(APawn* VehicleCharacter)
 
 	SeatOccupants[SeatIndex] = nullptr;
 
+	GetMesh()->SetCollisionResponseToChannel(
+		ECC_GameTraceChannel4,
+		ECR_Block
+	);
+	ChaosVehicleMovement->SetRequiresControllerForInputs(false);
 	// 차량에서 분리
 	FVector ExitLocation =
 		SeatPoints[SeatIndex]->GetComponentLocation()

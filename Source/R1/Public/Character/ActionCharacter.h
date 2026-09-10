@@ -103,6 +103,9 @@ public:
 	FORCEINLINE AWheeledVehicleBase* GetCurrentVehicle() const { return CurrentVehicle;}
 	FORCEINLINE void SetCurrentVehicle(AWheeledVehicleBase* InVehicle) { CurrentVehicle = InVehicle;}
 
+	FORCEINLINE AWheeledVehicleBase* GetCurrentHorse() const { return CurrentHorse;}
+	FORCEINLINE void SetCurrentHorse(AWheeledVehicleBase* InVehicle) { CurrentHorse = InVehicle;}
+
 protected:
 	virtual bool CanJumpInternal_Implementation() const override;
 	virtual void OnJumped_Implementation() override;
@@ -331,6 +334,9 @@ protected:
 
 	UPROPERTY(Replicated)
 	TObjectPtr<AWheeledVehicleBase> CurrentVehicle;
+
+	UPROPERTY(Replicated)
+	TObjectPtr<AWheeledVehicleBase> CurrentHorse;
 
 	// 스탯 컴포넌트
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)

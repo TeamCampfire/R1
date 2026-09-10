@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Character/ActionCharacter.h"
@@ -335,12 +335,22 @@ void AActionCharacter::SetIsInVehicle(bool bIsInVehicleNew, bool bIsDriver)
 	//LegMesh->SetVisibility(!bIsInVehicleNew);
 	//FeetMesh->SetVisibility(!bIsInVehicleNew);
 
-	VehicleYawOffset = CurrentVehicle->GetActorRotation().Yaw;
-
-	GetCapsuleComponent()->SetCollisionEnabled(
+	VehicleYawOffset = CurrentVehicle? CurrentVehicle->GetActorRotation().Yaw : 0.0f;
+	GetCapsuleComponent()->SetCollisionObjectType(bIsInVehicleNew? ECC_GameTraceChannel4 : ECC_Pawn);
+	GetMesh()->SetCollisionObjectType(bIsInVehicleNew? ECC_GameTraceChannel4 : ECC_Pawn);
+	/*GetCapsuleComponent()->SetCollisionEnabled(
 		bIsInVehicleNew?
 		ECollisionEnabled::NoCollision
-       :ECollisionEnabled::QueryAndPhysics);
+       :ECollisionEnabled::QueryAndPhysics);*/
+
+	//GetCapsuleComponent()->SetCollisionResponseToChannel(
+	//	ECC_GameTraceChannel4, // Vehicle
+	//	bIsInVehicleNew ? ECR_Ignore : ECR_Block
+	//);
+	//GetMesh()->SetCollisionResponseToChannel(
+	//	ECC_GameTraceChannel4,
+	//	ECR_Ignore
+	//);
 	bUseControllerRotationYaw = !bIsInVehicleNew;
 
 	SetReplicateMovement(!bIsInVehicleNew);
@@ -645,7 +655,7 @@ bool AActionCharacter::IsUIBlockingGameplayInput() const
 void AActionCharacter::OnMoveAction(const FInputActionValue& InValue)
 {
 	const FVector2D MoveValue = InValue.Get<FVector2D>();
-
+	if (bIsSitting) return;
 	// 손에 든 도구/무기가 이동 차단 중일 때 (예: 낚시 중 A/D 저항, S 릴 감기)
 	if (HeldItemComponent && HeldItemComponent->BlocksCharacterMovement())
 	{
