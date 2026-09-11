@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.08.30
+﻿/// 최초작성 : 2026.08.30
 /// 작 성 자 : 주 형 진
 
 // Fill out your copyright notice in the Description page of Project Settings.
@@ -351,7 +351,7 @@ void UHeldItemComponent::UnequipHeldItem()
 	{
 		if (USkeletalMeshComponent* FPMesh = OwnerCharacter->GetFirstPersonMesh())
 		{
-			FPMesh->SetRelativeLocationAndRotation(FVector(0.f, 0.f, -130.f), FRotator(0.f, -90.f, 0.f));
+			FPMesh->SetRelativeLocationAndRotation(FVector(0.f, 0.f, -140.f), FRotator(0.f, -90.f, 0.f));
 		}
 	}
 
