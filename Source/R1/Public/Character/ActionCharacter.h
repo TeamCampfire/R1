@@ -382,6 +382,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|DefaultItem")
 	TArray<TObjectPtr<UItemDataBase>> DefaultItems;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|DefaultItem")
+	TObjectPtr<USoundBase> hitSFX;
+
 	UPROPERTY()
 	float VehicleYawOffset = 0.0f;
 

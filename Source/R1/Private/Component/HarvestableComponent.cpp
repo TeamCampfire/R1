@@ -415,7 +415,14 @@ void UHarvestableComponent::OnHarvestEnd_Implementation()
 		CurrentSweetSpotDecal->DestroyComponent();
 		CurrentSweetSpotDecal = nullptr;
 	}
-	GetOwner()->Destroy();
+
+	if (AActor* Owner = GetOwner())
+	{
+		// 플레이어 눈에는 숨기고 0.2초 뒤에 destroy
+		Owner->SetActorEnableCollision(false);
+		Owner->SetActorHiddenInGame(true);
+		Owner->SetLifeSpan(0.2f);
+	}
 }
 
 void UHarvestableComponent::SpawnImpactDecal_Implementation(const FVector SpawnPoint, const FRotator SpawnRotator)

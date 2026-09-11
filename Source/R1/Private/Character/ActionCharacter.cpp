@@ -29,6 +29,7 @@
 #include "BuildingSystem/BuildingActor.h"
 #include "Framework/MainHUD.h"
 #include "Widget/MainHUDWidget.h"
+#include "Kismet/GameplayStatics.h"
 
 #include "InputMappingContext.h"
 #include "InputAction.h"
@@ -550,6 +551,15 @@ void AActionCharacter::ProcessAttack()
 		AActor* Target = DetectRes.GetActor();
 		if (!Target) return;
 
+		if (Target->Implements<UStatInterface>())
+		{
+			if (hitSFX)
+			{
+				UGameplayStatics::PlaySound2D(this, hitSFX);
+			}
+		}
+
+
 		// 서버 권한으로 타격 및 자원 채집 처리 요청
 		Server_ProcessAttackTarget(Target, DetectRes.ImpactPoint);
 	}
@@ -577,10 +587,21 @@ void AActionCharacter::Server_ProcessAttackTarget_Implementation(AActor* TargetA
 			IHealthInterface::Execute_InflictDamage(TargetActor, HeldItemComponent->GetCurrentHeldItem()->GetItemData()->Damage);
 			return;
 		}
-
 	}
 
-	// 2. 자원을 얻을 수 있는 대상인지 확인
+	// 2. 자원이 아니라 공격을 받는 대상인 경우 (플레이어)
+	if (IStatInterface* IStat = Cast<IStatInterface>(TargetActor))
+	{
+		// 공격 실행
+		if (IStat->GetStatComponent())
+		{
+			//TODO 하드코딩 수정
+			IHealthInterface::Execute_InflictDamage(IStat->GetStatComponent(), HeldItemComponent->GetCurrentHeldItem()->GetItemData()->Damage);
+			return;
+		}
+	}
+
+	// 3. 자원을 얻을 수 있는 대상인지 확인
 	if (UHarvestableComponent* HarvestComp = TargetActor->FindComponentByClass<UHarvestableComponent>())
 	{
 		// 서버에서 자원 획득 진행 (OnHitted_Implementation 실행)
@@ -607,21 +628,19 @@ void AActionCharacter::Server_ProcessAttackTarget_Implementation(AActor* TargetA
 		}
 	}
 
-	// 3.건축물을 공격한 경우
+	// 4.건축물을 공격한 경우
 	if (ABuildingActor* BuildingActor = Cast<ABuildingActor>(TargetActor))
 	{
 		// 건물에 데미지를 준다.
 		Server_ApplyBuildingDamage(BuildingActor, HeldItemComponent->GetCurrentHeldItem()->GetItemData()->Damage);
 	}
 
-	// 4.Placeable 아이템을 공격한 경우
+	// 5.Placeable 아이템을 공격한 경우
 	if (APlaceableItemBase* PlaceableActor = Cast<APlaceableItemBase>(TargetActor))
 	{
 		// 개별 Placeable에 데미지를 준다
 		Server_ApplyPlaceableDamage(PlaceableActor, HeldItemComponent->GetCurrentHeldItem()->GetItemData()->Damage);
 	}
-
-
 }
 
 bool AActionCharacter::Server_GrantHarvestReward_Validate(UItemDataBase* ItemData, int32 Count)
