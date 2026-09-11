@@ -131,6 +131,9 @@ public:
 	FORCEINLINE AWheeledVehicleBase* GetCurrentVehicle() const { return CurrentVehicle;}
 	FORCEINLINE void SetCurrentVehicle(AWheeledVehicleBase* InVehicle) { CurrentVehicle = InVehicle;}
 
+	// 세션 접속 이전 시체 적용
+	void ApplyDeathVisuals();
+
 protected:
 	virtual bool CanJumpInternal_Implementation() const override;
 	virtual void OnJumped_Implementation() override;
@@ -407,4 +410,6 @@ private:
 
 	FVector CameraPosCache;
 	FRotator CameraRotCache;
+
+	bool bDeathVisualsApplied = false;	// 세션 접속 이전 시체들 적용됐는가
 };

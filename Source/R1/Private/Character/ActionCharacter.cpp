@@ -141,6 +141,12 @@ void AActionCharacter::BeginPlay()
 			this,
 			&AActionCharacter::Die
 		);
+
+		// 늦게 접속했을 때 OnRep가 BeginPlay보다 먼저 끝난 경우 보관
+		if (!StatComponent->IsAlive())
+		{
+			ApplyDeathVisuals();
+		}
 	}
 
 	
@@ -663,6 +669,13 @@ void AActionCharacter::Server_GrantHarvestReward_Implementation(UItemDataBase* I
 
 void AActionCharacter::Die()
 {
+	// 늦게 접속한 클라이언트는 bAlive의 OnRep를 통해 여기로 진입
+	if (!HasAuthority())
+	{
+		ApplyDeathVisuals();
+		return;
+	}
+
 	if (bIsSleeping)
 		StopSleeping();
 
@@ -759,14 +772,6 @@ void AActionCharacter::MulticastDie_Implementation()
 	// 캡슐 컴포넌트 충돌 끄기
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	// Unpossess되면 UpdateTargeting()의 IsLocallyControlled() 체크에 걸려 더 이상
-	// 갱신되지 않으므로, 죽기 직전 조준하고 있던 대상의 아웃라인이 영구히 남는다.
-	// 컨트롤러가 떨어지기 전에 명시적으로 하이라이트를 끄고 타겟을 비운다.
-	if (InteractionComponent)
-	{
-		InteractionComponent->ClearTarget();
-	}
-
 	// 애니메이션 중지
 	//GetMesh()->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 	//GetMesh()->Stop();
@@ -776,7 +781,6 @@ void AActionCharacter::MulticastDie_Implementation()
 	GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
 	GetMesh()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 
-	GetMesh()->SetSimulatePhysics(true);
 	if (HasAuthority())
 	{
 		// 컨트롤러 연결 해제: 서버만 실행
@@ -853,6 +857,36 @@ void AActionCharacter::Interact_Implementation(APawn* Interactor)
 	}
 }
 
+
+void AActionCharacter::ApplyDeathVisuals()
+{
+	if (bDeathVisualsApplied)
+		return;
+
+	bDeathVisualsApplied = true;
+
+	// Looting: 서버와 클라이언트 모두 사망 후 이동 계산 중단
+	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+	{
+		Movement->StopMovementImmediately();
+		Movement->DisableMovement();
+		Movement->SetComponentTickEnabled(false);
+	}
+
+	// 캡슐 컴포넌트 충돌 끄기
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	// 애니메이션 중지
+	//GetMesh()->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+	//GetMesh()->Stop();
+	GetMesh()->SetAnimInstanceClass(nullptr);
+
+	// 메쉬 랙돌 전환
+	GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
+	GetMesh()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+
+	GetMesh()->SetSimulatePhysics(true);
+}
 
 bool AActionCharacter::CanJumpInternal_Implementation() const
 {
