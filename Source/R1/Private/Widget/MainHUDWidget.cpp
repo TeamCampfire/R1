@@ -146,6 +146,8 @@ void UMainHUDWidget::HideBuildingPlacementMessage()
 
 void UMainHUDWidget::ShowDeathScreen()
 {
+	if (DeathScreenBorder)
+		DeathScreenBorder->SetVisibility(ESlateVisibility::Visible);
 	if (DeathScreenOverlay)
 		DeathScreenOverlay->SetVisibility(ESlateVisibility::Visible);
 
@@ -155,8 +157,11 @@ void UMainHUDWidget::ShowDeathScreen()
 
 void UMainHUDWidget::HideDeathScreen()
 {
+	if (DeathScreenBorder)
+		DeathScreenBorder->SetVisibility(ESlateVisibility::Collapsed);
 	if (DeathScreenOverlay)
 		DeathScreenOverlay->SetVisibility(ESlateVisibility::Collapsed);
+
 	if (HUDPanel)
 		HUDPanel->SetVisibility(ESlateVisibility::Visible);
 }

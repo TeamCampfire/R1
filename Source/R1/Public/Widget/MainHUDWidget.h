@@ -196,6 +196,8 @@ protected:
 
 	// 사망 화면
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UBorder> DeathScreenBorder;
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UDeathScreenOverlayWidget> DeathScreenOverlay;
 
 	// BuildingDurability 건물 내구도 UI
