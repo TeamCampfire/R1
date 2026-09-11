@@ -11,6 +11,7 @@
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "NiagaraComponent.h"
+#include "Components/PointLightComponent.h"
 
 ACampfire::ACampfire()
 {
@@ -28,6 +29,13 @@ ACampfire::ACampfire()
 	FireVFX = CreateDefaultSubobject<UNiagaraComponent>(TEXT("FireVFX"));
 	FireVFX->SetupAttachment(GetRootComponent());
 	FireVFX->bAutoActivate = false;
+
+	FireLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("Light3"));
+	FireLight->SetupAttachment(GetRootComponent());
+	FireLight->SetVisibility(false);
+	FireLight->SetLightColor(FLinearColor(1.f, 0.6f, 0.2f));
+	FireLight->SetIntensity(700.0f);
+	FireLight->SetAttenuationRadius(800.0f);
 }
 
 void ACampfire::BeginPlay()
@@ -112,12 +120,14 @@ void ACampfire::HandleCampfireStateChanged()
 	{
 		//UNiagaraFunctionLibrary::SpawnSystemAtLocation(
 			//GetWorld(), FireVFX, GetActorLocation(), GetActorRotation(), GetActorScale3D());
-		FireVFX->Activate();
+		FireVFX->Activate(true);
+		FireLight->SetVisibility(true);
 	}
 
 	if (false == bLit)
 	{
 		FireVFX->Deactivate();
+		FireLight->SetVisibility(false);
 	}
 
 	bWasLitForAudio = bLit;			// 점화 오디오 상태 업데이트: 이번에 처리한 점화 상태를 다음 상태와 비교하기 위해 저장
