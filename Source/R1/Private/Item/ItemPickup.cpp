@@ -19,6 +19,11 @@ AItemPickup::AItemPickup()
 
 	// 리플리케이트 적용
 	bReplicates = true;
+	// 다른 물리 이동 액터들(Vehicle, Car, Animal, Building, Character)과 동일하게 명시적으로
+	// 켠다 — 이게 빠져 있으면 ReplicatedMovement(위치/속도)가 리모트 클라이언트에 전혀
+	// 복제되지 않아, 서버에서 던지는 임펄스를 줘도 클라이언트에서는 로컬로 독립 시뮬레이션된
+	// 중력만 적용된 채 제자리에서 수직으로 떨어지는 것처럼 보인다.
+	SetReplicateMovement(true);
 
 
 	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
