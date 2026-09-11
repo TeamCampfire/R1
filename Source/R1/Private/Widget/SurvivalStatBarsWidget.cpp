@@ -136,6 +136,10 @@ void USurvivalStatBarsWidget::UpdateStatusEffects()
 
                     USurvivalStatBarsWidget* This = WeakThis.Get();
 
+					// ★ 다음 Tick에 실제 생성하기 직전에 다시 검사
+					if (This->StatusBarWidgets.Contains(EachEffect))
+						return;
+
                     UStatusBarWidget* StatusWidget =
                         CreateWidget<UStatusBarWidget>(
                             This,
