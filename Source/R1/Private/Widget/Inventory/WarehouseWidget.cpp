@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Widget/Inventory/WarehouseWidget.h"
@@ -10,10 +10,17 @@
 #include "Components/PanelWidget.h"
 #include "GameFramework/Pawn.h"
 #include "Character/ActionPlayerController.h"
+#include "Character/ActionCharacter.h"
+#include "Components/TextBlock.h"
 
 void UWarehouseWidget::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
+
+	if (WarehouseLabel)
+	{
+		DefaultWarehouseLabel = WarehouseLabel->GetText();
+	}
 
 	// 시작은 항상 숨김 — MainHUDWidget::OpenWarehousePanel이 열 때만 보이게 한다.
 	SetVisibility(ESlateVisibility::Collapsed);
@@ -31,6 +38,27 @@ void UWarehouseWidget::OpenWarehouse(UWarehouseInventoryComponent* Warehouse, UI
 	UnbindDelegates();
 
 	BoundWarehouse = Warehouse;
+
+	// Looting: 창고 UI 라벨 바꾸기
+	if (WarehouseLabel)
+	{
+		// 창고 컴포넌트를 달고 있는 게 플레이어 캐릭터이면 캐릭터 기억
+		const AActionCharacter* Character =
+			Warehouse
+			? Cast<AActionCharacter>(Warehouse->GetOwner())
+			: nullptr;
+
+		const bool bIsCorpseStorage = Character && Character->GetCorpseStorageComponent() == Warehouse;	// 시체 창고인지 확인
+
+		// 시체 창고면 UI 라벨 내용 시체로 바꾸기
+		// 일반 창고면 원래 내용으로 두기
+		// -> 시체 창고를 열었다가 일반 창고를 열었을 때 라벨이 시체로 유지되는 것을 방지하기 위해서
+		//    창고열 때마다 SetText해주기
+		WarehouseLabel->SetText(
+			bIsCorpseStorage
+			? FText::FromString(TEXT("시체"))
+			: DefaultWarehouseLabel);
+	}
 
 	if (APawn* OwningPawn = GetOwningPlayerPawn())
 	{

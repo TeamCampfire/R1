@@ -1,14 +1,43 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Component/WarehouseInventoryComponent.h"
 #include "Data/Item/ItemDataBase.h"
 #include "Net/UnrealNetwork.h"
 
+#include "Character/ActionCharacter.h"
+#include "Components/SkeletalMeshComponent.h"
+
 UWarehouseInventoryComponent::UWarehouseInventoryComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	SetIsReplicatedByDefault(true);
+}
+
+FVector UWarehouseInventoryComponent::GetInteractionLocation() const
+{
+	const AActor* OwnerActor = GetOwner();
+
+	if (!OwnerActor)
+		return FVector::ZeroVector;
+
+	// 상호작용 액터가 플레이어 캐릭터인 경우
+	if (const AActionCharacter* Character = Cast<AActionCharacter>(OwnerActor))
+	{
+		// 메시 기준으로 상호작용 위치 판정
+		if (const USkeletalMeshComponent* Mesh = Character->GetMesh())
+		{
+			static const FName PelvisBone(TEXT("pelvis"));	// 랙돌의 골반뼈 기준
+
+			if (Mesh->GetBoneIndex(PelvisBone) != INDEX_NONE)
+				return Mesh->GetSocketLocation(PelvisBone);
+
+			return Mesh->GetComponentLocation();
+		}
+	}
+
+	// 상호작용 액터가 플레이어 캐릭터가 아니고, 일반 창고인 경우
+	return OwnerActor->GetActorLocation();
 }
 
 bool UWarehouseInventoryComponent::AddItem(UItemDataBase* ItemData, int32 Count, int32& OutRemainder)

@@ -802,13 +802,13 @@ bool UInventoryComponent::Server_TransferWithWarehouse_Validate(UWarehouseInvent
 	// _Validate는 자기 자신의 슬롯만 다루므로 비어있어도 큰 문제가 없었지만, 이 함수는 원거리에서
 	// 악의적으로 창고 슬롯을 조작하는 걸 막아야 한다.
 	const AActor* PlayerOwner = GetOwner();
-	const AActor* WarehouseOwner = Warehouse->GetOwner();
-	if (!PlayerOwner || !WarehouseOwner)
+	//const AActor* WarehouseOwner = Warehouse->GetOwner();	// Looting: WarehouseComponent에 위치 반환 함수를 만들어 사용하기 때문에 더이상 창고 액터를 기억할 필요가 없어서 주석 처리
+	if (!PlayerOwner || !Warehouse)
 	{
 		return false;
 	}
 
-	const float DistSq = FVector::DistSquared(PlayerOwner->GetActorLocation(), WarehouseOwner->GetActorLocation());
+	const float DistSq = FVector::DistSquared(PlayerOwner->GetActorLocation(), Warehouse->GetInteractionLocation());
 	return DistSq <= FMath::Square(Warehouse->MaxInteractDistance);
 }
 

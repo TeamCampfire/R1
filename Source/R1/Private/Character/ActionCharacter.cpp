@@ -710,6 +710,14 @@ void AActionCharacter::MulticastDie_Implementation()
 	//	PC->UnPossess();
 	//}
 
+	// Looting: 서버와 클라이언트 모두 사망 후 이동 계산 중단
+	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+	{
+		Movement->StopMovementImmediately();
+		Movement->DisableMovement();
+		Movement->SetComponentTickEnabled(false);
+	}
+
 	// 캡슐 컴포넌트 충돌 끄기
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
@@ -724,10 +732,14 @@ void AActionCharacter::MulticastDie_Implementation()
 	GetMesh()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 
 	GetMesh()->SetSimulatePhysics(true);
-	// 컨트롤러 연결 해제
-	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	if (HasAuthority())
 	{
-		PC->UnPossess();
+		// 컨트롤러 연결 해제: 서버만 실행
+		// -> 어떤 컨트롤러가 어떤 캐릭터를 조종하는지는 서버가 결정하기 때문
+		if (APlayerController* PC = Cast<APlayerController>(GetController()))
+		{
+			PC->UnPossess();
+		}
 	}
 }
 
@@ -780,7 +792,7 @@ bool AActionCharacter::CanInteract_Implementation(APawn* Interactor) const
 		return false;
 
 	// 거리 확인 (제곱인 상태로 비교하는 게 빠름)
-	return FVector::DistSquared(Interactor->GetActorLocation(), GetActorLocation()) <= FMath::Square(CorpseStorageComponent->MaxInteractDistance);
+	return FVector::DistSquared(Interactor->GetActorLocation(), CorpseStorageComponent->GetInteractionLocation()) <= FMath::Square(CorpseStorageComponent->MaxInteractDistance);
 }
 
 void AActionCharacter::Interact_Implementation(APawn* Interactor)

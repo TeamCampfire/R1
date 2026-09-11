@@ -8,16 +8,6 @@
 #include "Components/PrimitiveComponent.h"
 #include "Item/PlaceableItem/Campfire.h"
 #include "CollisionShape.h"
-	// debug: Looting --------
-#include "HAL/IConsoleManager.h"
-#include "Character/ActionCharacter.h"
-#include "Component/StatComponent.h"
-
-static TAutoConsoleVariable<int32> CVarDebugCorpseInteraction(
-	TEXT("r1.DebugCorpseInteraction"), 0,
-	TEXT("Log local interaction trace hits when the interact key is pressed.")
-);
-// ----------------------------
 
 // Sets default values for this component's properties
 UInteractionComponent::UInteractionComponent()
@@ -43,40 +33,6 @@ ACampfire* UInteractionComponent::GetActiveCampfire() const
 
 void UInteractionComponent::TryInteract()
 {
-	// debug: Looting --------
-	if (CVarDebugCorpseInteraction.GetValueOnGameThread() != 0)
-	{
-		UpdateTargeting();
-		APawn* Pawn = Cast<APawn>(GetOwner());
-		UCameraComponent* Camera = Pawn ? Pawn->FindComponentByClass<UCameraComponent>() : nullptr;
-		if (Camera && GetWorld())
-		{
-			const FVector Start = Camera->GetComponentLocation();
-			const FVector End = Start + Camera->GetForwardVector() * TraceDistance;
-			FCollisionQueryParams Params;
-			Params.AddIgnoredActor(Pawn);
-			TArray<FHitResult> Hits;
-			if (InteractionAssistRadius > 0.f)
-				GetWorld()->SweepMultiByChannel(Hits, Start, End, FQuat::Identity, TraceChannel, FCollisionShape::MakeSphere(InteractionAssistRadius), Params);
-			else
-				GetWorld()->LineTraceMultiByChannel(Hits, Start, End, TraceChannel, Params);
-			UE_LOG(LogTemp, Warning, TEXT("[CorpseTrace] NetMode=%d Pawn=%s Target=%s Channel=%d Hits=%d Start=%s End=%s"),
-				static_cast<int32>(GetNetMode()), *GetNameSafe(Pawn), *GetNameSafe(CurrentTarget), static_cast<int32>(TraceChannel.GetValue()), Hits.Num(), *Start.ToString(), *End.ToString());
-			for (const FHitResult& Hit : Hits)
-			{
-				AActor* Actor = Hit.GetActor();
-				AActionCharacter* Character = Cast<AActionCharacter>(Actor);
-				const bool bCanInteract = IsValid(Actor) && Actor->Implements<UInteractableInterface>()
-					&& IInteractableInterface::Execute_CanInteract(Actor, Pawn);
-				UE_LOG(LogTemp, Warning, TEXT("[CorpseTrace] Hit=%s Component=%s Blocking=%d CanInteract=%d Alive=%d Storage=%s ActorDistance=%.1f"),
-					*GetNameSafe(Actor), *GetNameSafe(Hit.GetComponent()), Hit.bBlockingHit, bCanInteract,
-					Character && Character->GetStatComponent() ? static_cast<int32>(Character->GetStatComponent()->IsAlive()) : -1,
-					Character && Character->GetCorpseStorageComponent() ? TEXT("Present") : TEXT("None"),
-					Actor ? FVector::Distance(Pawn->GetActorLocation(), Actor->GetActorLocation()) : -1.f);
-			}
-		}
-	}
-	// ---------------------
 	UE_LOG(LogTemp, Log, TEXT("[PIE %d][%s] TryInteract 호출됨"),
 		UE::GetPlayInEditorID(),
 		GetOwner() && GetOwner()->HasAuthority() ? TEXT("SERVER") : TEXT("CLIENT"));
