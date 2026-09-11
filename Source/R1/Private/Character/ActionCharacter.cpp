@@ -728,7 +728,6 @@ void AActionCharacter::MulticastDie_Implementation()
 
 	// 메쉬 랙돌 전환
 	GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
-	GetMesh()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	GetMesh()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 
 	GetMesh()->SetSimulatePhysics(true);

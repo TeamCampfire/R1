@@ -888,13 +888,12 @@ bool UInventoryComponent::Server_TransferWithinWarehouse_Validate(UWarehouseInve
 	// Server_TransferWithWarehouse_Validate와 동일한 이유로 거리 검증을 둔다 — 남의(창고)
 	// 컴포넌트를 건드리는 함수라 원거리에서 악의적으로 조작하는 걸 막아야 한다.
 	const AActor* PlayerOwner = GetOwner();
-	const AActor* WarehouseOwner = Warehouse->GetOwner();
-	if (!PlayerOwner || !WarehouseOwner)
+	if (!PlayerOwner || !Warehouse)
 	{
 		return false;
 	}
 
-	const float DistSq = FVector::DistSquared(PlayerOwner->GetActorLocation(), WarehouseOwner->GetActorLocation());
+	const float DistSq = FVector::DistSquared(PlayerOwner->GetActorLocation(), Warehouse->GetInteractionLocation());
 	return DistSq <= FMath::Square(Warehouse->MaxInteractDistance);
 }
 
@@ -934,13 +933,12 @@ bool UInventoryComponent::Server_QuickMoveToWarehouse_Validate(UWarehouseInvento
 
 	// Server_TransferWithWarehouse_Validate와 동일한 이유로 거리 검증을 둔다.
 	const AActor* PlayerOwner = GetOwner();
-	const AActor* WarehouseOwner = Warehouse->GetOwner();
-	if (!PlayerOwner || !WarehouseOwner)
+	if (!PlayerOwner || !Warehouse)
 	{
 		return false;
 	}
 
-	const float DistSq = FVector::DistSquared(PlayerOwner->GetActorLocation(), WarehouseOwner->GetActorLocation());
+	const float DistSq = FVector::DistSquared(PlayerOwner->GetActorLocation(), Warehouse->GetInteractionLocation());
 	return DistSq <= FMath::Square(Warehouse->MaxInteractDistance);
 }
 
@@ -1002,13 +1000,12 @@ bool UInventoryComponent::Server_QuickMoveFromWarehouse_Validate(UWarehouseInven
 	}
 
 	const AActor* PlayerOwner = GetOwner();
-	const AActor* WarehouseOwner = Warehouse->GetOwner();
-	if (!PlayerOwner || !WarehouseOwner)
+	if (!PlayerOwner || !Warehouse)
 	{
 		return false;
 	}
 
-	const float DistSq = FVector::DistSquared(PlayerOwner->GetActorLocation(), WarehouseOwner->GetActorLocation());
+	const float DistSq = FVector::DistSquared(PlayerOwner->GetActorLocation(), Warehouse->GetInteractionLocation());
 	return DistSq <= FMath::Square(Warehouse->MaxInteractDistance);
 }
 
