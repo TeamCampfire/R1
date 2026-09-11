@@ -189,10 +189,12 @@ void UMainHUDWidget::OnDeath()
 	CloseCraftingPanel();
 	CloseCampfire();
 	ShowDeathScreen();
+	CachedController->SetShowMouseCursor(true);		// 마우스 커서 보이기
 }
 
 void UMainHUDWidget::OnRespawnClicked()
 {
+	CachedController->SetShowMouseCursor(false);	// 마우스 커서 숨기기
 	CachedController->RequestSpawn();
 }
 
