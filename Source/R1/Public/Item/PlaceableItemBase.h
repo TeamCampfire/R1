@@ -60,6 +60,6 @@ protected:
 	TObjectPtr<class UPlaceableItemData> PlaceableItemData; // 설치에 사용된 원본 아이템 데이터
 	// OnRep을 통해 메시 컴포넌트에 적용됨
 
-	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Placeable|Durability")
+	UPROPERTY(Replicated, EditAnywhere, BlueprintReadOnly, Category = "Placeable|Durability")
 	float CurrentDurability = 0.f; // 현재 아이템의 내구도
 };

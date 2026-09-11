@@ -25,6 +25,9 @@
 #include "Data/Item/HeldItemData.h"
 #include "Vehicle/WheeledVehicleBase.h"
 #include "Item/SleepingBag.h"
+#include "BuildingSystem/BuildingActor.h"
+#include "Framework/MainHUD.h"
+#include "Widget/MainHUDWidget.h"
 
 #include "InputMappingContext.h"
 #include "InputAction.h"
@@ -602,6 +605,21 @@ void AActionCharacter::Server_ProcessAttackTarget_Implementation(AActor* TargetA
 		}
 	}
 
+	// 3.건축물을 공격한 경우
+	if (ABuildingActor* BuildingActor = Cast<ABuildingActor>(TargetActor))
+	{
+		// 건물에 데미지를 준다.
+		Server_ApplyBuildingDamage(BuildingActor, HeldItemComponent->GetCurrentHeldItem()->GetItemData()->Damage);
+	}
+
+	// 4.Placeable 아이템을 공격한 경우
+	if (APlaceableItemBase* PlaceableActor = Cast<APlaceableItemBase>(TargetActor))
+	{
+		// 개별 Placeable에 데미지를 준다
+		Server_ApplyPlaceableDamage(PlaceableActor, HeldItemComponent->GetCurrentHeldItem()->GetItemData()->Damage);
+	}
+
+
 }
 
 bool AActionCharacter::Server_GrantHarvestReward_Validate(UItemDataBase* ItemData, int32 Count)
@@ -1068,3 +1086,45 @@ UInventoryComponent* AActionCharacter::GetInventoryComponent() const
 
 
 
+void AActionCharacter::Server_ApplyPlaceableDamage_Implementation(APlaceableItemBase* TargetPlaceable, float Damage)
+{
+	if (nullptr == TargetPlaceable || Damage <= 0.f) return;
+
+	// 아이템이 이번 공격으로 파괴되더라도 UI에 표시는 할 수 있도록 피해 적용 전에 최대 내구도와 예상 결과를 보관
+	float MaxDurability = TargetPlaceable->GetMaxDurability();
+	float ResultDurability = FMath::Max(0.f, TargetPlaceable->GetCurrentDurability() - Damage);
+
+	if (false == TargetPlaceable->ApplyPlaceableDamage(Damage)) return;
+
+	// 서버가 확정한 공격 이후 내구도를 공격한 클라이언트에게 전달
+	Client_ShowBuildingDurability(ResultDurability, MaxDurability);
+}
+
+void AActionCharacter::Server_ApplyBuildingDamage_Implementation(ABuildingActor* TargetBuilding, float Damage)
+{
+	if (!TargetBuilding || Damage <= 0.f) return;
+
+	// 건물이 이번 공격으로 파괴되더라도 UI에 표시는 할 수 있도록 피해 적용 전에 최대 내구도와 예상 결과를 보관
+	float MaxDurability = TargetBuilding->GetMaxDurability();
+	float ResultDurability = FMath::Max(0.f, TargetBuilding->GetCurrentDurability() - Damage);
+
+	if (false == TargetBuilding->ApplyBuildingDamage(Damage)) return;
+
+	// 서버가 확정한 공격 이후 내구도를 공격한 클라이언트에게 전달
+	Client_ShowBuildingDurability(ResultDurability, MaxDurability);
+}
+
+void AActionCharacter::Client_ShowBuildingDurability_Implementation(float CurrentDurability, float MaxDurability)
+{
+	APlayerController* PlayerController = Cast<APlayerController>(GetController());
+
+	if (false == IsValid(PlayerController)) return;
+
+	// 공격한 플레이어 자신의 MainHUD 가져옴
+	UE_LOG(LogTemp, Display, TEXT("123123"));
+	AMainHUD* MainHUD = Cast<AMainHUD>(PlayerController->GetHUD());
+	UMainHUDWidget* MainHUDWidget = IsValid(MainHUD) ? MainHUD->GetMainHudWidget() : nullptr;
+	if (false == IsValid(MainHUDWidget)) return;
+	// MainHUD 내부 타이머 동작하는 동안만 내구도 위젯을 보여줘요
+	MainHUDWidget->ShowBuildingDurability(CurrentDurability, MaxDurability);
+}

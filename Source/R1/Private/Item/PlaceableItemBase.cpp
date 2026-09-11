@@ -10,6 +10,8 @@
 #include "Data/Building/BuildingPartDefinition.h"
 #include "Data/Item/PlaceableItemData.h"
 
+#include "Component/HarvestableComponent.h"
+
 APlaceableItemBase::APlaceableItemBase()
 {
  	PrimaryActorTick.bCanEverTick = false;
@@ -61,6 +63,12 @@ void APlaceableItemBase::InitializePlaceable(UPlaceableItemData* InPlaceableItem
 
 float APlaceableItemBase::GetMaxDurability()
 {
+	// Placeable 이면서 Harvestable인 경우 Harvestable의 체력을 최대 내구도로
+	if (UHarvestableComponent* Comp = FindComponentByClass<UHarvestableComponent>())
+	{
+		return Comp->GetMaxHealth();
+	}
+
 	if(false == IsValid(PlaceableItemData)) return 0.f;
 
 	UBuildingPartDefinition* BuildingPart = PlaceableItemData->BuildingPart.LoadSynchronous();
@@ -89,7 +97,6 @@ bool APlaceableItemBase::ApplyPlaceableDamage(float DamageAmount)
 	}
 
 	const float  MaxDurability = GetMaxDurability();
-
 	// 최대 내구도가 없는 건물은 정상적인 내구도 데이터가 구성되지 않은 상태
 	if (MaxDurability <= 0.f)
 	{

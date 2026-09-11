@@ -44,6 +44,8 @@ public:
 	virtual void		OnHarvestEnd_Implementation() override;
 	virtual void		SpawnImpactDecal_Implementation(const FVector SpawnPoint, const FRotator SpawnRotator) override;
 
+	inline float		GetMaxHealth() { return MaxHp; }
+
 protected:
 	// 컴포넌트 시작 시 호출 (부모 액터의 bReplicates를 보장)
 	virtual void		BeginPlay() override;
