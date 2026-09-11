@@ -679,8 +679,7 @@ void AActionCharacter::Die()
 	if (bIsSleeping)
 		StopSleeping();
 
-	if (!HasAuthority()) return;
-
+	/* 기존 제작 큐 정리 */
 	// UnPossess 전에
 	// 개인 제작 큐를 취소해 환불 재료와 지급 대기 중인 완성품을 이 캐릭터의 인벤토리에 넣고,
 	// 남은 수량은 곧 랙돌이 될 캐릭터 주변에 드롭
