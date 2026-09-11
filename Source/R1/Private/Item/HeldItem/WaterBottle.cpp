@@ -59,7 +59,7 @@ void AWaterBottle::OnSecondaryActionStarted()
 	Super::OnSecondaryActionStarted();
 
 
-	if (FillSound)
+	if (FillSound && TraceForWaterBody())
 	{
 		UGameplayStatics::PlaySoundAtLocation(
 			this,
