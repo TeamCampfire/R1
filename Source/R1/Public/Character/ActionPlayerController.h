@@ -73,6 +73,8 @@ protected:
 	// Called to bind functionality to input
 	virtual void SetupInputComponent() override;
 
+	virtual void PawnLeavingGame() override;
+
 
 public:
 

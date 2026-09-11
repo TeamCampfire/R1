@@ -217,6 +217,37 @@ void AActionPlayerController::SetupInputComponent()
 	}
 }
 
+void AActionPlayerController::PawnLeavingGame()
+{
+	UWorld* World = GetWorld();
+
+	// 서버 월드 자체가 종료되는 과정이면 시체를 만들 필요가 없다.
+	const bool bWorldIsClosing =
+		!World || World->bIsTearingDown;
+
+	if (!bWorldIsClosing)
+	{
+		AActionCharacter* LeavingCharacter = Cast<AActionCharacter>(GetPawn());
+
+		if (IsValid(LeavingCharacter))
+		{
+			UStatComponent* StatComp = LeavingCharacter->GetStatComponent();
+			IHealthInterface* Health = Cast<IHealthInterface>(StatComp);
+
+			if (Health && Health->IsAlive())
+			{
+				// 기존 체력 및 사망 경로를 사용한다.
+				IHealthInterface::Execute_InflictDamage(StatComp, IHealthInterface::Execute_GetMaxHealth(StatComp));
+			}
+		}
+	}
+
+	// 사망 처리 과정에서 Die() → MulticastDie() → UnPossess()가 실행되어
+	// GetPawn()이 nullptr이 된다.
+	// 따라서 부모 구현은 시체를 Destroy하지 않는다.
+	Super::PawnLeavingGame();
+}
+
 void AActionPlayerController::OnConfirmBuildingPlacement()
 {
 	if (true == IsValid(BuildingPlacementComponent))
