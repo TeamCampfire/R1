@@ -127,6 +127,12 @@ void USurvivalStatBarsWidget::UpdateStatusEffects()
         {
             TWeakObjectPtr<USurvivalStatBarsWidget> WeakThis(this);
 
+			// 이미 생성 예약된 경우
+			if (PendingStatusEffects.Contains(EachEffect)) continue;
+
+			// 생성 예약
+			PendingStatusEffects.Add(EachEffect);
+
             GetWorld()->GetTimerManager().SetTimerForNextTick(
                 [WeakThis, EachEffect]()
                 {
@@ -134,6 +140,24 @@ void USurvivalStatBarsWidget::UpdateStatusEffects()
 
                     USurvivalStatBarsWidget* This = WeakThis.Get();
 
+					// 예약 상태 해제
+					This->PendingStatusEffects.Remove(EachEffect);
+
+					// 스탯컴포넌트 존재 확인
+					if (!This->StatComp) return;
+
+					// 1프레임 사이 스탯컴포넌트에서 상태가 해제됐는지 다시 확인
+					const EStatusEffect CurrentEffects =
+						IStatusEffectInterface::Execute_GetCurrentStatusEffect(
+							This->StatComp
+						);
+
+					if (!EnumHasAnyFlags(CurrentEffects, EachEffect)) return;
+
+					// 1프레임 사이 이미 생성됐는지 확인
+					if (This->StatusBarWidgets.Contains(EachEffect)) return;
+
+					// 위젯 추가
                     UStatusBarWidget* StatusWidget =
                         CreateWidget<UStatusBarWidget>(
                             This,

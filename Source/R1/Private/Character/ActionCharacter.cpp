@@ -335,11 +335,44 @@ void AActionCharacter::SetIsInVehicle(bool bIsInVehicleNew, bool bIsDriver)
 	bIsSitting = bIsInVehicleNew;
 	//LegMesh->SetVisibility(!bIsInVehicleNew);
 	//FeetMesh->SetVisibility(!bIsInVehicleNew);
-
+	if (bIsInVehicleNew)
+	{
+		GetCharacterMovement()->StopMovementImmediately();
+		GetCharacterMovement()->DisableMovement();
+	}
+	else
+	{
+		GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	}
 	VehicleYawOffset = CurrentVehicle? CurrentVehicle->GetActorRotation().Yaw : 0.0f;
 	GetCapsuleComponent()->SetCollisionObjectType(bIsInVehicleNew? ECC_GameTraceChannel4 : ECC_Pawn);
 	GetMesh()->SetCollisionObjectType(bIsInVehicleNew? ECC_GameTraceChannel4 : ECC_Pawn);
+	//GetMesh()->SetCollisionObjectType(bIsInVehicleNew? ECC_GameTraceChannel4 : ECC_Pawn);
 
+	if (bIsInVehicleNew)
+	{
+		GetCapsuleComponent()->SetCollisionResponseToChannel(
+			ECC_Pawn,
+			ECR_Ignore
+		);
+
+		GetMesh()->SetCollisionResponseToChannel(
+			ECC_Pawn,
+			ECR_Ignore
+		);
+	}
+	else
+	{
+		GetCapsuleComponent()->SetCollisionResponseToChannel(
+			ECC_Pawn,
+			ECR_Block
+		);
+
+		GetMesh()->SetCollisionResponseToChannel(
+			ECC_Pawn,
+			ECR_Block
+		);
+	}
 	bUseControllerRotationYaw = !bIsInVehicleNew;
 
 	SetReplicateMovement(!bIsInVehicleNew);
@@ -347,11 +380,12 @@ void AActionCharacter::SetIsInVehicle(bool bIsInVehicleNew, bool bIsDriver)
 	if (!HasAuthority())
 	{
 	}
-
 	if (bIsDriver && IsLocallyControlled())
 	{
-		GetMesh()->SetVisibility(!(bIsInVehicleNew));
+		GetMesh()->SetVisibility(!bIsInVehicleNew);
 	}
+
+
 }
 
 void AActionCharacter::ServerRequestExitVehicle_Implementation()
@@ -382,33 +416,25 @@ void AActionCharacter::OnRep_IsSitting()
 		return;
 	}
 
-	// 현재 로컬 PlayerController가 Possess하고 있는 Pawn
 	AActionPlayerController* PC =
-		Cast<AActionPlayerController>(GetWorld()->GetFirstPlayerController());
+		Cast<AActionPlayerController>(
+			GetWorld()->GetFirstPlayerController());
 
 	if (!PC || !PC->IsLocalController())
+	{
 		return;
+	}
 
 	APawn* PossessedPawn = PC->GetPawn();
 
 	if (!PossessedPawn)
+	{
 		return;
+	}
 
-	// 현재 Possess한 Pawn이 Vehicle인지 확인
-	IVehicleInterface* VehicleInterface = Cast<IVehicleInterface>(PossessedPawn);
-
-	if (!VehicleInterface) return;
-
-	// 이 Character가 현재 Vehicle의 운전자인 경우에만
-	// 로컬 화면에서 Mesh 숨김
-	if (VehicleInterface->GetDriverCharacter() == this)
+	if (PossessedPawn->IsA(AHorse::StaticClass()) || PossessedPawn->IsA(AWheeledVehicleBase::StaticClass()))
 	{
 		GetMesh()->SetVisibility(false);
-
-		UE_LOG(LogTemp, Warning,
-			TEXT("[LOCAL DRIVER] Hide Mesh - Character=%s"),
-			*GetNameSafe(this)
-		);
 	}
 }
 
@@ -792,7 +818,8 @@ void AActionCharacter::OnRotateBuildingPartPressed()
 void AActionCharacter::OnInteractPressed()
 {
 
-	if (bIsSitting && CurrentVehicle)
+	if (bIsSitting && CurrentVehicle ||
+		bIsSitting && CurrentHorse)
 	{
 		ServerRequestExitVehicle();
 		return;

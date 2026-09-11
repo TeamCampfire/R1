@@ -58,6 +58,9 @@ protected:
 	TMap<EStatusEffect, TObjectPtr<UStatusBarWidget>> StatusBarWidgets;
 
 	UPROPERTY()
+	TSet<EStatusEffect> PendingStatusEffects;
+
+	UPROPERTY()
 	TObjectPtr<UStatComponent> StatComp;
 
 };

@@ -33,13 +33,13 @@ AHorse::AHorse(const FObjectInitializer& ObjectInitializer) : Super(
 	HorseCameraRoot = CreateDefaultSubobject<USceneComponent>(TEXT("HorseCameraRoot"));
 
 	HorseCameraRoot->SetupAttachment(GetCapsuleComponent());
-	HorseCameraRoot->SetUsingAbsoluteRotation(true);
 	HorseCameraRoot->SetRelativeLocation(FVector(-300.0f, 0.0f, 150.0f));
 	HorseCameraRoot->SetRelativeRotation(FRotator(-10.0f, 0.0f, 0.0f));
 
 	HorseCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("HorseCamera"));
 
 	HorseCamera->SetupAttachment(HorseCameraRoot);
+	HorseCamera->SetUsingAbsoluteRotation(true);
 	HorseCamera->SetRelativeLocation(FVector::ZeroVector);
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationPitch = false;
@@ -78,6 +78,7 @@ void AHorse::EnterVehicle_Implementation(APawn* VehicleCharacter, int32 SeatInde
 	// 캐릭터 차량 상태
 	Character->SetCurrentHorse(this);
 	Character->SetIsInVehicle(true, true);
+	//Character->SetActorEnableCollision(false);
 
 	// 운전석에 부착
 	Character->AttachToComponent(
@@ -108,7 +109,7 @@ void AHorse::ExitVehicle_Implementation(APawn* VehicleCharacter)
 
 AActionCharacter* AHorse::GetDriverCharacter() const
 {
-	return nullptr;
+	return DriverCharacter;
 }
 
 void AHorse::RequestMountVehicle_Implementation(ACharacter* VehicleCharacter)
@@ -201,9 +202,8 @@ void AHorse::RemoveHorseInputMapping()
 
 void AHorse::Move(const FInputActionValue& Value)
 {
-	UE_LOG(LogTemp, Warning, TEXT("[HORSE INPUT] MOVE CALLED"));
 	const FVector2D Input = Value.Get<FVector2D>();
-
+	
 	UHorseMovementComponent* Movement =
 		Cast<UHorseMovementComponent>(GetCharacterMovement());
 
@@ -211,10 +211,6 @@ void AHorse::Move(const FInputActionValue& Value)
 	{
 		return;
 	}
-	UE_LOG(LogTemp, Warning,
-		TEXT("[HORSE MOVE] Mode=%d Ground=%d"),
-		(int32)Movement->MovementMode,
-		Movement->IsMovingOnGround());	
 	// A / D
 	Movement->SetTurnInput(Input.X);
 
