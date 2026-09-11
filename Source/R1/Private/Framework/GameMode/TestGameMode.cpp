@@ -47,7 +47,7 @@ void ATestGameMode::RespawnPlayer(AController* InController)
 			);
 
 		SpawnLocation = RespawnTransform.GetLocation();
-		SpawnRotation = RespawnTransform.Rotator();
+		SpawnRotation = FRotator::ZeroRotator;
 	}
 	else if (!FindRandomSpawnLocation(SpawnLocation))
 	{

@@ -442,6 +442,7 @@ void AActionCharacter::OnRep_IsSitting()
 
 void AActionCharacter::StartSleeping(AActor* InActor)
 {
+	HeldItemComponent->UnequipHeldItem();
 	if (ASleepingBag* SleepingBag = Cast<ASleepingBag>(InActor))
 	{
 		if (!HasAuthority()) return;
