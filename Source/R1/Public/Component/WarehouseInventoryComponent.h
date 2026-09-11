@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.09.06
+﻿/// 최초작성 : 2026.09.06
 /// 작 성 자 : 최 요 환
 /// 간단설명 : 창고(Warehouse) 액터가 소지하는 저장 컴포넌트
 
@@ -37,7 +37,11 @@ class R1_API UWarehouseInventoryComponent : public UActorComponent
 	GENERATED_BODY()
 
 public:
+
 	UWarehouseInventoryComponent();
+
+	// Looting: 일반 창고는 액터 위치, 캐릭터의 시체 창고는 랙돌 위치 사용
+	FVector GetInteractionLocation() const;
 
 	// ItemData/Count를 StorageSlots에 넣는다. UInventoryComponent::AddItem과 동일한 규칙
 	// (기존 스택에 먼저 채우고 남으면 빈 슬롯에) — 다 못 넣으면 남은 수량을 OutRemainder로 돌려준다.

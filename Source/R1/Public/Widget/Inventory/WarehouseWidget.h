@@ -1,4 +1,4 @@
-/// 최초작성 : 2026.09.06
+﻿/// 최초작성 : 2026.09.06
 /// 작 성 자 : 최 요 환
 /// 간단설명 : 창고 상호작용 시 여는, 플레이어 인벤토리(메인 슬롯)와 창고 저장공간을 나란히 보여주는 위젯
 
@@ -14,6 +14,7 @@
 class UInventorySlotWidget;
 class UPanelWidget;
 class UWarehouseInventoryComponent;
+class UTextBlock;
 class UInventoryWidget;
 class UBeltBarWidget;
 
@@ -106,6 +107,9 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UPanelWidget> WarehouseSlotContainer;
 
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> WarehouseLabel;
+
 	UPROPERTY(EditDefaultsOnly, Category = "Warehouse")
 	TSubclassOf<UInventorySlotWidget> SlotWidgetClass;
 
@@ -113,6 +117,9 @@ protected:
 	int32 GridColumns = 6;
 
 private:
+
+	FText DefaultWarehouseLabel;	// Looting: 시체 창고는 UI 라벨 내용 바꿔야 돼서 원래 내용 기억
+
 	static constexpr int32 PlayerContainerId = 0;
 	static constexpr int32 WarehouseContainerId = 1;
 

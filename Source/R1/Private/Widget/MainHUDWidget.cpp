@@ -123,13 +123,15 @@ void UMainHUDWidget::CheckWarehouseAutoClose()
 
 	UWarehouseInventoryComponent* Warehouse = WarehouseWidget->GetBoundWarehouse();
 	APawn* OwningPawn = GetOwningPlayerPawn();
-	AActor* WarehouseOwner = Warehouse ? Warehouse->GetOwner() : nullptr;
-	if (!Warehouse || !OwningPawn || !WarehouseOwner)
+	// Looting: WarehouseComponent에 위치 반환 함수를 만들어 사용하기 때문에 더이상 창고 액터를 기억할 필요가 없어서 주석 처리
+	//AActor* WarehouseOwner = Warehouse ? Warehouse->GetOwner() : nullptr;
+	//if (!Warehouse || !OwningPawn || !WarehouseOwner)
+	if (!Warehouse || !OwningPawn)
 	{
 		return;
 	}
 
-	const float DistSq = FVector::DistSquared(OwningPawn->GetActorLocation(), WarehouseOwner->GetActorLocation());
+	const float DistSq = FVector::DistSquared(OwningPawn->GetActorLocation(), Warehouse->GetInteractionLocation());
 	if (DistSq > FMath::Square(Warehouse->MaxInteractDistance))
 	{
 		CloseWarehousePanel();
@@ -187,10 +189,12 @@ void UMainHUDWidget::OnDeath()
 	CloseCraftingPanel();
 	CloseCampfire();
 	ShowDeathScreen();
+	CachedController->SetShowMouseCursor(true);		// 마우스 커서 보이기
 }
 
 void UMainHUDWidget::OnRespawnClicked()
 {
+	CachedController->SetShowMouseCursor(false);	// 마우스 커서 숨기기
 	CachedController->RequestSpawn();
 }
 

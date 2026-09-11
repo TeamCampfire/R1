@@ -8,6 +8,7 @@
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
 #include "Interface/StatInterface.h"
+#include "Interface/InteractableInterface.h"
 #include "ActionCharacter.generated.h"
 
 UENUM(BlueprintType)
@@ -28,13 +29,14 @@ class UInputAction;
 class UCameraComponent;
 class UStatComponent;
 class UInventoryComponent;
+class UWarehouseInventoryComponent;
 class UInteractionComponent;
 class UEquipmentComponent;
 class UItemDataBase;
 class AWheeledVehicleBase;
 
 UCLASS()
-class R1_API AActionCharacter : public ACharacter, public IStatInterface
+class R1_API AActionCharacter : public ACharacter, public IStatInterface, public IInteractableInterface
 {
 	GENERATED_BODY()
 
@@ -88,6 +90,11 @@ public:
 
 	// 스탯 컴포넌트
 	virtual UStatComponent* GetStatComponent() const override;
+
+	// IInteractableInterface 상속 함수
+	virtual FText GetInteractionDisplayName_Implementation() const override;
+	virtual bool CanInteract_Implementation(APawn* Interactor) const override;
+	virtual void Interact_Implementation(APawn* Interactor) override;
 	
 	// 공격 프로세스
 	UFUNCTION(BlueprintCallable)
@@ -247,6 +254,7 @@ protected:
 #pragma endregion
 
 public:
+
 	// 손에 든 아이템(도구/무기) 관리 컴포넌트 접근자
 	UFUNCTION(BlueprintPure, Category = "Component")
 	FORCEINLINE class UHeldItemComponent* GetHeldItemComponent() const { return HeldItemComponent; }
@@ -254,8 +262,17 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Component")
 	class UInventoryComponent* GetInventoryComponent() const;
 
+	// 시체 파밍에 사용하는 창고 컴포넌트 접근자
+	UFUNCTION(BlueprintPure, Category = "Component")
+	UWarehouseInventoryComponent* GetCorpseStorageComponent() const { return CorpseStorageComponent; }
+
 	UFUNCTION(BlueprintPure, Category = "Mesh")
 	FORCEINLINE USkeletalMeshComponent* GetFirstPersonMesh() const { return FirstPersonMesh; }
+
+private :
+
+	// 죽었을 때 인벤토리의 아이템을 시체 창고에 이동
+	void MoveInventoryToCorpseStorage();
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
@@ -324,12 +341,17 @@ protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Component")
 	TObjectPtr<UInventoryComponent> InventoryComponent;
 
+	// 사망 시 메인+벨트+장비 아이템을 한 배열로 옮겨 기존 창고 UI와 이동 로직으로 시체 파밍에 사용
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Component")
+	TObjectPtr<UWarehouseInventoryComponent> CorpseStorageComponent;
+
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Component")
 	TObjectPtr<UInteractionComponent> InteractionComponent;
 
 
 
 protected:
+
 	// 스프린트 모드
 	UPROPERTY(Replicated);
 	bool bIsSprinting = false;
@@ -357,8 +379,6 @@ protected:
 	float DefaultEyeHeight = 0.f;
 	float CurrentWorldEyeHeight = 0.f; // 로컬이 아니라 "월드" 목표 눈높이
 
-
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|DefaultItem")
 	TArray<TObjectPtr<UItemDataBase>> DefaultItems;
 
@@ -378,6 +398,10 @@ protected:
 	TObjectPtr<AActor> CurrentSleepingBag;
 
 private:
+
+	// 사망 아이템의 중복 이관을 방지하는 서버 전용 상태
+	bool bCorpseInventoryPrepared = false;
+
 	FVector CameraPosCache;
 	FRotator CameraRotCache;
 };

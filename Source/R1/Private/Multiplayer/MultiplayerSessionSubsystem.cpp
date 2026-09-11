@@ -7,6 +7,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "OnlineSessionSettings.h"
 #include "OnlineSubsystem.h"
+#include "Multiplayer/HostingSettings.h"
 
 // 검색 결과에 포함시킬 사용자 정의 방 이름의 Key
 // 호스트와 검색 측이 반드시 같은 Key를 사용해야 값을 다시 읽을 수 있기 때문에 .h에서 static const로 선언
@@ -407,10 +408,20 @@ void UMultiplayerSessionSubsystem::OnCreateSessionComplete(FName SessionName, bo
 
 	UWorld* World = GetWorld();
 
+	const UHostingSettings* Settings = GetDefault<UHostingSettings>();
+	const FString MapPath = Settings->HostingMap.ToSoftObjectPath().GetLongPackageName();
+
+	if (MapPath.IsEmpty())
+	{
+		UE_LOG(LogTemp, Error, TEXT("HostingMap이 설정되지 않았습니다."));
+		return;
+	}
+
 	// 서버 이동을 하며 MaxPlayers 옵션 전달: 클라이언트가 접속할 때 서버가 내부적으로 현재 인원 검사
 	// -> AGameSession::ApproveLogin()
 	const FString TravelURL = FString::Printf(
-		TEXT("/Game/Maps/Lv_Test_BuildingSystem?listen?MaxPlayers=%d"),
+		TEXT("%s?listen?MaxPlayers=%d"),
+		*MapPath,
 		HostedMaxPlayers
 	);
 

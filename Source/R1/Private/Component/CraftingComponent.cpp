@@ -734,7 +734,7 @@ void UCraftingComponent::DropContents()
 	for (const FCraftingOrder& Order : Queue)
 	{
 		// CompleteCurrentItem 진입 후 지급에 실패한 1개는 제작 시간이 이미 끝난 완성품
-		// 이 수량은 재료로 환불하지 않고 완성된 아이템 자체로 드롭한다.
+		// 이 수량은 재료로 환불하지 않고 완성된 아이템 자체로 드롭
 		const int32 CompletedCount = Order.bAwaitingDelivery ? 1 : 0;
 		if (!AddDropItem(Order.Item, CompletedCount))
 			return;
@@ -813,8 +813,8 @@ void UCraftingComponent::DropContents()
 
 		if (!Prepared.DeferredPickup)
 		{
-			// 하나라도 준비하지 못하면 앞서 만든 지연 스폰 액터를 모두 제거한다.
-			// 아직 FinishSpawning을 호출하지 않았으므로 실제 드롭은 발생하지 않는다.
+			// 하나라도 준비하지 못하면 앞서 만든 지연 스폰 액터를 모두 제거
+			// -> 아직 FinishSpawning을 호출하지 않았으므로 실제 드롭은 발생하지 않음
 			for (FPreparedWorkbenchDrop& Existing : PreparedDrops)
 			{
 				if (Existing.DeferredPickup)

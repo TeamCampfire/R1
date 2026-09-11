@@ -130,7 +130,7 @@ void UInteractionComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 void UInteractionComponent::UpdateTargeting()
 {
 	APawn* OwnerPawn = Cast<APawn>(GetOwner());
-	if (!OwnerPawn)
+	if (!OwnerPawn || !OwnerPawn->IsLocallyControlled())
 	{
 		return;
 	}
@@ -182,7 +182,8 @@ void UInteractionComponent::UpdateTargeting()
 		}
 
 		AActor* HitActor = EachHit.GetActor();
-		if (HitActor && HitActor->Implements<UInteractableInterface>())
+		if (HitActor && HitActor->Implements<UInteractableInterface>()
+			&& IInteractableInterface::Execute_CanInteract(HitActor, OwnerPawn))
 		{
 			Candidates.AddUnique(HitActor);
 		}
