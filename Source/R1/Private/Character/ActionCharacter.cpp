@@ -347,7 +347,7 @@ void AActionCharacter::SetIsInVehicle(bool bIsInVehicleNew, bool bIsDriver)
 	VehicleYawOffset = CurrentVehicle? CurrentVehicle->GetActorRotation().Yaw : 0.0f;
 	GetCapsuleComponent()->SetCollisionObjectType(bIsInVehicleNew? ECC_GameTraceChannel4 : ECC_Pawn);
 	GetMesh()->SetCollisionObjectType(bIsInVehicleNew? ECC_GameTraceChannel4 : ECC_Pawn);
-	//GetMesh()->SetCollisionObjectType(bIsInVehicleNew? ECC_GameTraceChannel4 : ECC_Pawn);
+
 
 	if (bIsInVehicleNew)
 	{
@@ -380,7 +380,7 @@ void AActionCharacter::SetIsInVehicle(bool bIsInVehicleNew, bool bIsDriver)
 	if (!HasAuthority())
 	{
 	}
-	if (bIsDriver && IsLocallyControlled())
+	if (IsLocallyControlled())
 	{
 		GetMesh()->SetVisibility(!bIsInVehicleNew);
 	}
@@ -432,10 +432,18 @@ void AActionCharacter::OnRep_IsSitting()
 		return;
 	}
 
-	if (PossessedPawn->IsA(AHorse::StaticClass()) || PossessedPawn->IsA(AWheeledVehicleBase::StaticClass()))
+
+	if (AWheeledVehicleBase* Vehicle =
+		Cast<AWheeledVehicleBase>(PossessedPawn))
 	{
-		GetMesh()->SetVisibility(false);
+		if (Vehicle->GetDriverCharacter() == this)
+		{
+			GetMesh()->SetVisibility(false);
+		}
+
+		return;
 	}
+
 }
 
 void AActionCharacter::ProcessAttack()
