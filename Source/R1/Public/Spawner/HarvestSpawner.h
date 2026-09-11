@@ -53,7 +53,7 @@ protected:
 	float Delay = 10.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Spawn")
-	float SpawnInterval = 0.2f;
+	float SpawnInterval = 0.1f;
 
 	/*UPROPERTY(EditDefaultsOnly, Category = "Spawn|Target")
 	TArray<TObjectPtr<TSubclassOf<AActor>>> TreeArray;*/
