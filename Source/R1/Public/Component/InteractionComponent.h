@@ -55,6 +55,12 @@ public:
 	void SetActiveCampfire(ACampfire* Campfire);
 	ACampfire* GetActiveCampfire() const;
 
+	// 현재 조준 타겟의 하이라이트를 끄고 타겟을 비운다. 캐릭터 사망처럼 더 이상
+	// UpdateTargeting()이 갱신을 못 하게 되는 시점(Unpossess로 IsLocallyControlled가
+	// 꺼지는 등)에 하이라이트가 그대로 남는 걸 막기 위해 명시적으로 호출한다.
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	void ClearTarget();
+
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;

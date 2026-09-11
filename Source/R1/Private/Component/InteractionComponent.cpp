@@ -68,6 +68,19 @@ void UInteractionComponent::Server_TryInteract_Implementation(AActor* Target)
 	}
 }
 
+void UInteractionComponent::ClearTarget()
+{
+	if (!CurrentTarget)
+	{
+		return;
+	}
+
+	SetActorHighlight(CurrentTarget, false);
+	CurrentTarget = nullptr;
+
+	OnInteractableTargetChanged.Broadcast(nullptr, FText::GetEmpty(), nullptr);
+}
+
 void UInteractionComponent::SetActorHighlight(AActor* Actor, bool bEnable)
 {
 	if (!IsValid(Actor))

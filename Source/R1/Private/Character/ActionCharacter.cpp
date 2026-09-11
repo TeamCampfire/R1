@@ -758,6 +758,14 @@ void AActionCharacter::MulticastDie_Implementation()
 	// 캡슐 컴포넌트 충돌 끄기
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
+	// Unpossess되면 UpdateTargeting()의 IsLocallyControlled() 체크에 걸려 더 이상
+	// 갱신되지 않으므로, 죽기 직전 조준하고 있던 대상의 아웃라인이 영구히 남는다.
+	// 컨트롤러가 떨어지기 전에 명시적으로 하이라이트를 끄고 타겟을 비운다.
+	if (InteractionComponent)
+	{
+		InteractionComponent->ClearTarget();
+	}
+
 	// 애니메이션 중지
 	//GetMesh()->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 	//GetMesh()->Stop();
