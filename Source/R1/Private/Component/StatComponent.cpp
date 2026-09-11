@@ -426,8 +426,8 @@ void UStatComponent::DrainSurvivalStats()
 	Execute_DecreaseCalories(this, CaloryDropRate);
 	Execute_DecreaseHydration(this, HydrationDropRate);
 	// 칼로리, 수분 감소율 세팅
-	float SprintCaloryMultiplier	= (CachedCharacter->IsSprinting()) ? 20.0f : 1.0f;
-	float SprintHydrationMultiplier = (CachedCharacter->IsSprinting()) ? 20.0f : 1.0f;
+	float SprintCaloryMultiplier	= (CachedCharacter->IsSprinting()) ? 2.0f : 1.0f;
+	float SprintHydrationMultiplier = (CachedCharacter->IsSprinting()) ? 2.0f : 1.0f;
 	Execute_SetCaloriesDropRate(this, DefaultCaloryDropRate * SprintCaloryMultiplier);
 	Execute_SetHydrationDropRate(this, DefaultHydrationDropRate * SprintCaloryMultiplier);
 }

@@ -171,16 +171,16 @@ protected:
 
 	// 초당 칼로리 감소율(기본)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float DefaultCaloryDropRate = 0.016f;
+	float DefaultCaloryDropRate = 0.6f;
 	// 초당 수분 감소율(기본)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float DefaultHydrationDropRate = 0.0032f;
+	float DefaultHydrationDropRate = 0.3f;
 	// 칼로리 감소율
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	float CaloryDropRate = 0.016f;
+	float CaloryDropRate = 0.6f;
 	// 수분 감소율
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	float HydrationDropRate = 0.0032f;
+	float HydrationDropRate = 0.3f;
 
 
 	// 목마름 시작 수치
