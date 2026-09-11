@@ -74,7 +74,10 @@ protected :
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Campfire|FX")
 	TObjectPtr<class UNiagaraComponent> FireVFX; // 연소 나이아가라
-	
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Campfire|FX")
+	TObjectPtr<class UPointLightComponent> FireLight;
+
 private:
 
 	bool bWasLitForAudio = false;			// 마지막으로 오디오를 처리한 모닥불 점화 상태 (재생/정지 반복 호출 방지)
