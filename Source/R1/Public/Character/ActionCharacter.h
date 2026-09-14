@@ -175,6 +175,12 @@ protected:
 	// 무브먼트 값 갱신
 	void ApplyMovementSettings();
 
+	// 모듈형 의상 파츠는 독립 물리 없이 메인 몸체의 본 포즈만 따르게 한다.
+	void ConfigureModularMeshFollowers();
+
+	// 탑승 중에는 부착된 Character의 캡슐/메시가 차량 물리와 부딪히지 않도록 충돌을 전환한다.
+	void ApplyMountedCollisionState(bool bIsMounted);
+
 	// 인벤토리/창고 등 UI 패널이 하나라도 열려있는지 — 이동(OnMoveAction)과 상호작용
 	// (OnInteractPressed, 창고를 재상호작용으로 닫는 데 필요)만 예외로 두고, 그 외 시야 회전/점프/
 	// 스프린트/크라우치/공격/보조 액션/건축/벨트단축키는 UI가 열려있는 동안 이 값을 확인해 무시한다.
@@ -410,6 +416,10 @@ protected:
 	UPROPERTY()
 	TObjectPtr<AActor> CurrentSleepingBag;
 
+	// 사망 후 시체가 유지되는 시간. 0 이하면 자동 삭제하지 않는다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Death", meta = (ClampMin = "0.0", Units = "s"))
+	float CorpseLifeSpan = 300.0f;
+
 private:
 
 	// 사망 아이템의 중복 이관을 방지하는 서버 전용 상태
@@ -419,4 +429,8 @@ private:
 	FRotator CameraRotCache;
 
 	bool bDeathVisualsApplied = false;	// 세션 접속 이전 시체들 적용됐는가
+
+	bool bMountedCollisionStateSaved = false;
+	ECollisionEnabled::Type SavedCapsuleCollision = ECollisionEnabled::QueryAndPhysics;
+	ECollisionEnabled::Type SavedMeshCollision = ECollisionEnabled::QueryAndPhysics;
 };

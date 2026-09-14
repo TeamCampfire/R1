@@ -17,6 +17,15 @@
 
 AWheeledVehicleBase::AWheeledVehicleBase()
 {
+	// AWheeledVehiclePawn은 이동 컴포넌트만 복제할 뿐 Pawn 액터의
+	// Replicates/Replicate Movement 기본값을 켜지 않는다. 독립 프로세스
+	// 클라이언트가 운전할 때 이 값이 꺼져 있으면 클라이언트 물리와 서버 물리가
+	// 서로 다른 상태로 진행되어 반복 보정(트레이서/덜컹임)이 발생한다.
+	bReplicates = true;
+	SetReplicateMovement(true);
+	SetNetUpdateFrequency(100.0f);
+	SetMinNetUpdateFrequency(60.0f);
+
 	GetMesh()->SetSimulatePhysics(true);
 	GetMesh()->SetCollisionProfileName(TEXT("Vehicle"));
 	GetMesh()->SetCollisionResponseToChannel(
@@ -149,9 +158,14 @@ void AWheeledVehicleBase::Tick(float DeltaTime)
 
 		DriverCamera->SetRelativeRotation(CurrentRotation);
 	}
-	if (!DriverCharacter)
+	// DriverCharacter는 서버에서 관리하는 권한 상태다. 자율 클라이언트에서는
+	// Possess와 해당 포인터의 복제 순서가 어괋나 잠시 null일 수 있으며, 이때
+	// 로컬 스로틀을 0으로 덮어쓰면 차량이 나갔다 멈춘다. 무인 초기화는 서버만 한다.
+	if (HasAuthority() && !IsValid(DriverCharacter))
 	{
 		ChaosVehicleMovement->SetThrottleInput(0.0f);
+		ChaosVehicleMovement->SetBrakeInput(0.0f);
+		ChaosVehicleMovement->SetSteeringInput(0.0f);
 	}
 }
 
@@ -190,6 +204,9 @@ void AWheeledVehicleBase::EnterVehicle_Implementation(APawn* VehicleCharacter, i
 	{
 		DriverCharacter = VehicleChar;
 		ChaosVehicleMovement->SetRequiresControllerForInputs(true);
+		// Possess와 DriverCharacter 복제 순서가 분리되지 않도록 소유권 변경을
+		// 즉시 전송한다. 특히 Standalone 멀티 프로세스에서 첫 입력 유실을 막는다.
+		ForceNetUpdate();
 	}
 
 	if (!SeatPoints.IsValidIndex(InSeatIndex)) return;
@@ -218,6 +235,9 @@ void AWheeledVehicleBase::EnterVehicle_Implementation(APawn* VehicleCharacter, i
 	if (InSeatIndex == 0)
 	{
 		PC->Possess(this);
+		// Possess가 소유권을 바꾼 뒤 한 번 더 전송해 클라이언트를 AutonomousProxy로
+		// 즉시 전환한다.
+		ForceNetUpdate();
 		if (PC->IsLocalController())
 		{
 			if (ULocalPlayer* LocalPlayer = PC->GetLocalPlayer())
@@ -266,7 +286,6 @@ void AWheeledVehicleBase::ExitVehicle_Implementation(APawn* VehicleCharacter)
 		ECC_GameTraceChannel4,
 		ECR_Block
 	);*/
-	ChaosVehicleMovement->SetRequiresControllerForInputs(false);
 	// 차량에서 분리
 	FVector ExitLocation =
 		SeatPoints[SeatIndex]->GetComponentLocation()
@@ -291,6 +310,11 @@ void AWheeledVehicleBase::ExitVehicle_Implementation(APawn* VehicleCharacter)
 	if (bWasDriver)
 	{
 		DriverCharacter = nullptr;
+		ChaosVehicleMovement->SetRequiresControllerForInputs(false);
+		ChaosVehicleMovement->SetThrottleInput(0.0f);
+		ChaosVehicleMovement->SetBrakeInput(0.0f);
+		ChaosVehicleMovement->SetSteeringInput(0.0f);
+		ForceNetUpdate();
 
 		// 현재 Vehicle을 Possess하고 있는 Controller를 가져온다.
 		AActionPlayerController* PC =

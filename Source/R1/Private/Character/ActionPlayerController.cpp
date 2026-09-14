@@ -221,6 +221,7 @@ void AActionPlayerController::SetupInputComponent()
 void AActionPlayerController::PawnLeavingGame()
 {
 	UWorld* World = GetWorld();
+	APawn* LeavingPawn = GetPawn();
 
 	// 서버 월드 자체가 종료되는 과정이면 시체를 만들 필요가 없다.
 	const bool bWorldIsClosing =
@@ -228,7 +229,36 @@ void AActionPlayerController::PawnLeavingGame()
 
 	if (!bWorldIsClosing)
 	{
-		AActionCharacter* LeavingCharacter = Cast<AActionCharacter>(GetPawn());
+		AActionCharacter* LeavingCharacter = Cast<AActionCharacter>(LeavingPawn);
+
+		// 운전 중에는 Controller의 Pawn이 원래 캐릭터가 아니라 차량이다.
+		// 부모 PawnLeavingGame에 차량을 넘기면 차량이 Destroy되므로,
+		// 종료하는 운전자 한 명만 먼저 하차 처리한다.
+		if (AWheeledVehicleBase* Vehicle = Cast<AWheeledVehicleBase>(LeavingPawn))
+		{
+			LeavingCharacter = Vehicle->GetDriverCharacter();
+			if (IsValid(LeavingCharacter))
+			{
+				IVehicleInterface::Execute_ExitVehicle(Vehicle, LeavingCharacter);
+			}
+		}
+		else if (AHorse* Horse = Cast<AHorse>(LeavingPawn))
+		{
+			LeavingCharacter = Horse->GetDriverCharacter();
+			if (IsValid(LeavingCharacter))
+			{
+				IVehicleInterface::Execute_ExitVehicle(Horse, LeavingCharacter);
+			}
+		}
+		else if (IsValid(LeavingCharacter))
+		{
+			// 승객은 자신의 Character를 계속 Possess하므로 위 캐스트로 찾아진다.
+			// 접속 종료 전 해당 승객의 좌석만 비워 시체 포인터가 좌석을 점유하지 않게 한다.
+			if (AWheeledVehicleBase* PassengerVehicle = LeavingCharacter->GetCurrentVehicle())
+			{
+				IVehicleInterface::Execute_ExitVehicle(PassengerVehicle, LeavingCharacter);
+			}
+		}
 
 		if (IsValid(LeavingCharacter))
 		{
@@ -240,6 +270,14 @@ void AActionPlayerController::PawnLeavingGame()
 				// 기존 체력 및 사망 경로를 사용한다.
 				IHealthInterface::Execute_InflictDamage(StatComp, IHealthInterface::Execute_GetMaxHealth(StatComp));
 			}
+		}
+
+		// 좌석 데이터가 이미 깨진 예외 상황에서도 부모 구현이 차량을
+		// 접속 종료 Pawn으로 오인해 삭제하지 않도록 보장한다.
+		if (GetPawn() == LeavingPawn &&
+			(Cast<AWheeledVehicleBase>(LeavingPawn) || Cast<AHorse>(LeavingPawn)))
+		{
+			UnPossess();
 		}
 	}
 

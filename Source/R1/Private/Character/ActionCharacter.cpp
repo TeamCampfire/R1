@@ -118,6 +118,7 @@ AActionCharacter::AActionCharacter()
 void AActionCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	ConfigureModularMeshFollowers();
 	
 	// PC의 카메라 상하각도 세팅
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
@@ -366,6 +367,10 @@ void AActionCharacter::SetCrouchInputMode(ECrouchInputMode NewMode)
 
 void AActionCharacter::SetIsInVehicle(bool bIsInVehicleNew, bool bIsDriver)
 {
+	// BP에서 파츠 물리가 켜져 있거나 기존 물리 블렌드가 남아 있어도
+	// 탑승 중 발/다리가 따로 흔들리지 않도록 다시 정규화한다.
+	ConfigureModularMeshFollowers();
+
 	bIsSitting = bIsInVehicleNew;
 	//LegMesh->SetVisibility(!bIsInVehicleNew);
 	//FeetMesh->SetVisibility(!bIsInVehicleNew);
@@ -379,34 +384,7 @@ void AActionCharacter::SetIsInVehicle(bool bIsInVehicleNew, bool bIsDriver)
 		GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 	}
 	VehicleYawOffset = CurrentVehicle? CurrentVehicle->GetActorRotation().Yaw : 0.0f;
-	GetCapsuleComponent()->SetCollisionObjectType(bIsInVehicleNew? ECC_GameTraceChannel4 : ECC_Pawn);
-	GetMesh()->SetCollisionObjectType(bIsInVehicleNew? ECC_GameTraceChannel4 : ECC_Pawn);
-
-
-	if (bIsInVehicleNew)
-	{
-		GetCapsuleComponent()->SetCollisionResponseToChannel(
-			ECC_Pawn,
-			ECR_Ignore
-		);
-
-		GetMesh()->SetCollisionResponseToChannel(
-			ECC_Pawn,
-			ECR_Ignore
-		);
-	}
-	else
-	{
-		GetCapsuleComponent()->SetCollisionResponseToChannel(
-			ECC_Pawn,
-			ECR_Block
-		);
-
-		GetMesh()->SetCollisionResponseToChannel(
-			ECC_Pawn,
-			ECR_Block
-		);
-	}
+	ApplyMountedCollisionState(bIsInVehicleNew);
 	bUseControllerRotationYaw = !bIsInVehicleNew;
 
 	SetReplicateMovement(!bIsInVehicleNew);
@@ -420,6 +398,73 @@ void AActionCharacter::SetIsInVehicle(bool bIsInVehicleNew, bool bIsDriver)
 	}
 
 
+}
+
+void AActionCharacter::ConfigureModularMeshFollowers()
+{
+	const TArray<USkeletalMeshComponent*> ModularParts =
+	{
+		TorsoMesh,
+		LegMesh,
+		HandMesh,
+		FeetMesh
+	};
+
+	for (USkeletalMeshComponent* Part : ModularParts)
+	{
+		if (!Part)
+		{
+			continue;
+		}
+
+		Part->SetSimulatePhysics(false);
+		Part->SetAllBodiesSimulatePhysics(false);
+		Part->SetPhysicsBlendWeight(0.0f);
+		Part->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Part->SetLeaderPoseComponent(GetMesh());
+	}
+}
+
+void AActionCharacter::ApplyMountedCollisionState(bool bIsMounted)
+{
+	UCapsuleComponent* Capsule = GetCapsuleComponent();
+	USkeletalMeshComponent* CharacterMesh = GetMesh();
+	if (!Capsule || !CharacterMesh)
+	{
+		return;
+	}
+
+	if (bIsMounted)
+	{
+		if (!bMountedCollisionStateSaved)
+		{
+			SavedCapsuleCollision = Capsule->GetCollisionEnabled();
+			SavedMeshCollision = CharacterMesh->GetCollisionEnabled();
+			bMountedCollisionStateSaved = true;
+		}
+
+		// 부착된 캐릭터와 차량이 동일한 물리 시뮬레이션에서 서로 부딪히는 것을 방지한다.
+		Capsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		CharacterMesh->SetSimulatePhysics(false);
+		CharacterMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Capsule->SetCollisionObjectType(ECC_GameTraceChannel4);
+		CharacterMesh->SetCollisionObjectType(ECC_GameTraceChannel4);
+		Capsule->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+		CharacterMesh->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+		return;
+	}
+
+	Capsule->SetCollisionObjectType(ECC_Pawn);
+	CharacterMesh->SetCollisionObjectType(ECC_Pawn);
+	Capsule->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+	CharacterMesh->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+
+	if (bMountedCollisionStateSaved)
+	{
+		Capsule->SetCollisionEnabled(SavedCapsuleCollision);
+		CharacterMesh->SetCollisionEnabled(SavedMeshCollision);
+		bMountedCollisionStateSaved = false;
+	}
 }
 
 void AActionCharacter::ServerRequestExitVehicle_Implementation()
@@ -439,11 +484,10 @@ void AActionCharacter::OnRep_IsSitting()
 		IsLocallyControlled(),
 		bIsSitting
 	);
-	GetCapsuleComponent()->SetCollisionEnabled(
-		bIsSitting
-		? ECollisionEnabled::NoCollision
-		: ECollisionEnabled::QueryAndPhysics
-	);
+	// 서버에서 SetIsInVehicle()로 바뀔 캐릭터 메시 충돌 설정은
+	// 컴포넌트 상태로 그대로 복제되지 않는다. 클라이언트에서도 동일하게 적용해
+	// 부착된 몸체가 차량 물리와 부딪히지 않게 한다.
+	ApplyMountedCollisionState(bIsSitting);
 	if (!bIsSitting)
 	{
 		GetMesh()->SetVisibility(true);
@@ -808,6 +852,13 @@ void AActionCharacter::MulticastDie_Implementation()
 		if (APlayerController* PC = Cast<APlayerController>(GetController()))
 		{
 			PC->UnPossess();
+		}
+
+		// SetLifeSpan은 서버의 내장 타이머로 Destroy를 호출하므로
+		// 시체 삭제가 모든 클라이언트에 정상 복제된다.
+		if (CorpseLifeSpan > 0.0f)
+		{
+			SetLifeSpan(CorpseLifeSpan);
 		}
 	}
 }
