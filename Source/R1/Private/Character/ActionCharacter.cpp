@@ -737,6 +737,10 @@ void AActionCharacter::Die()
 
 void AActionCharacter::MulticastDie_Implementation()
 {
+	// 즉시 사망과 늦은 접속자의 OnRep 경로가 같은 렉돌 처리를 사용한다.
+	// 기존 Multicast 경로에는 물리 활성화가 없어 서버에서만 시체가 고정됐다.
+	ApplyDeathVisuals();
+
 	//// 1. 캡슐 충돌 완전 비활성화 (캡슐이 바닥에 걸려 렉돌과 부딪히는 것 방지)
 	//GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	//GetCapsuleComponent()->SetCollisionResponseToAllChannels(ECR_Ignore);
@@ -796,26 +800,6 @@ void AActionCharacter::MulticastDie_Implementation()
 	//{
 	//	PC->UnPossess();
 	//}
-
-	// Looting: 서버와 클라이언트 모두 사망 후 이동 계산 중단
-	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
-	{
-		Movement->StopMovementImmediately();
-		Movement->DisableMovement();
-		Movement->SetComponentTickEnabled(false);
-	}
-
-	// 캡슐 컴포넌트 충돌 끄기
-	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	// 애니메이션 중지
-	//GetMesh()->SetAnimationMode(EAnimationMode::AnimationSingleNode);
-	//GetMesh()->Stop();
-	GetMesh()->SetAnimInstanceClass(nullptr);
-
-	// 메쉬 랙돌 전환
-	GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
-	GetMesh()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 
 	if (HasAuthority())
 	{
@@ -920,8 +904,9 @@ void AActionCharacter::ApplyDeathVisuals()
 	// 메쉬 랙돌 전환
 	GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
 	GetMesh()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
-
+	GetMesh()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	GetMesh()->SetSimulatePhysics(true);
+	GetMesh()->WakeAllRigidBodies();
 }
 
 bool AActionCharacter::CanJumpInternal_Implementation() const
