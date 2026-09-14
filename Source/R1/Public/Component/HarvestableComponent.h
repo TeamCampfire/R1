@@ -18,6 +18,8 @@ class USoundBase;
 class AItemPickup;
 class FLifetimeProperty;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHarvestableDepleted, AActor*, DepletedActor);
+
 UENUM()
 enum class EHarvestType
 {
@@ -46,6 +48,16 @@ public:
 
 	inline float		GetMaxHealth() { return MaxHp; }
 
+	/** Restores health and transient harvesting state before a pooled actor is reused. */
+	void ResetForPoolReuse();
+
+	/** Applies pooled visibility/collision state on the server and every client. */
+	void SetPoolActive(bool bActive);
+
+	/** Bound internally by AHarvestSpawner. If unbound, depletion keeps the legacy destroy behavior. */
+	UPROPERTY()
+	FOnHarvestableDepleted OnHarvestableDepleted;
+
 protected:
 	// 컴포넌트 시작 시 호출 (부모 액터의 bReplicates를 보장)
 	virtual void		BeginPlay() override;
@@ -59,6 +71,12 @@ protected:
 	// [멀티캐스트] 모든 플레이어 화면에 타격 사운드, 나이아가라 파편 FX, 임팩트 데칼 재생 브로드캐스트
 	UFUNCTION(NetMulticast, Unreliable)
 	void				Multicast_PlayHitEffects(const FVector& HitLocation, bool bIsSweetSpot, const FRotator& DecalRot);
+
+	UFUNCTION(NetMulticast, Reliable)
+	void				Multicast_SetPoolActive(bool bActive);
+
+	UFUNCTION()
+	void				OnRep_PoolActive();
 
 	// [OnRep] 서버에서 SweetSpotTransform이 갱신되었을 때 각 클라이언트 화면에 데칼을 스폰/이동
 	UFUNCTION()
@@ -201,4 +219,8 @@ private:
 
 	UPROPERTY(ReplicatedUsing = OnRep_SweetSpotTransform)
 	FTransform SweetSpotTransform;
+
+	// 늦게 접속하거나 다시 relevancy 범위에 들어온 클라이언트도 풀 상태를 복구한다.
+	UPROPERTY(ReplicatedUsing = OnRep_PoolActive)
+	bool bIsPoolActive = true;
 };

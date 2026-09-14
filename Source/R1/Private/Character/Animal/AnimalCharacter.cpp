@@ -85,6 +85,38 @@ bool AAnimalCharacter::IsAlive() const
 	return !bIsDead;
 }
 
+void AAnimalCharacter::OnTakenFromHarvestPool_Implementation()
+{
+	if (!HasAuthority()) return;
+
+	CurrentHp = MaxHp;
+	bIsDead = false;
+	HarvestableComponent->Deactivate();
+	Multicast_ResetFromPool();
+
+	// 풀에 들어가는 동안 유지한 컨트롤러를 재사용한다.
+	if (AAIController* AIC = Cast<AAIController>(GetController()))
+	{
+		if (AIC->BrainComponent)
+		{
+			AIC->BrainComponent->RestartLogic();
+		}
+		if (AAnimalAIController* AnimalAI = Cast<AAnimalAIController>(AIC))
+		{
+			AnimalAI->ResumePatrol();
+		}
+	}
+	else
+	{
+		SpawnDefaultController();
+	}
+	ForceNetUpdate();
+}
+
+void AAnimalCharacter::OnReturnedToHarvestPool_Implementation()
+{
+}
+
 void AAnimalCharacter::Die()
 {
 	if (!HasAuthority() || bIsDead) return;
@@ -99,7 +131,10 @@ void AAnimalCharacter::Die()
 		{
 			AIC->BrainComponent->StopLogic("Animal Died");
 		}
-		AIC->UnPossess();
+		if (AAnimalAIController* AnimalAI = Cast<AAnimalAIController>(AIC))
+		{
+			AnimalAI->PausePatrol();
+		}
 	}
 
 	// 모든 클라이언트에 랙돌 및 사망 상태 브로드캐스트
@@ -137,4 +172,27 @@ void AAnimalCharacter::Multicast_Die_Implementation()
 	}
 	PlayAnimMontage(AM_Death);
 
+}
+
+void AAnimalCharacter::Multicast_ResetFromPool_Implementation()
+{
+	bIsDead = false;
+
+	StopAnimMontage();
+
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		MoveComp->GravityScale = 1.0f;
+		MoveComp->SetMovementMode(MOVE_Walking);
+		MoveComp->MaxWalkSpeed = WalkSpeed;
+	}
+
+	GetCapsuleComponent()->SetCollisionProfileName(TEXT("Pawn"));
+
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		MeshComp->SetSimulatePhysics(false);
+		MeshComp->SetCollisionProfileName(TEXT("CharacterMesh"));
+		MeshComp->InitAnim(true);
+	}
 }

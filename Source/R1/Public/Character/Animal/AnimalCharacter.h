@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Interface/HealthInterface.h"
+#include "Interface/HarvestPoolable.h"
 #include "AnimalCharacter.generated.h"
 
 class UHarvestableComponent;
@@ -15,7 +16,7 @@ class USoundBase;
  * 사슴 등 야생 동물 캐릭터 베이스 클래스 (리슨 서버 복제 및 시체 채집 지원)
  */
 UCLASS()
-class R1_API AAnimalCharacter : public ACharacter, public IHealthInterface
+class R1_API AAnimalCharacter : public ACharacter, public IHealthInterface, public IHarvestPoolable
 {
 	GENERATED_BODY()
 
@@ -32,12 +33,18 @@ public:
 	virtual void Heal_Implementation(float InAmount) override;
 	virtual bool IsAlive() const override;
 
+	virtual void OnTakenFromHarvestPool_Implementation() override;
+	virtual void OnReturnedToHarvestPool_Implementation() override;
+
 	// 사망 처리 (서버 권한)
 	void Die();
 
 	// 모든 클라이언트에 랙돌 및 사망 상태 복제
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_Die();
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_ResetFromPool();
 
 	UFUNCTION(BlueprintPure, Category = "Animal|State")
 	FORCEINLINE bool IsDead() const { return bIsDead; }

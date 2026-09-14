@@ -23,6 +23,7 @@ void UHarvestableComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(UHarvestableComponent, SweetSpotTransform);
+	DOREPLIFETIME(UHarvestableComponent, bIsPoolActive);
 }
 
 void UHarvestableComponent::BeginPlay()
@@ -94,6 +95,7 @@ FHarvestRes UHarvestableComponent::OnHitted_Implementation(AActionCharacter* InC
 	// 4. 부숴진 경우에 아이템을 획득하는 경우
 	if (CurrentHp <= 0)
 	{
+		Res.bIsDepleted = true;
 		if (bGiveItemWhenDestroy)
 		{
 			TArray<FHarvestItemResult> DestroyAdditiveItems;
@@ -418,10 +420,69 @@ void UHarvestableComponent::OnHarvestEnd_Implementation()
 
 	if (AActor* Owner = GetOwner())
 	{
-		// 플레이어 눈에는 숨기고 0.2초 뒤에 destroy
+		// 스포너가 구독 중이면 액터를 파괴하지 않고 풀로 반환한다.
+		if (OnHarvestableDepleted.IsBound())
+		{
+			OnHarvestableDepleted.Broadcast(Owner);
+			return;
+		}
+
+		// 스포너 밖에서 배치된 기존 채집 액터는 종전 동작을 유지한다.
 		Owner->SetActorEnableCollision(false);
 		Owner->SetActorHiddenInGame(true);
 		Owner->SetLifeSpan(0.2f);
+	}
+}
+
+void UHarvestableComponent::ResetForPoolReuse()
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+
+	CurrentHp = MaxHp;
+	SweetSpotTransform = FTransform::Identity;
+
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		OnRep_SweetSpotTransform();
+	}
+
+	GetOwner()->SetLifeSpan(0.0f);
+	GetOwner()->ForceNetUpdate();
+}
+
+void UHarvestableComponent::SetPoolActive(bool bActive)
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+
+	if (bActive)
+	{
+		ResetForPoolReuse();
+	}
+
+	bIsPoolActive = bActive;
+	Multicast_SetPoolActive(bActive);
+	GetOwner()->ForceNetUpdate();
+}
+
+void UHarvestableComponent::Multicast_SetPoolActive_Implementation(bool bActive)
+{
+	bIsPoolActive = bActive;
+	OnRep_PoolActive();
+}
+
+void UHarvestableComponent::OnRep_PoolActive()
+{
+	AActor* Owner = GetOwner();
+	if (!Owner) return;
+
+	Owner->SetActorHiddenInGame(!bIsPoolActive);
+	Owner->SetActorEnableCollision(bIsPoolActive);
+	Owner->SetActorTickEnabled(bIsPoolActive);
+
+	if (!bIsPoolActive && CurrentSweetSpotDecal)
+	{
+		CurrentSweetSpotDecal->DestroyComponent();
+		CurrentSweetSpotDecal = nullptr;
 	}
 }
 

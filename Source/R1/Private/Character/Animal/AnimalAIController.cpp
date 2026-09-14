@@ -14,8 +14,19 @@ AAnimalAIController::AAnimalAIController()
 void AAnimalAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
+	ResumePatrol();
+}
 
-	// 빙의 후 잠시 대기했다가 첫 패트롤 시작
+void AAnimalAIController::PausePatrol()
+{
+	GetWorldTimerManager().ClearTimer(WaitTimerHandle);
+	StopMovement();
+}
+
+void AAnimalAIController::ResumePatrol()
+{
+	GetWorldTimerManager().ClearTimer(WaitTimerHandle);
+	// 빙의/풀 재활성화 후 잠시 대기했다가 패트롤을 시작한다.
 	GetWorld()->GetTimerManager().SetTimer(WaitTimerHandle, this, &AAnimalAIController::MoveToRandomPatrolLocation, 1.5f, false);
 }
 

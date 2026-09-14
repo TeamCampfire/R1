@@ -17,6 +17,9 @@ class R1_API AAnimalAIController : public AAIController
 public:
 	AAnimalAIController();
 
+	void PausePatrol();
+	void ResumePatrol();
+
 protected:
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;

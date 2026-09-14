@@ -1,189 +1,317 @@
-﻿#include "Spawner/HarvestSpawner.h"
+#include "Spawner/HarvestSpawner.h"
+
+#include "Component/HarvestableComponent.h"
 #include "Engine/AssetManager.h"
+#include "Interface/HarvestPoolable.h"
 #include "R1/R1.h"
 
-// Sets default values
 AHarvestSpawner::AHarvestSpawner()
 {
-	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
-
 }
 
-// Called when the game starts or when spawned
 void AHarvestSpawner::BeginPlay()
 {
 	Super::BeginPlay();
 	if (!HasAuthority()) return;
+
 	InitializeSpawner();
 }
 
-// Called every frame
-void AHarvestSpawner::Tick(float DeltaTime)
+void AHarvestSpawner::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	Super::Tick(DeltaTime);
+	GetWorldTimerManager().ClearTimer(SpawnTimerHandle);
+	for (TPair<TWeakObjectPtr<AActor>, FTimerHandle>& Pair : RespawnTimerHandles)
+	{
+		GetWorldTimerManager().ClearTimer(Pair.Value);
+	}
+	RespawnTimerHandles.Empty();
 
+	for (AActor* ManagedActor : ManagedActors)
+	{
+		if (!IsValid(ManagedActor)) continue;
+
+		if (UHarvestableComponent* Harvestable = ManagedActor->FindComponentByClass<UHarvestableComponent>())
+		{
+			Harvestable->OnHarvestableDepleted.RemoveDynamic(this, &AHarvestSpawner::OnActorDepleted);
+		}
+		ManagedActor->OnDestroyed.RemoveDynamic(this, &AHarvestSpawner::OnManagedActorDestroyed);
+	}
+	ManagedActors.Empty();
+	InactiveActors.Empty();
+
+	Super::EndPlay(EndPlayReason);
 }
 
 AActor* AHarvestSpawner::SpawnHarvestableObject(TSubclassOf<AActor> TargetClass)
 {
-	if (!HasAuthority()) return nullptr;
-	AActor* SpawnedActor = nullptr;
+	if (!HasAuthority() || !TargetClass || !GetWorld()) return nullptr;
 
-	int32 MaxTry = 100;
-	int32 Current = 0;
-	// 최대 반복횟수 제한
-	while (Current < MaxTry)
+	FTransform SpawnTransform;
+	if (!FindSpawnTransform(SpawnTransform))
 	{
-		//0. 원 안에서 임의의 점을 선택
-		//0-1. 원의 중심 선정
-		FVector CentorLoc = GetActorLocation();
-		float ZOffset = 5000.f;
-		CentorLoc.Z += ZOffset;
+		UE_LOG(LogTemp, Warning,
+			TEXT("[AHarvestSpawner] Could not find a valid ground position for %s"),
+			*TargetClass->GetName());
+		return nullptr;
+	}
 
-		//0-2. 원점을 통해서 반지름 Radius인 원을 만들고 반지름 안의 임의의 점 선정
-		FVector2D RandonPos2D = FMath::RandPointInCircle(Radius);
-		FVector RandPos3D(CentorLoc.X + RandonPos2D.X, CentorLoc.Y + RandonPos2D.Y, CentorLoc.Z);
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AActor* SpawnedActor = GetWorld()->SpawnActor<AActor>(TargetClass, SpawnTransform, SpawnParams);
+	if (!SpawnedActor) return nullptr;
 
-		//1. 해당 점에서 아래로 라인 트레이스
-		FHitResult HitRes;
-		//1-1. 라인 트레이스 길이는 10미터 까지로 제한.
-		FVector StartPos = RandPos3D;
-		FVector EndPos = RandPos3D + FVector::DownVector * 10000.f;
+	if (UHarvestableComponent* Harvestable = SpawnedActor->FindComponentByClass<UHarvestableComponent>())
+	{
+		SpawnedActor->SetReplicateMovement(true);
+		ManagedActors.Add(SpawnedActor);
+		Harvestable->OnHarvestableDepleted.AddDynamic(this, &AHarvestSpawner::OnActorDepleted);
+		SpawnedActor->OnDestroyed.AddDynamic(this, &AHarvestSpawner::OnManagedActorDestroyed);
+		Harvestable->SetPoolActive(true);
 
-		//1-2. ECC_WorldStatic,ECC_WorldDynamic만 감지
-		FCollisionObjectQueryParams ObjectQueryParams;
-		ObjectQueryParams.AddObjectTypesToQuery(ECC_BUILDABLEGROUND);
-
-		//1-3. 추가 파라미터 (자신 제외, 복잡한 충돌 여부 등)
-		FCollisionQueryParams QueryParams;
-		QueryParams.AddIgnoredActor(this); // 자기 자신은 무시
-		QueryParams.bTraceComplex = false; // 단순 콜리전 사용 (필요시 true)
-
-		// 해당 지점이 물인지 먼저 확인
-		FHitResult WaterHit;
-		bool bInWater = GetWorld()->LineTraceSingleByChannel(
-			WaterHit,
-			StartPos,
-			EndPos,
-			ECC_Water,
-			QueryParams
-		);
-
-		//1-3. 라인 트레이스 ECC_BUILDABLEGROUND 대상으로만 진행
-		bool bHit = GetWorld()->LineTraceSingleByObjectType(
-			HitRes,
-			StartPos,
-			EndPos,
-			ObjectQueryParams,
-			QueryParams
-		);
-		//2. 충돌시 해당 지점에 소환
-		if (bHit && !bInWater)
-		{	
-			SpawnedActor = GetWorld()->SpawnActor<AActor>(TargetClass, HitRes.ImpactPoint, FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f));
-			if (!SpawnedActor) return SpawnedActor;
-			//3. 소환한 액터의 OnDestroy에 SpawnHarvestableObject 달아놓기
-			SpawnedActor->OnDestroyed.AddDynamic(this, &AHarvestSpawner::OnActorDepleted);
-			break;
+		if (SpawnedActor->GetClass()->ImplementsInterface(UHarvestPoolable::StaticClass()))
+		{
+			IHarvestPoolable::Execute_OnTakenFromHarvestPool(SpawnedActor);
 		}
-		//4. 충돌하지 않은 경우 0.으로 복귀
-		Current++;
+	}
+	else
+	{
+		// HarvestableComponent가 없는 기존 대상은 기존 파괴 기반 리스폰을 유지한다.
+		UE_LOG(LogTemp, Warning,
+			TEXT("[AHarvestSpawner] %s has no HarvestableComponent; using legacy destroy/respawn."),
+			*GetNameSafe(SpawnedActor));
+		SpawnedActor->OnDestroyed.AddDynamic(this, &AHarvestSpawner::OnLegacyActorDestroyed);
 	}
 
 	return SpawnedActor;
 }
 
-
-void AHarvestSpawner::OnActorDepleted(AActor* DestroyedActor)
+bool AHarvestSpawner::FindSpawnTransform(FTransform& OutTransform) const
 {
-	if (!HasAuthority()) return;
+	if (!GetWorld()) return false;
 
-	// 해당 엑터가 파괴되었을 때 Delay만큼 기다렸다가 다시 소환
-	TSubclassOf<AActor> OriginalClass = DestroyedActor->GetClass();
+	constexpr int32 MaxTry = 100;
+	constexpr float ZOffset = 5000.0f;
+	constexpr float TraceLength = 10000.0f;
 
-	FTimerHandle RespawnHandle;
-	GetWorld()->GetTimerManager().SetTimer(
-		RespawnHandle,
-		[this, OriginalClass]()
+	FCollisionObjectQueryParams ObjectQueryParams;
+	ObjectQueryParams.AddObjectTypesToQuery(ECC_BUILDABLEGROUND);
+
+	FCollisionQueryParams QueryParams;
+	QueryParams.AddIgnoredActor(this);
+	QueryParams.bTraceComplex = false;
+
+	for (int32 CurrentTry = 0; CurrentTry < MaxTry; ++CurrentTry)
+	{
+		const FVector2D RandomPos2D = FMath::RandPointInCircle(Radius);
+		const FVector StartPos = GetActorLocation()
+			+ FVector(RandomPos2D.X, RandomPos2D.Y, ZOffset);
+		const FVector EndPos = StartPos + FVector::DownVector * TraceLength;
+
+		FHitResult WaterHit;
+		const bool bInWater = GetWorld()->LineTraceSingleByChannel(
+			WaterHit, StartPos, EndPos, ECC_Water, QueryParams);
+
+		FHitResult GroundHit;
+		const bool bHitGround = GetWorld()->LineTraceSingleByObjectType(
+			GroundHit, StartPos, EndPos, ObjectQueryParams, QueryParams);
+
+		if (bHitGround && !bInWater)
 		{
-			SpawnHarvestableObject(OriginalClass);
-		},
-		Delay,
-		false
-	);
+			OutTransform = FTransform(
+				FRotator(0.0f, FMath::FRandRange(0.0f, 360.0f), 0.0f),
+				GroundHit.ImpactPoint);
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void AHarvestSpawner::OnActorDepleted(AActor* DepletedActor)
+{
+	if (!HasAuthority() || !IsValid(DepletedActor) || InactiveActors.Contains(DepletedActor)) return;
+
+	InactiveActors.Add(DepletedActor);
+
+	if (DepletedActor->GetClass()->ImplementsInterface(UHarvestPoolable::StaticClass()))
+	{
+		IHarvestPoolable::Execute_OnReturnedToHarvestPool(DepletedActor);
+	}
+
+	if (UHarvestableComponent* Harvestable = DepletedActor->FindComponentByClass<UHarvestableComponent>())
+	{
+		Harvestable->SetPoolActive(false);
+	}
+
+	SchedulePoolActivation(DepletedActor, Delay);
+}
+
+void AHarvestSpawner::SchedulePoolActivation(AActor* PooledActor, float InDelay)
+{
+	if (!IsValid(PooledActor) || !GetWorld()) return;
+
+	const TWeakObjectPtr<AActor> WeakActor(PooledActor);
+	if (FTimerHandle* ExistingHandle = RespawnTimerHandles.Find(WeakActor))
+	{
+		GetWorldTimerManager().ClearTimer(*ExistingHandle);
+	}
+
+	FTimerHandle& TimerHandle = RespawnTimerHandles.FindOrAdd(WeakActor);
+	FTimerDelegate RespawnDelegate = FTimerDelegate::CreateUObject(
+		this, &AHarvestSpawner::ActivatePooledActor, WeakActor);
+	GetWorldTimerManager().SetTimer(
+		TimerHandle, RespawnDelegate, FMath::Max(InDelay, KINDA_SMALL_NUMBER), false);
+}
+
+void AHarvestSpawner::ActivatePooledActor(TWeakObjectPtr<AActor> PooledActor)
+{
+	RespawnTimerHandles.Remove(PooledActor);
+
+	AActor* Actor = PooledActor.Get();
+	if (!HasAuthority() || !IsValid(Actor) || !InactiveActors.Contains(PooledActor)) return;
+
+	FTransform SpawnTransform;
+	if (!FindSpawnTransform(SpawnTransform))
+	{
+		// 일시적으로 지면을 찾지 못했으면 새로 생성하지 않고 같은 인스턴스로 재시도한다.
+		SchedulePoolActivation(Actor, FMath::Max(SpawnInterval, 1.0f));
+		return;
+	}
+
+	Actor->SetActorLocationAndRotation(
+		SpawnTransform.GetLocation(),
+		SpawnTransform.Rotator(),
+		false,
+		nullptr,
+		ETeleportType::TeleportPhysics);
+
+	if (UHarvestableComponent* Harvestable = Actor->FindComponentByClass<UHarvestableComponent>())
+	{
+		Harvestable->SetPoolActive(true);
+	}
+
+	if (Actor->GetClass()->ImplementsInterface(UHarvestPoolable::StaticClass()))
+	{
+		IHarvestPoolable::Execute_OnTakenFromHarvestPool(Actor);
+	}
+
+	InactiveActors.Remove(PooledActor);
+}
+
+void AHarvestSpawner::OnManagedActorDestroyed(AActor* DestroyedActor)
+{
+	if (!HasAuthority() || !DestroyedActor) return;
+
+	const TSubclassOf<AActor> OriginalClass = DestroyedActor->GetClass();
+	const TWeakObjectPtr<AActor> WeakActor(DestroyedActor);
+	if (FTimerHandle* Handle = RespawnTimerHandles.Find(WeakActor))
+	{
+		GetWorldTimerManager().ClearTimer(*Handle);
+	}
+	RespawnTimerHandles.Remove(WeakActor);
+	InactiveActors.Remove(WeakActor);
+	ManagedActors.Remove(DestroyedActor);
+
+	FTimerHandle ReplacementHandle;
+	FTimerDelegate ReplacementDelegate = FTimerDelegate::CreateWeakLambda(this, [this, OriginalClass]()
+	{
+		SpawnHarvestableObject(OriginalClass);
+	});
+	GetWorldTimerManager().SetTimer(
+		ReplacementHandle,
+		ReplacementDelegate,
+		FMath::Max(Delay, KINDA_SMALL_NUMBER),
+		false);
+}
+
+void AHarvestSpawner::OnLegacyActorDestroyed(AActor* DestroyedActor)
+{
+	if (!HasAuthority() || !DestroyedActor) return;
+
+	const TSubclassOf<AActor> OriginalClass = DestroyedActor->GetClass();
+	FTimerHandle RespawnHandle;
+	FTimerDelegate RespawnDelegate = FTimerDelegate::CreateWeakLambda(this, [this, OriginalClass]()
+	{
+		SpawnHarvestableObject(OriginalClass);
+	});
+	GetWorldTimerManager().SetTimer(
+		RespawnHandle,
+		RespawnDelegate,
+		FMath::Max(Delay, KINDA_SMALL_NUMBER),
+		false);
 }
 
 void AHarvestSpawner::OnTargetClassesLoaded()
 {
 	PendingList.Empty();
 
-
-	// SpawnTargetArray[i] 타겟을  MaxCntArray[i]개 만큼 소환 
-	for (int i = 0; i < SpawnTargetArray.Num(); i++)
+	// SpawnTargetArray[i] 타겟을 MaxCntArray[i]개만큼 최초 한 번 생성한다.
+	for (int32 Index = 0; Index < SpawnTargetArray.Num(); ++Index)
 	{
-		TSubclassOf<AActor> LoadedClass = SpawnTargetArray[i].Get();
-		if (!LoadedClass) return;
-		for (int j = 0; j < MaxCntArray[i]; j++)
+		TSubclassOf<AActor> LoadedClass = SpawnTargetArray[Index].Get();
+		if (!LoadedClass) continue;
+
+		for (int32 Count = 0; Count < MaxCntArray[Index]; ++Count)
 		{
 			PendingList.Add(LoadedClass);
-			//if (SpawnHarvestableObject(SpawnTargetArray[i]) == nullptr)
-			//{
-			//	UE_LOG(LogTemp, Warning, TEXT("[AHarvestSpawner::InitializeSpawner()] : Something Wrong With Spawn"));
-			//	return;
-			//}
 		}
 	}
 
-	// 3. 한 번에 스폰하지 않고 타이머로 분할 스폰 시작 (히치 완전 제거)
-	GetWorld()->GetTimerManager().SetTimer(
+	if (PendingList.IsEmpty()) return;
+
+	// 풀 워밍업도 프레임에 나누어 처리해 시작 히치를 줄인다.
+	GetWorldTimerManager().SetTimer(
 		SpawnTimerHandle,
 		this,
 		&AHarvestSpawner::ProcessPendingSpawns,
-		SpawnInterval,
-		true
-	);
+		FMath::Max(SpawnInterval, KINDA_SMALL_NUMBER),
+		true);
 }
 
 void AHarvestSpawner::ProcessPendingSpawns()
 {
-	if (PendingList.Num() == 0)
+	if (PendingList.IsEmpty())
 	{
 		GetWorldTimerManager().ClearTimer(SpawnTimerHandle);
 		return;
 	}
 
-	// 큐에서 하나 꺼내어 스폰
-	TSubclassOf<AActor> ClassToSpawn = PendingList.Pop();
+	const TSubclassOf<AActor> ClassToSpawn = PendingList.Pop();
 	SpawnHarvestableObject(ClassToSpawn);
 }
 
 void AHarvestSpawner::InitializeSpawner()
 {
-	if (SpawnTargetArray.Num() == 0)
+	if (SpawnTargetArray.IsEmpty())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[AHarvestSpawner::InitializeSpawner()] : Please Assign Spawn Target"));
+		UE_LOG(LogTemp, Warning, TEXT("[AHarvestSpawner::InitializeSpawner] Please assign spawn targets."));
 		return;
 	}
 
 	if (MaxCntArray.Num() != SpawnTargetArray.Num())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[AHarvestSpawner::InitializeSpawner()] : Please set All Max Cnt"));
+		UE_LOG(LogTemp, Warning, TEXT("[AHarvestSpawner::InitializeSpawner] Set a max count for every target."));
 		return;
 	}
 
-	// 소환할 목록
 	TArray<FSoftObjectPath> TargetsToLoad;
-	for (TSoftClassPtr<AActor>& SpawnTarget : SpawnTargetArray)
+	for (const TSoftClassPtr<AActor>& SpawnTarget : SpawnTargetArray)
 	{
-		if (SpawnTarget.IsNull()) continue;
-		TargetsToLoad.Add(SpawnTarget.ToSoftObjectPath());
+		if (!SpawnTarget.IsNull())
+		{
+			TargetsToLoad.AddUnique(SpawnTarget.ToSoftObjectPath());
+		}
+	}
+
+	if (TargetsToLoad.IsEmpty())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[AHarvestSpawner::InitializeSpawner] Every spawn target is null."));
+		return;
 	}
 
 	FStreamableManager& StreamableManager = UAssetManager::GetStreamableManager();
 	AsyncHandle = StreamableManager.RequestAsyncLoad(
 		TargetsToLoad,
-		FStreamableDelegate::CreateUObject(this, &AHarvestSpawner::OnTargetClassesLoaded)
-	);
-
+		FStreamableDelegate::CreateUObject(this, &AHarvestSpawner::OnTargetClassesLoaded));
 }
