@@ -19,7 +19,10 @@ AWheeledVehicleBase::AWheeledVehicleBase()
 {
 	GetMesh()->SetSimulatePhysics(true);
 	GetMesh()->SetCollisionProfileName(TEXT("Vehicle"));
-
+	GetMesh()->SetCollisionResponseToChannel(
+		ECC_GameTraceChannel4,
+		ECR_Ignore
+	);
 	ChaosVehicleMovement =
 		CastChecked<UChaosWheeledVehicleMovementComponent>(
 			GetVehicleMovement());
@@ -146,6 +149,10 @@ void AWheeledVehicleBase::Tick(float DeltaTime)
 
 		DriverCamera->SetRelativeRotation(CurrentRotation);
 	}
+	if (!DriverCharacter)
+	{
+		ChaosVehicleMovement->SetThrottleInput(0.0f);
+	}
 }
 
 void AWheeledVehicleBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -162,7 +169,10 @@ void AWheeledVehicleBase::EnterVehicle_Implementation(APawn* VehicleCharacter, i
 	AActionCharacter* VehicleChar = Cast<AActionCharacter>(VehicleCharacter);
 	AActionPlayerController* PC = Cast<AActionPlayerController>(VehicleChar->GetController());
 	bool bIsDriver = (InSeatIndex == 0);
-
+	GetMesh()->SetCollisionResponseToChannel(
+		ECC_GameTraceChannel4,
+		ECR_Ignore
+	);
 	if (IsSeatOccupied(InSeatIndex))
 	{
 		UE_LOG(LogTemp, Warning,
@@ -172,12 +182,14 @@ void AWheeledVehicleBase::EnterVehicle_Implementation(APawn* VehicleCharacter, i
 		return;
 	}
 
+	
 	SeatOccupants[InSeatIndex] = VehicleChar;
 
 	// 운전석
 	if (InSeatIndex == 0)
 	{
 		DriverCharacter = VehicleChar;
+		ChaosVehicleMovement->SetRequiresControllerForInputs(true);
 	}
 
 	if (!SeatPoints.IsValidIndex(InSeatIndex)) return;
@@ -250,6 +262,11 @@ void AWheeledVehicleBase::ExitVehicle_Implementation(APawn* VehicleCharacter)
 
 	SeatOccupants[SeatIndex] = nullptr;
 
+	/*GetMesh()->SetCollisionResponseToChannel(
+		ECC_GameTraceChannel4,
+		ECR_Block
+	);*/
+	ChaosVehicleMovement->SetRequiresControllerForInputs(false);
 	// 차량에서 분리
 	FVector ExitLocation =
 		SeatPoints[SeatIndex]->GetComponentLocation()

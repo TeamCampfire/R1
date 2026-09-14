@@ -34,6 +34,7 @@ class UInteractionComponent;
 class UEquipmentComponent;
 class UItemDataBase;
 class AWheeledVehicleBase;
+class AHorse;
 
 UCLASS()
 class R1_API AActionCharacter : public ACharacter, public IStatInterface, public IInteractableInterface
@@ -133,6 +134,9 @@ public:
 
 	// 세션 접속 이전 시체 적용
 	void ApplyDeathVisuals();
+
+	FORCEINLINE AHorse* GetCurrentHorse() const { return CurrentHorse;}
+	FORCEINLINE void SetCurrentHorse(AHorse* InVehicle) { CurrentHorse = InVehicle;}
 
 protected:
 	virtual bool CanJumpInternal_Implementation() const override;
@@ -374,6 +378,9 @@ protected:
 
 	UPROPERTY(Replicated)
 	TObjectPtr<AWheeledVehicleBase> CurrentVehicle;
+
+	UPROPERTY(Replicated)
+	TObjectPtr<AHorse> CurrentHorse;
 
 	// 스탯 컴포넌트
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)

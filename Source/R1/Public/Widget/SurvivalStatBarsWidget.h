@@ -69,6 +69,9 @@ protected:
 	TMap<EStatusEffect, TObjectPtr<UStatusBarWidget>> StatusBarWidgets;
 
 	UPROPERTY()
+	TSet<EStatusEffect> PendingStatusEffects;
+
+	UPROPERTY()
 	TObjectPtr<UStatComponent> StatComp;
 
 	// 아이템 획득 알림 스택이 쌓일 컨테이너 — WBP_SurvivalStatBars_New의 세로 박스 안, Debuffs와

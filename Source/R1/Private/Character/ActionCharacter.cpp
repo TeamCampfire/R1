@@ -25,6 +25,7 @@
 #include "Data/Item/PlaceableItemData.h"
 #include "Data/Item/HeldItemData.h"
 #include "Vehicle/WheeledVehicleBase.h"
+#include "Vehicle/Horse.h"
 #include "Item/SleepingBag.h"
 #include "BuildingSystem/BuildingActor.h"
 #include "Framework/MainHUD.h"
@@ -312,6 +313,7 @@ void AActionCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(AActionCharacter, bIsSprinting);
 	DOREPLIFETIME(AActionCharacter, bIsSitting);
 	DOREPLIFETIME(AActionCharacter, CurrentVehicle);
+	DOREPLIFETIME(AActionCharacter, CurrentHorse);
 	DOREPLIFETIME(AActionCharacter, bIsSleeping);
 }
 
@@ -367,13 +369,44 @@ void AActionCharacter::SetIsInVehicle(bool bIsInVehicleNew, bool bIsDriver)
 	bIsSitting = bIsInVehicleNew;
 	//LegMesh->SetVisibility(!bIsInVehicleNew);
 	//FeetMesh->SetVisibility(!bIsInVehicleNew);
+	if (bIsInVehicleNew)
+	{
+		GetCharacterMovement()->StopMovementImmediately();
+		GetCharacterMovement()->DisableMovement();
+	}
+	else
+	{
+		GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	}
+	VehicleYawOffset = CurrentVehicle? CurrentVehicle->GetActorRotation().Yaw : 0.0f;
+	GetCapsuleComponent()->SetCollisionObjectType(bIsInVehicleNew? ECC_GameTraceChannel4 : ECC_Pawn);
+	GetMesh()->SetCollisionObjectType(bIsInVehicleNew? ECC_GameTraceChannel4 : ECC_Pawn);
 
-	VehicleYawOffset = CurrentVehicle->GetActorRotation().Yaw;
 
-	GetCapsuleComponent()->SetCollisionEnabled(
-		bIsInVehicleNew?
-		ECollisionEnabled::NoCollision
-       :ECollisionEnabled::QueryAndPhysics);
+	if (bIsInVehicleNew)
+	{
+		GetCapsuleComponent()->SetCollisionResponseToChannel(
+			ECC_Pawn,
+			ECR_Ignore
+		);
+
+		GetMesh()->SetCollisionResponseToChannel(
+			ECC_Pawn,
+			ECR_Ignore
+		);
+	}
+	else
+	{
+		GetCapsuleComponent()->SetCollisionResponseToChannel(
+			ECC_Pawn,
+			ECR_Block
+		);
+
+		GetMesh()->SetCollisionResponseToChannel(
+			ECC_Pawn,
+			ECR_Block
+		);
+	}
 	bUseControllerRotationYaw = !bIsInVehicleNew;
 
 	SetReplicateMovement(!bIsInVehicleNew);
@@ -381,11 +414,12 @@ void AActionCharacter::SetIsInVehicle(bool bIsInVehicleNew, bool bIsDriver)
 	if (!HasAuthority())
 	{
 	}
-
-	if (bIsDriver && IsLocallyControlled())
+	if (IsLocallyControlled())
 	{
-		GetMesh()->SetVisibility(!(bIsInVehicleNew));
+		GetMesh()->SetVisibility(!bIsInVehicleNew);
 	}
+
+
 }
 
 void AActionCharacter::ServerRequestExitVehicle_Implementation()
@@ -416,28 +450,30 @@ void AActionCharacter::OnRep_IsSitting()
 		return;
 	}
 
-	// 현재 로컬 PlayerController가 Possess하고 있는 Pawn
 	AActionPlayerController* PC =
-		Cast<AActionPlayerController>(GetWorld()->GetFirstPlayerController());
+		Cast<AActionPlayerController>(
+			GetWorld()->GetFirstPlayerController());
 
 	if (!PC || !PC->IsLocalController())
+	{
 		return;
+	}
 
 	APawn* PossessedPawn = PC->GetPawn();
 
 	if (!PossessedPawn)
-		return;
-
-	// 현재 Possess한 Pawn이 Vehicle인지 확인
-	IVehicleInterface* VehicleInterface = Cast<IVehicleInterface>(PossessedPawn);
-
-	if (!VehicleInterface) return;
-
-	// 이 Character가 현재 Vehicle의 운전자인 경우에만
-	// 로컬 화면에서 Mesh 숨김
-	if (VehicleInterface->GetDriverCharacter() == this)
 	{
-		GetMesh()->SetVisibility(false);
+		return;
+	}
+
+
+	if (AWheeledVehicleBase* Vehicle =
+		Cast<AWheeledVehicleBase>(PossessedPawn))
+	{
+		if (Vehicle->GetDriverCharacter() == this)
+		{
+			GetMesh()->SetVisibility(false);
+		}
 
 		UE_LOG(LogTemp, Warning,
 			TEXT("[LOCAL DRIVER] Hide Mesh - Character=%s"),
@@ -540,6 +576,7 @@ void AActionCharacter::OnRep_IsSleeping()
 			FirstPersonCamera->SetRelativeLocationAndRotation(CameraPosCache, CameraRotCache);
 		}
 	}
+
 }
 
 void AActionCharacter::ProcessAttack()
@@ -940,7 +977,7 @@ bool AActionCharacter::IsUIBlockingGameplayInput() const
 void AActionCharacter::OnMoveAction(const FInputActionValue& InValue)
 {
 	const FVector2D MoveValue = InValue.Get<FVector2D>();
-
+	if (bIsSitting) return;
 	// 손에 든 도구/무기가 이동 차단 중일 때 (예: 낚시 중 A/D 저항, S 릴 감기)
 	if (HeldItemComponent && HeldItemComponent->BlocksCharacterMovement())
 	{
@@ -1097,7 +1134,8 @@ void AActionCharacter::OnInteractPressed()
 		return;
 	}
 
-	if (bIsSitting && CurrentVehicle)
+	if (bIsSitting && CurrentVehicle ||
+		bIsSitting && CurrentHorse)
 	{
 		ServerRequestExitVehicle();
 		return;

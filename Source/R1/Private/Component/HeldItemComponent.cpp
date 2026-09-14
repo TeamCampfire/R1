@@ -472,11 +472,11 @@ void UHeldItemComponent::UnlinkItemAnimLayers()
 
 void UHeldItemComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	Super::EndPlay(EndPlayReason);
 
 	if (CurrentHeldItem)
 	{
 		CurrentHeldItem->Destroy();
 		CurrentHeldItem = nullptr;
 	}
+	Super::EndPlay(EndPlayReason);
 }
