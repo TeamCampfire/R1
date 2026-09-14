@@ -714,6 +714,7 @@ void AActionCharacter::Server_ProcessAttackTarget_Implementation(AActor* TargetA
 				}
 			}
 		}
+		return;
 	}
 
 	// 4.건축물을 공격한 경우
@@ -721,6 +722,7 @@ void AActionCharacter::Server_ProcessAttackTarget_Implementation(AActor* TargetA
 	{
 		// 건물에 데미지를 준다.
 		Server_ApplyBuildingDamage(BuildingActor, HeldItemComponent->GetCurrentHeldItem()->GetItemData()->Damage);
+		return;
 	}
 
 	// 5.Placeable 아이템을 공격한 경우
@@ -728,6 +730,7 @@ void AActionCharacter::Server_ProcessAttackTarget_Implementation(AActor* TargetA
 	{
 		// 개별 Placeable에 데미지를 준다
 		Server_ApplyPlaceableDamage(PlaceableActor, HeldItemComponent->GetCurrentHeldItem()->GetItemData()->Damage);
+		return;
 	}
 }
 

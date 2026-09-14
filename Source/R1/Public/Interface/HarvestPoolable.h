@@ -4,6 +4,8 @@
 #include "UObject/Interface.h"
 #include "HarvestPoolable.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHarvestableDepleted, AActor*, DepletedActor);
+
 /**
  * Optional lifecycle hooks for actors managed by AHarvestSpawner.
  *

@@ -1,10 +1,11 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Interface/Harvestable.h"
+#include "Interface/HarvestPoolable.h"
 #include "HarvestableComponent.generated.h"
 
 /*-----------------------------------------
@@ -18,12 +19,9 @@ class USoundBase;
 class AItemPickup;
 class FLifetimeProperty;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHarvestableDepleted, AActor*, DepletedActor);
-
 UENUM()
 enum class EHarvestType
 {
-
 	Tree,
 	Stone,
 	Barrel,

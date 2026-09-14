@@ -1,9 +1,10 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Item/ItemPickup.h"
 #include "Data/Item/ItemDataBase.h"
 #include "Component/InventoryComponent.h"
+#include "Subsystem/ItemPickupPoolSubsystem.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SphereComponent.h"
 #include "GameFramework/Pawn.h"
@@ -92,6 +93,7 @@ void AItemPickup::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 
 	DOREPLIFETIME(AItemPickup, ItemData);
 	DOREPLIFETIME(AItemPickup, Count);
+	DOREPLIFETIME(AItemPickup, bIsPoolActive);
 }
 
 void AItemPickup::OnRep_ItemData()
@@ -117,12 +119,23 @@ void AItemPickup::BeginPlay()
 	
 }
 
+void AItemPickup::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (bIsFromDropPool && EndPlayReason != EEndPlayReason::Quit && EndPlayReason != EEndPlayReason::EndPlayInEditor)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ItemPickup] Pooled pickup %s destroyed unexpectedly! Reason: %d"),
+			*GetName(), (int32)EndPlayReason);
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
 void AItemPickup::OnInteractionSphereBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	// 오버랩은 서버/클라이언트 양쪽에서 각자 독립적으로 발생한다 — 클라이언트에서도 처리해버리면
 	// 권한 없이 TryGrantToInventory(내부에서 Destroy() 호출)가 실행돼 리플리케이션이 꼬인다.
 	// 서버는 어차피 모든 폰을 권한 있게 시뮬레이션하니 이 가드만으로 충분하고, 별도 RPC가 필요 없다.
-	if (!HasAuthority())
+	if (!HasAuthority() || !bIsPoolActive)
 	{
 		return;
 	}
@@ -184,6 +197,21 @@ void AItemPickup::TryGrantToInventory(APawn* Interactor)
 
 	if (Remainder <= 0)
 	{
+		if (OnHarvestableDepleted.IsBound())
+		{
+			OnHarvestableDepleted.Broadcast(this);
+			return;
+		}
+
+		if (bIsFromDropPool)
+		{
+			if (UItemPickupPoolSubsystem* PoolSubsystem = GetWorld() ? GetWorld()->GetSubsystem<UItemPickupPoolSubsystem>() : nullptr)
+			{
+				PoolSubsystem->ReturnPickup(this);
+				return;
+			}
+		}
+
 		Destroy();
 	}
 	else if (Remainder < Count)
@@ -211,7 +239,7 @@ bool AItemPickup::CanInteract_Implementation(APawn* Interactor) const
 	// LookAndPress 아이템만 이 경로로 상호작용한다. AutoOnOverlap은 오버랩에서
 	// 이미 처리되므로 조준+단축키로 또 시도해도 ItemData가 남아있으면 그냥
 	// 같은 로직(TryGrantToInventory)을 한 번 더 태우는 것뿐이라 안전하다.
-	return ItemData != nullptr;
+	return ItemData != nullptr && bIsPoolActive;
 }
 
 void AItemPickup::Interact_Implementation(APawn* Interactor)
@@ -228,5 +256,46 @@ void AItemPickup::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 	RefreshVisual();
+}
+
+void AItemPickup::SetPoolActive(bool bActive)
+{
+	if (!HasAuthority()) return;
+
+	bIsPoolActive = bActive;
+	Multicast_SetPoolActive(bActive);
+	ForceNetUpdate();
+}
+
+void AItemPickup::Multicast_SetPoolActive_Implementation(bool bActive)
+{
+	bIsPoolActive = bActive;
+	OnRep_PoolActive();
+}
+
+void AItemPickup::OnRep_PoolActive()
+{
+	SetActorHiddenInGame(!bIsPoolActive);
+	SetActorEnableCollision(bIsPoolActive);
+	SetActorTickEnabled(bIsPoolActive);
+
+	if (Mesh)
+	{
+		Mesh->SetSimulatePhysics(bIsPoolActive);
+		if (!bIsPoolActive)
+		{
+			Mesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
+			Mesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
+		}
+	}
+}
+
+void AItemPickup::OnTakenFromHarvestPool_Implementation()
+{
+	RefreshVisual();
+}
+
+void AItemPickup::OnReturnedToHarvestPool_Implementation()
+{
 }
 

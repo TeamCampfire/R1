@@ -1,10 +1,11 @@
-﻿#include "Component/HarvestableComponent.h"
+#include "Component/HarvestableComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Kismet/GameplayStatics.h"
 #include "Character/ActionCharacter.h"
 #include "Components/DecalComponent.h"
 #include "Data/Item/ItemDataBase.h"
 #include "Item/ItemPickup.h"
+#include "Subsystem/ItemPickupPoolSubsystem.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Component/HeldItemComponent.h"
 #include "Data/Item/HeldItemData.h"
@@ -36,6 +37,14 @@ void UHarvestableComponent::BeginPlay()
 		if (MyOwner->HasAuthority())
 		{
 			MyOwner->SetReplicates(true);
+
+			if (bDropItemsInWorldOnDepleted && ItemPickupClass)
+			{
+				if (UItemPickupPoolSubsystem* PoolSubsystem = GetWorld() ? GetWorld()->GetSubsystem<UItemPickupPoolSubsystem>() : nullptr)
+				{
+					PoolSubsystem->EnsurePoolSize(ItemPickupClass, 20);
+				}
+			}
 		}
 	}
 }
@@ -348,6 +357,8 @@ void UHarvestableComponent::SpawnWorldPickups(const TArray<FHarvestItemResult>& 
 {
 	if (!ItemPickupClass || !GetWorld()) return;
 
+	UItemPickupPoolSubsystem* PoolSubsystem = GetWorld()->GetSubsystem<UItemPickupPoolSubsystem>();
+
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
@@ -362,7 +373,11 @@ void UHarvestableComponent::SpawnWorldPickups(const TArray<FHarvestItemResult>& 
 		);
 		FRotator SpawnRot = FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f);
 
-		if (AItemPickup* Pickup = GetWorld()->SpawnActor<AItemPickup>(ItemPickupClass, SpawnLoc, SpawnRot, SpawnParams))
+		if (PoolSubsystem)
+		{
+			PoolSubsystem->AcquirePickup(ItemPickupClass, SpawnLoc, SpawnRot, Item.ItemData, Item.Count);
+		}
+		else if (AItemPickup* Pickup = GetWorld()->SpawnActor<AItemPickup>(ItemPickupClass, SpawnLoc, SpawnRot, SpawnParams))
 		{
 			Pickup->InitializeFromItem(Item.ItemData, Item.Count);
 		}

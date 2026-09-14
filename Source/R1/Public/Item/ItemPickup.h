@@ -1,4 +1,4 @@
-﻿/// 최초작성 : 2026.08.27
+/// 최초작성 : 2026.08.27
 /// 작 성 자 : 최 요 환
 /// 간단설명 : 레벨에 배치되거나 드랍으로 스폰되는 "월드 픽업" 액터.
 
@@ -9,38 +9,15 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Interface/InteractableInterface.h"
+#include "Interface/HarvestPoolable.h"
 #include "ItemPickup.generated.h"
-
-/**
- * 레벨에 배치되거나 드랍으로 스폰되는 "월드 픽업" 액터.
- *
- * 인벤토리 슬롯에 들어가는 FItemInstance(런타임 상태, ItemInstance.h)와는
- * 다른 층위다. 이 액터는 그저 "월드에 놓인 아이템의 시각적 표현 + 상호작용
- * 트리거" 역할만 하고, 인벤토리 슬롯 인덱스나 장비 여부 같은 상태는 전혀 모른다. 
- * 실제로 주울 때는 이 액터가 들고 있는 ItemData/Count로 새 FItemInstance를 
- * 만들어 인벤토리 배열에 추가하고, 이 액터 자신은 파괴.
- * 반대로 드랍할 때는 인벤토리에서 FItemInstance를 제거하면서 그 자리에
- * AItemPickup을 스폰해 ItemData/Count를 그대로 넘겨준다.
- *
- * 획득 방식은 두 가지를 아이템 정의(UItemDataBase::DefaultPickupMode) 기준으로
- * 분기한다.
- * - LookAndPress: IInteractable을 구현해서, 캐릭터의 UInteractionComponent가
- *   조준 중 감지 → 이름 표시 → 단축키 입력 시 Interact() 호출.
- * - AutoOnOverlap: InteractionSphere 오버랩 즉시 자동 획득 (조준/입력 불필요).
- *   여러 개가 무더기로 흩어지는 광석·제작 재료 등에 적합.
- *
- * IInteractable을 구현해두는 건 AutoOnOverlap 아이템에도 해가 되지 않는다 —
- * 조준하면 이름 정도는 뜨고, 어차피 오버랩으로 먼저 자동 획득되니 실질적으로는
- * 안 쓰일 뿐이다.
- *
- */
 
 class UItemDataBase;
 class USphereComponent;
 class UTexture2D;
 
 UCLASS()
-class R1_API AItemPickup : public AActor, public IInteractableInterface
+class R1_API AItemPickup : public AActor, public IInteractableInterface, public IHarvestPoolable
 {
 	GENERATED_BODY()
 	
@@ -61,6 +38,7 @@ public:
 
 	//~ Begin AActor Interface
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	//~ End AActor Interface
 
 	//~ Begin IInteractable Interface
@@ -69,6 +47,29 @@ public:
 	virtual void Interact_Implementation(APawn* Interactor) override;
 	virtual TSoftObjectPtr<UTexture2D> GetInteractionIcon_Implementation() const override;
 	//~ End IInteractable Interface
+
+	//~ Begin IHarvestPoolable Interface
+	virtual void OnTakenFromHarvestPool_Implementation() override;
+	virtual void OnReturnedToHarvestPool_Implementation() override;
+	//~ End IHarvestPoolable Interface
+
+	/** Applies pooled visibility/collision state on the server and every client. */
+	void SetPoolActive(bool bActive);
+	bool IsPoolActive() const { return bIsPoolActive; }
+
+	void SetIsFromDropPool(bool bFromPool) { bIsFromDropPool = bFromPool; }
+	bool IsFromDropPool() const { return bIsFromDropPool; }
+
+	/** Bound internally by AHarvestSpawner. If unbound, depletion keeps the legacy destroy behavior. */
+	UPROPERTY()
+	FOnHarvestableDepleted OnHarvestableDepleted;
+
+protected:
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_SetPoolActive(bool bActive);
+
+	UFUNCTION()
+	void OnRep_PoolActive();
 
 protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
@@ -128,6 +129,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USphereComponent> InteractionSphere;
 
+private:
+	UPROPERTY(ReplicatedUsing = OnRep_PoolActive)
+	bool bIsPoolActive = true;
 
-
+	bool bIsFromDropPool = false;
 };

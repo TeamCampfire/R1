@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Component/InventoryComponent.h"
@@ -6,6 +6,7 @@
 #include "Data/Item/EquipmentItemData.h"
 #include "Data/Item/HeldItemData.h"
 #include "Item/ItemPickup.h"
+#include "Subsystem/ItemPickupPoolSubsystem.h"
 #include "GameFramework/Character.h"
 #include "Component/HeldItemComponent.h"
 #include "Component/StatComponent.h"
@@ -560,12 +561,24 @@ bool UInventoryComponent::DropItem(FInventorySlotRef Slot, int32 Count, const FT
 	const FItemInstance Instance = Array[Slot.Index];
 	const int32 DropCount = (Count > 0) ? FMath::Min(Count, Instance.StackCount) : Instance.StackCount;
 
-	AItemPickup* Pickup = World->SpawnActor<AItemPickup>(AItemPickup::StaticClass(), DropTransform);
+	AItemPickup* Pickup = nullptr;
+	if (UItemPickupPoolSubsystem* PoolSubsystem = World->GetSubsystem<UItemPickupPoolSubsystem>())
+	{
+		Pickup = PoolSubsystem->AcquirePickup(nullptr, DropTransform.GetLocation(), DropTransform.Rotator(), Instance.ItemData, DropCount);
+	}
+	else
+	{
+		Pickup = World->SpawnActor<AItemPickup>(AItemPickup::StaticClass(), DropTransform);
+		if (Pickup)
+		{
+			Pickup->InitializeFromItem(Instance.ItemData, DropCount);
+		}
+	}
+
 	if (!Pickup)
 	{
 		return false;
 	}
-	Pickup->InitializeFromItem(Instance.ItemData, DropCount);
 
 	if (!ThrowImpulse.IsNearlyZero())
 	{

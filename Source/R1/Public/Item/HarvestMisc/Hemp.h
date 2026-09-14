@@ -1,15 +1,18 @@
-﻿
+
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Interface/InteractableInterface.h"
+#include "Interface/HarvestPoolable.h"
 #include "Data/Item/ItemDataBase.h"
 #include "Hemp.generated.h"
 
+class FLifetimeProperty;
+
 UCLASS()
-class R1_API AHemp : public AActor, public IInteractableInterface
+class R1_API AHemp : public AActor, public IInteractableInterface, public IHarvestPoolable
 {
 	GENERATED_BODY()
 	
@@ -23,6 +26,28 @@ public:
 	virtual void Interact_Implementation(APawn* Interactor) override;
 	virtual TSoftObjectPtr<UTexture2D> GetInteractionIcon_Implementation() const override;
 	//~ End IInteractableInterface
+
+	//~ Begin IHarvestPoolable Interface
+	virtual void OnTakenFromHarvestPool_Implementation() override;
+	virtual void OnReturnedToHarvestPool_Implementation() override;
+	//~ End IHarvestPoolable Interface
+
+	/** Applies pooled visibility/collision state on the server and every client. */
+	void SetPoolActive(bool bActive);
+	bool IsPoolActive() const { return bIsPoolActive; }
+
+	/** Bound internally by AHarvestSpawner. If unbound, depletion keeps the legacy destroy behavior. */
+	UPROPERTY()
+	FOnHarvestableDepleted OnHarvestableDepleted;
+
+protected:
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_SetPoolActive(bool bActive);
+
+	UFUNCTION()
+	void OnRep_PoolActive();
 
 protected:
 	// Called when the game starts or when spawned
@@ -50,4 +75,7 @@ protected:
 
 private:
 	bool bHarvested = false;
+
+	UPROPERTY(ReplicatedUsing = OnRep_PoolActive)
+	bool bIsPoolActive = true;
 };

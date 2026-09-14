@@ -1,9 +1,10 @@
-﻿
+
 
 
 #include "Item/HarvestMisc/Hemp.h"
 #include "Component/InventoryComponent.h"
 #include "Character/ActionCharacter.h"
+#include "Net/UnrealNetwork.h"
 
 // Sets default values
 AHemp::AHemp()
@@ -18,6 +19,13 @@ AHemp::AHemp()
 	MeshComponent->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 }
 
+void AHemp::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AHemp, bIsPoolActive);
+}
+
 FText AHemp::GetInteractionDisplayName_Implementation() const
 {
 	return DisplayName;
@@ -25,12 +33,12 @@ FText AHemp::GetInteractionDisplayName_Implementation() const
 
 bool AHemp::CanInteract_Implementation(APawn* Interactor) const
 {
-	return YieldItemData != nullptr; 
+	return YieldItemData != nullptr && !bHarvested && bIsPoolActive; 
 }
 
 void AHemp::Interact_Implementation(APawn* Interactor)
 {
-	if (!HasAuthority() || bHarvested || !Interactor || !YieldItemData) return;
+	if (!HasAuthority() || bHarvested || !bIsPoolActive || !Interactor || !YieldItemData) return;
 	// 여기까지 들어왔으면 채집완료 표시
 	bHarvested = true;
 
@@ -45,12 +53,56 @@ void AHemp::Interact_Implementation(APawn* Interactor)
 		}
 	}
 
+	if (OnHarvestableDepleted.IsBound())
+	{
+		UE_LOG(LogTemp, Log, TEXT("[AHemp] %s harvested -> Returned to HarvestSpawner pool"), *GetName());
+		OnHarvestableDepleted.Broadcast(this);
+		return;
+	}
+
 	Destroy();
 }
 
 TSoftObjectPtr<UTexture2D> AHemp::GetInteractionIcon_Implementation() const
 {
 	return InteractionIcon; 
+}
+
+void AHemp::SetPoolActive(bool bActive)
+{
+	if (!HasAuthority()) return;
+
+	if (bActive)
+	{
+		bHarvested = false;
+	}
+
+	bIsPoolActive = bActive;
+	Multicast_SetPoolActive(bActive);
+	ForceNetUpdate();
+}
+
+void AHemp::Multicast_SetPoolActive_Implementation(bool bActive)
+{
+	bIsPoolActive = bActive;
+	OnRep_PoolActive();
+}
+
+void AHemp::OnRep_PoolActive()
+{
+	SetActorHiddenInGame(!bIsPoolActive);
+	SetActorEnableCollision(bIsPoolActive);
+	SetActorTickEnabled(bIsPoolActive);
+}
+
+void AHemp::OnTakenFromHarvestPool_Implementation()
+{
+	bHarvested = false;
+}
+
+void AHemp::OnReturnedToHarvestPool_Implementation()
+{
+	bHarvested = true;
 }
 
 // Called when the game starts or when spawned
@@ -66,4 +118,5 @@ void AHemp::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 }
+
 

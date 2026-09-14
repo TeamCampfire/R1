@@ -1,4 +1,4 @@
-﻿
+
 
 #pragma once
 
@@ -29,6 +29,7 @@ private:
 	bool FindSpawnTransform(FTransform& OutTransform) const;
 	void ActivatePooledActor(TWeakObjectPtr<AActor> PooledActor);
 	void SchedulePoolActivation(AActor* PooledActor, float InDelay);
+	void SetActorPoolActive(AActor* Actor, bool bActive);
 
 	UFUNCTION()
 	void OnActorDepleted(AActor* DepletedActor);

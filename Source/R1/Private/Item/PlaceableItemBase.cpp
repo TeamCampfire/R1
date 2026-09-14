@@ -1,4 +1,4 @@
-﻿// 작업 시작일 : 9/6
+// 작업 시작일 : 9/6
 // 작업자 : 우진
 
 #include "Item/PlaceableItemBase.h"
@@ -113,6 +113,15 @@ bool APlaceableItemBase::ApplyPlaceableDamage(float DamageAmount)
 
 	// 내구도가 남아 있다면 피해 처리만 마치고 건물은 유지
 	if (CurrentDurability > 0.f) return true;
+
+	// 채집 컴포넌트(배럴 등)가 부착된 액터는 스포너 풀링으로 관리되므로 직접 Destroy하지 않는다.
+	if (UHarvestableComponent* HarvestComp = FindComponentByClass<UHarvestableComponent>())
+	{
+		UE_LOG(LogTemp, Log, TEXT("[APlaceableItemBase::ApplyPlaceableDamage] 채집 컴포넌트가 부착된 액터이므로 Destroy 대신 OnHarvestEnd를 호출합니다."));
+		HarvestComp->OnHarvestEnd();
+		return true;
+	}
+
 	UE_LOG(LogTemp, Log, TEXT("[APlaceableItemBase::ApplyPlaceableDamage] 내구도가 0이 되어 건물 전체를 파괴합니다."));
 
 	// 내구도가 없으면 걍 부숴버렷
